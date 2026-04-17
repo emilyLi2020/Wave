@@ -8,28 +8,28 @@ The product is a **Next.js web application** that runs in any modern browser. An
 
 ## Repo Layout
 
-- `clients/` — Next.js 16 (App Router) + TypeScript + Tailwind v4 web app. This is the one and only product surface. `pnpm dev` runs here. Includes `app/` routes, Route Handlers under `app/api/`, typed domain models under `types/`, and (soon) prompt templates under `lib/prompts/`.
+- `client/` — Next.js 16 (App Router) + TypeScript + Tailwind v4 web app. This is the one and only product surface. `pnpm dev` runs here. Includes `app/` routes, Route Handlers under `app/api/`, typed domain models under `types/`, and (soon) prompt templates under `lib/prompts/`.
 - `.agents/skills/`, `.claude/skills/` — Cursor / Claude Code agent skills (`domain-to-spec`, `scaffold-frontend`, `scaffold-backend`, `v0-prompt-crafter`, `demo-prep`, etc.). Do not edit these during feature work.
 - `AGENTS.md` — This file. Shared instructions for every AI agent working in the repo.
 - `PRD.md` — Product Requirements Document. The source of truth for what to build, the medication-aware prompt logic, and the tech stack.
 - `README.md` — Human-facing quickstart.
 
-There is intentionally no `web/`, `frontend/`, `backend/`, `mobile/`, or `supabase/` folder at the repo root. If you see references to those in older code or docs, they are stale — the app lives in `clients/`.
+There is intentionally no `web/`, `frontend/`, `backend/`, `mobile/`, or `supabase/` folder at the repo root. If you see references to those in older code or docs, they are stale — the app lives in `client/`.
 
 ## Setup Commands
 
-### Web app (`clients/`)
+### Web app (`client/`)
 
-- Install: `cd clients && pnpm install`
-- Dev: `cd clients && pnpm dev` (http://localhost:3000)
-- Build: `cd clients && pnpm build`
-- Lint: `cd clients && pnpm lint`
-- Typecheck: `cd clients && pnpm exec tsc --noEmit`
-- Env: copy `clients/.env.example` to `clients/.env.local`. Required keys depend on which narration provider is selected — see `PRD.md > Tech Stack`. At minimum, set `NARRATION_PROVIDER` (`webllm | ollama | llamacpp | claude-fallback`). Only set `ANTHROPIC_API_KEY` if you are explicitly testing the scripted-fallback path, and only set `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` if you are working on the opt-in cross-device sync feature.
+- Install: `cd client && pnpm install`
+- Dev: `cd client && pnpm dev` (http://localhost:3000)
+- Build: `cd client && pnpm build`
+- Lint: `cd client && pnpm lint`
+- Typecheck: `cd client && pnpm exec tsc --noEmit`
+- Env: copy `client/.env.example` to `client/.env.local`. Required keys depend on which narration provider is selected — see `PRD.md > Tech Stack`. At minimum, set `NARRATION_PROVIDER` (`webllm | ollama | llamacpp | claude-fallback`). Only set `ANTHROPIC_API_KEY` if you are explicitly testing the scripted-fallback path, and only set `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` if you are working on the opt-in cross-device sync feature.
 
 ### PWA layer (optional, added when a feature needs it)
 
-- Service Worker and Web App Manifest live under `clients/app/` and `clients/public/`.
+- Service Worker and Web App Manifest live under `client/app/` and `client/public/`.
 - Web Push requires HTTPS (Vercel deploys satisfy this; locally use `next dev --experimental-https` or `ngrok`).
 - Feature-detect everything. iOS Safari restricts Web Push to installed PWAs; always have an in-page fallback.
 
@@ -54,19 +54,19 @@ There is intentionally no `web/`, `frontend/`, `backend/`, `mobile/`, or `supaba
 
 ## Code Style
 
-- TypeScript strict mode across `clients/`. No `any` without a justification comment.
+- TypeScript strict mode across `client/`. No `any` without a justification comment.
 - Functional React components with hooks. No class components.
 - Server components by default in the App Router; add `"use client"` only for interactivity (intake forms, wave animation, intensity slider, body-scan tap targets, PWA install prompt, notification permission flow).
 - kebab-case for filenames, PascalCase for components, camelCase for functions and variables.
 - Validate all user input with Zod at every API boundary (client submit + Route Handler re-validation).
-- **Clinical copy lives in data, not in components.** Medication-aware prompts (`PRD.md > Medication-Aware Prompt Logic`) must be stored as structured prompt templates in `clients/lib/prompts/` so a clinician can review them without reading React code.
+- **Clinical copy lives in data, not in components.** Medication-aware prompts (`PRD.md > Medication-Aware Prompt Logic`) must be stored as structured prompt templates in `client/lib/prompts/` so a clinician can review them without reading React code.
 - No single-letter variable names. No unexplained abbreviations.
-- Every craving-rating, medication-status, and trigger field must be typed with a narrow union (from `clients/types/models.ts`), not `string`.
+- Every craving-rating, medication-status, and trigger field must be typed with a narrow union (from `client/types/models.ts`), not `string`.
 - Feature-detect every browser capability before using it: `"serviceWorker" in navigator`, `"PushManager" in window`, `"gpu" in navigator`, etc. Never let a missing API break the session path.
 
 ## Testing Instructions
 
-- Lint and type-check before committing: `cd clients && pnpm lint && pnpm exec tsc --noEmit`.
+- Lint and type-check before committing: `cd client && pnpm lint && pnpm exec tsc --noEmit`.
 - Add a manual test path to every PR that touches the session flow. Example format:
   1. Go to `/session`
   2. Tap 7/10, "took on time", "stress"
@@ -83,7 +83,7 @@ There is intentionally no `web/`, `frontend/`, `backend/`, `mobile/`, or `supaba
 ## Security Considerations
 
 - **Never store or log raw medication photos.** Process them client-side in-memory via a WebGPU / WASM vision model (or `<canvas>` OCR) and discard. Do not upload them to any endpoint.
-- Never hardcode API keys. Any key (e.g. `ANTHROPIC_API_KEY` for the fallback, `SUPABASE_SECRET_KEY` for opt-in sync) lives only in `clients/.env.local`. `.env.local` is in `.gitignore`.
+- Never hardcode API keys. Any key (e.g. `ANTHROPIC_API_KEY` for the fallback, `SUPABASE_SECRET_KEY` for opt-in sync) lives only in `client/.env.local`. `.env.local` is in `.gitignore`.
 - Craving logs, medication logs, and journal entries are **protected-health-information-adjacent**. Treat them as PHI-like even though the app is not a covered entity: no third-party analytics, no error-tracking payloads containing user text, no shipping logs off-device without explicit opt-in.
 - If and when cross-device sync lands, Supabase tables must enable Row Level Security and scope every row to the authenticated user. Default state of sync is **disabled**.
 - Ask the user before destructive database operations, large refactors of the session flow, or adding any new network request to the session experience. **The session path must stay zero-network after initial page load; keep the session network surface minimal.**

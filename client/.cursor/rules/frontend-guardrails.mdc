@@ -1,16 +1,16 @@
 ---
-description: WAVE frontend guardrails — applies to every file under clients/
+description: WAVE frontend guardrails — applies to every file under client/
 alwaysApply: true
 ---
 
-# WAVE frontend guardrails (scope: `clients/`)
+# WAVE frontend guardrails (scope: `client/`)
 
-These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every file inside `clients/`. Read those two documents before adding pages, prompts, or components.
+These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every file inside `client/`. Read those two documents before adding pages, prompts, or components.
 
 ## Architecture
 
 - Server components by default. Only add `"use client"` when interactivity is required (forms, sliders, buttons with local state, Lottie, body-scan tap targets).
-- Route per PRD row. Every page in `PRD.md > Pages / Screens` maps to one route under `clients/app/`. Do not invent pages that are not in the PRD.
+- Route per PRD row. Every page in `PRD.md > Pages / Screens` maps to one route under `client/app/`. Do not invent pages that are not in the PRD.
 - TypeScript strict mode. No `any` without a justification comment. Prefer narrow string-literal unions (e.g. `MedicationStatus`) over `string`.
 - Keep components under 200 lines. Split larger files into colocated pieces.
 - Filenames use kebab-case; React components use PascalCase.
@@ -25,12 +25,12 @@ These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every 
 ## Forms and validation
 
 - Validate every form input with Zod at the submit boundary. Infer the form type from the schema (`z.infer<typeof schema>`).
-- Use typed union fields (`MedicationStatus`, `TriggerCategory`, `SessionOutcome`, `MatType`) from `clients/types/models.ts`. Do not accept free-text where a union is defined.
+- Use typed union fields (`MedicationStatus`, `TriggerCategory`, `SessionOutcome`, `MatType`) from `client/types/models.ts`. Do not accept free-text where a union is defined.
 - Never trust client input on any future Route Handler. Re-validate with Zod on the server side.
 
 ## Clinical copy
 
-- All medication-aware prompts and session narration live under `clients/lib/prompts/` as typed, reviewable data — never inline strings inside components. This lets a clinician review a prompt PR without reading React.
+- All medication-aware prompts and session narration live under `client/lib/prompts/` as typed, reviewable data — never inline strings inside components. This lets a clinician review a prompt PR without reading React.
 - Any change to medication prompts must cite an MBRP, SAMHSA, or FDA source in the PR description.
 - Tone is trauma-informed, non-judgmental, and grounded. Never use toxic-positivity copy. Never imply the patient has failed. Normalize missed doses and redirect.
 - WAVE is not a prescriber. "Take your medication if available" is acceptable. "Increase your dose" is not.
@@ -38,7 +38,7 @@ These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every 
 
 ## Privacy
 
-- No third-party analytics, error tracking, or ad scripts anywhere in `clients/`.
+- No third-party analytics, error tracking, or ad scripts anywhere in `client/`.
 - Do not send craving, medication, or journal content to an endpoint unless it is explicitly the user's export action or the user has opted into cross-device sync.
 - Medication photos (when added) must be processed client-side (WebGPU / WASM / `<canvas>`). Do not upload them.
 - The session route must make as few network calls as possible. After initial page load, the session path should hit zero network. Every narration call must have a scripted local fallback so the session works offline.

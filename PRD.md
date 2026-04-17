@@ -81,7 +81,7 @@ All entities are stored **locally in the patient's browser** by default (Indexed
 
 ## Backend Needed?
 
-**No dedicated backend service.** The app is a Next.js (App Router) project in `clients/`. All server work lives inside `clients/app/api/` as Route Handlers and is intentionally thin:
+**No dedicated backend service.** The app is a Next.js (App Router) project in `client/`. All server work lives inside `client/app/api/` as Route Handlers and is intentionally thin:
 
 - `POST /api/session/narrate` — accepts intake payload, returns medication-aware narration. Routes to whichever Gemma 4 runtime is configured (`NARRATION_PROVIDER=ollama | llamacpp | webllm | claude-fallback`). In the browser-first path (`webllm`), this handler is bypassed entirely and the model runs client-side.
 - `POST /api/sync/sessions` — **opt-in only**. Pushes session rows into Supabase when the patient has explicitly enabled cross-device sync. Default is "never call this."
@@ -121,7 +121,7 @@ Do **not** run the `scaffold-backend` skill. There is no Python / FastAPI servic
 
 ## Medication-Aware Prompt Logic
 
-This is the clinical core of WAVE and the source of truth for every prompt in `clients/lib/prompts/`. Any change requires a citation to MBRP, SAMHSA, or an FDA label.
+This is the clinical core of WAVE and the source of truth for every prompt in `client/lib/prompts/`. Any change requires a citation to MBRP, SAMHSA, or an FDA label.
 
 | Medication | Status | Example acknowledgment framing |
 |---|---|---|
@@ -166,7 +166,7 @@ This is the clinical core of WAVE and the source of truth for every prompt in `c
 
 ## Risk Areas
 
-1. **Clinical copy regression** — a well-meaning code change to prompt assembly accidentally strips a medication-specific clause, and a patient on Naltrexone hears generic Suboxone copy. Mitigation: prompt templates live in `clients/lib/prompts/` as typed, testable data; every prompt PR has a clinical citation.
+1. **Clinical copy regression** — a well-meaning code change to prompt assembly accidentally strips a medication-specific clause, and a patient on Naltrexone hears generic Suboxone copy. Mitigation: prompt templates live in `client/lib/prompts/` as typed, testable data; every prompt PR has a clinical citation.
 2. **Notification fatigue** — too many prophylactic alerts turn into noise the patient mutes. Mitigation: cap at one prophylactic + one medication alert per day by default, and let the pattern model down-weight windows the patient ignores repeatedly.
 3. **Offline-capable promise breaks under demo pressure** — a session accidentally hard-requires a network call and dies when the conference Wi-Fi drops. Mitigation: scripted local-fallback narration path covering all four medication statuses, precached by the Service Worker, exercised in every PR's manual test with DevTools set to "Offline."
 4. **Browser capability gaps** — iOS Safari historically lags on Web Push and some Service Worker features. Mitigation: feature-detect and fall back to in-page reminders; never let a missing API break the session.
