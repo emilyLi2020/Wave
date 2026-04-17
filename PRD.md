@@ -17,15 +17,17 @@ INPUT:   Patient opens WAVE (via proactive notification, lock-screen
          late / missed / N/A), trigger category (social / stress /
          physical / unknown).
 
-PROCESS: Gemma 4 E2B-it generates a medication-aware session end-to-
-         end — on-device via LiteRT on mobile, and in the browser via
-         transformers.js + WebGPU in the hackathon web demo. The same
-         model produces a 1-2 min medication acknowledgment tuned to
-         what the patient took or missed, a body-scan that locates the
-         craving physically, a 5-8 min wave animation with adaptive
-         narration through rise / peak / fall phases, and a reflection
-         that shows the patient their own longitudinal craving-vs-
-         medication data. No cloud LLM is ever called.
+PROCESS: One Gemma 4 E2B-it base + a stack of small LoRA adapters
+         (one per clinical situation) generate the session end-to-end
+         on-device — LiteRT on mobile, transformers.js + WebGPU in the
+         web demo. An Adapter Manager swaps the right LoRA in per
+         phase: `lora-med-ack` for the 1-2 min medication
+         acknowledgment, `lora-body-scan` for the body scan,
+         `lora-wave-rise` / `-peak` / `-fall` across the 5-8 min wave,
+         `lora-reflection` for the closing insight. Crisis triage runs
+         on base Gemma with no LoRA; routing to 988 / SAMHSA is
+         rule-based. No cloud LLM is ever called. Full architecture:
+         `docs/gemma-4-integration.md`.
 
 OUTPUT:  Patient rates ending intensity on the slider, sees a one-screen
          insight ("You surfed a 7 down to 2. On medication days you drop
@@ -140,11 +142,12 @@ This is the clinical core of WAVE and the source of truth for every prompt in `w
 ## Out of Scope (Save for Later)
 
 - Native iOS / Android React Native builds (the hackathon ships the web demo).
-- LiteRT port of the in-browser Gemma 4 integration (the web demo already runs Gemma 4 E2B end-to-end via transformers.js + WebGPU; the mobile swap is post-hackathon).
-- Gemma 4 fine-tuning / LoRA adapter (MVP ships base Gemma 4 E2B-it).
+- LiteRT port of the in-browser Gemma 4 + LoRA stack (the web demo runs base + adapters via transformers.js + WebGPU; the mobile swap reuses the same Adapter Manager contract post-hackathon).
+- **Stretch LoRAs** (`lora-notification`, `lora-insights`) — MVP ships LoRAs 1–6 (medication ack, body scan, three wave phases, reflection) per `docs/gemma-4-integration.md > §4`. Notification and insights LoRAs train through the same Synthetix pipeline when time allows.
+- Per-user / on-device-trained LoRA personalization.
 - Apple Watch / Wear OS complications.
 - Siri / Google Assistant shortcuts.
-- Multimodal medication photo recognition (Gemma 4 E2B vision on-device).
+- Multimodal medication photo recognition (Gemma 4 E2B vision on-device) with its own LoRA.
 - Clinician-facing portal for cohort-level insights.
 - Multi-language support (English only at MVP).
 - Integration with EHR systems (Epic, Cerner) via FHIR.
@@ -152,7 +155,7 @@ This is the clinical core of WAVE and the source of truth for every prompt in `w
 
 ## Risk Areas
 
-1. **Clinical copy regression** — a well-meaning code change to prompt assembly accidentally strips a medication-specific clause, and a patient on Naltrexone hears generic Suboxone copy. Mitigation: prompt templates live in `clients/lib/prompts/` as typed, testable data; every prompt PR has a clinical citation.
+1. **Clinical copy regression** — a well-meaning code change to prompt assembly or a LoRA update accidentally strips a medication-specific clause, and a patient on Naltrexone hears generic Suboxone copy. Mitigation: prompt templates live in `clients/lib/prompts/` as typed, testable data; every LoRA has its own Synthetix dataset, rubric, clinician-reviewed batches, and eval (`docs/gemma-4-integration.md > §6.5`) that must pass before it ships; every prompt-or-adapter PR has a clinical citation and a manifest bump.
 2. **Notification fatigue** — too many prophylactic alerts turn into noise the patient mutes. Mitigation: cap at one prophylactic + one medication alert per day by default, and let the pattern model down-weight windows the patient ignores repeatedly.
 3. **WebGPU unavailable at demo time** — the web demo relies on in-browser Gemma 4 via WebGPU; Safari and older machines may not support it. Mitigation: the landing page detects WebGPU on load, pre-warms the model download, and falls through to the scripted local narration bank if the runtime is unavailable or a model output fails Zod validation twice. The scripted bank covers every `(matType, medicationStatus, phase)` cell and is exercised in every PR's manual test.
 4. **First-load model size** — the Gemma 4 E2B INT4 shards are ~1.5 GB on first visit. Mitigation: stream during a visible "Loading WAVE's on-device model" screen on the landing page, cache in IndexedDB via transformers.js, and document the one-time cost for judges.
