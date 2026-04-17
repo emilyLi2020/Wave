@@ -365,152 +365,128 @@ Matches `AGENTS.md > Domain Constraints > Crisis handoff`.
 
 ## 6. Synthetix — the per-LoRA synthetic-data pipeline
 
-Each LoRA needs its own training set that densely covers the clinical
-situations it is responsible for. Synthetix is the pipeline that builds those
-sets from a **stack array** of conditions.
+One round of fine-tuning per LoRA. One loop to build the dataset. No batched
+review, no held-out splits, no A/B rubric scoring. The loop is four steps:
 
-### 6.1 Stack array (the conditioning grid)
+1. **Seed with a small human-written set.**
+2. **Expand with a Gemma model** into `N` synthetic examples.
+3. **Spot-check those synthetics in a small UI.** Leave feedback on anything
+   wrong.
+4. **Regenerate** using that feedback. Repeat (3)-(4) until a spot-check
+   passes with **no errors**. Then fine-tune, once.
 
-A stack array is the Cartesian product of the axes relevant to a given LoRA.
-For example, `lora-med-ack`'s stack is:
+### 6.1 Step 1 — human seed set
 
-```ts
-stack = {
-  matType:          ["buprenorphine", "naltrexone", "methadone", "vivitrol", "none"],
-  medicationStatus: ["on_time", "late", "missed", "none"],
-  trigger:          ["social", "stress", "physical", "unknown", "other"],
-  intensityBucket:  ["low_3-4", "mid_5-7", "high_8-10"],
-  timeOfDay:        ["morning", "midday", "evening", "late_night"],
-}
-```
+For each LoRA, a clinician (or a domain-informed developer) writes a small
+set of hand-crafted (structured input → JSON output) examples matching the
+Zod contract in §5. Seed sizes are small on purpose:
 
-5 × 4 × 5 × 3 × 4 = **1 200 cells**. Synthetix generates **3 examples per
-cell** → ~3 600 synthetic training examples. Each example is one
-(structured input → JSON output) pair matching the Zod contract in §5.1.
+| LoRA                 | Human seed examples |
+|----------------------|---------------------|
+| `lora-med-ack`       | 40                  |
+| `lora-body-scan`     | 20                  |
+| `lora-wave-rise`     | 20                  |
+| `lora-wave-peak`     | 25                  |
+| `lora-wave-fall`     | 20                  |
+| `lora-reflection`    | 25                  |
+| `lora-notification`  | 15 *(stretch)*      |
+| `lora-insights`      | 20 *(stretch)*      |
 
-Per-LoRA stack arrays (full spec lives in `clients/synthetix/stacks/`):
+Seeds live as typed TypeScript data under `clients/synthetix/seeds/<lora-id>.ts`
+so they are reviewable in code review.
 
-| LoRA | Stack axes | Cells | Examples/cell | Train set target |
-|---|---|---|---|---|
-| `lora-med-ack` | matType × status × trigger × intensity × timeOfDay | 1200 | 3 | ~3 600 |
-| `lora-body-scan` | bodyLocation × matType × status × intensity | 6 × 5 × 4 × 3 = 360 | 4 | ~1 440 |
-| `lora-wave-rise` | matType × status × trigger × intensityTrend | 5 × 4 × 5 × 3 = 300 | 4 | ~1 200 |
-| `lora-wave-peak` | matType × status × trigger × intensityTrend | 300 | 5 | ~1 500 |
-| `lora-wave-fall` | matType × status × trigger × intensityTrend | 300 | 4 | ~1 200 |
-| `lora-reflection` | matType × status × drop-delta-bucket × sessionsCount-bucket | 5 × 4 × 4 × 3 = 240 | 5 | ~1 200 |
-| `lora-notification` | predictedWindow-bucket × ignoredCount-bucket × recentDrop-bucket | 4 × 3 × 3 = 36 | 8 | ~288 |
-| `lora-insights` | history-profile × riskWindow-shape × medicationCorrelation | 6 × 5 × 4 = 120 | 5 | ~600 |
+The seed set is **not** a full coverage of the stack array (§5) — it is the
+variety seed that teaches the generator what "good" looks like for that
+LoRA's surface. The generator handles the combinatorial coverage.
 
-Total across all eight LoRAs: **~11 k synthetic examples**. MVP
-(LoRAs 1–6 only): **~10 k**.
+### 6.2 Step 2 — Gemma-generated synthetics
 
-### 6.2 Pipeline
+A Gemma model running on the developer workstation (**Gemma 4 31B-it** if
+available, otherwise **26B-A4B-it**; falls back to E4B-it on smaller dev
+machines) expands the seed set into `N` synthetic examples per LoRA.
 
-```
-  ┌─────────────────────────┐
-  │ Seed corpus (reviewed)  │  MBRP facilitator guide excerpts, SAMHSA TIP 63,
-  │  ~200 hand-written lines│  FDA labels (Suboxone, Naltrexone, Vivitrol,
-  │  per LoRA               │  Methadone), MI transcripts.
-  └───────────┬─────────────┘
-              ▼
-  ┌─────────────────────────┐
-  │ Stack-array expansion   │  For each cell, assemble a structured input
-  │                         │  object.
-  └───────────┬─────────────┘
-              ▼
-  ┌─────────────────────────┐
-  │ Generator: Gemma 4 31B  │  For each cell × N, prompt the generator with
-  │ (or 26B-A4B) in dev     │  the seed corpus + the structured input. Ask
-  │                         │  for JSON output matching the Zod schema.
-  │                         │  Temperature 0.7 for diversity. This model runs
-  │                         │  only on the developer workstation — it is not
-  │                         │  shipped to users.
-  └───────────┬─────────────┘
-              ▼
-  ┌─────────────────────────┐
-  │ Automatic rubric filter │  Per-LoRA rubric (§6.3) runs on each generated
-  │ (Gemma 4 31B judge)     │  example. Examples that fail are dropped.
-  └───────────┬─────────────┘
-              ▼
-  ┌─────────────────────────┐
-  │ Clinician review gate   │  Batches of 200 examples sampled per LoRA go
-  │                         │  to a clinician for approval. Accept / reject /
-  │                         │  edit. Only approved batches feed training.
-  └───────────┬─────────────┘
-              ▼
-  ┌─────────────────────────┐
-  │ Train / dev / test      │  80 / 10 / 10 split per LoRA, stratified by
-  │                         │  stack-array cell so every cell shows up in
-  │                         │  test.
-  └───────────┬─────────────┘
-              ▼
-  ┌─────────────────────────┐
-  │ LoRA training (§7.2)    │  Unsloth + TRL + QLoRA. One run per LoRA.
-  └─────────────────────────┘
-```
+| LoRA                 | Synthetic examples (`N`) |
+|----------------------|--------------------------|
+| `lora-med-ack`       | 400                      |
+| `lora-body-scan`     | 200                      |
+| `lora-wave-rise`     | 200                      |
+| `lora-wave-peak`     | 250                      |
+| `lora-wave-fall`     | 200                      |
+| `lora-reflection`    | 250                      |
+| `lora-notification`  | 120 *(stretch)*          |
+| `lora-insights`      | 150 *(stretch)*          |
 
-> **Note on the generator model.** The 31B Gemma **never ships to users**.
-> It is only used offline in the developer's training pipeline to produce
-> synthetic data. The user-facing model is 100 % E2B-it + our LoRAs.
+Total MVP (LoRAs 1–6): **~1 500 synthetic examples** across the stack.
+These are the only examples that go into training — we do not reserve a
+held-out split. The spot-check in §6.3 replaces a held-out eval.
 
-### 6.3 Per-LoRA rubric
+The generator is prompted with: (a) the surface's Zod schema, (b) the human
+seed set, (c) a structured input sampled from the §5 stack axes, (d) the
+tone rules from `AGENTS.md > Domain Constraints` (no toxic positivity, no
+substance naming, no pharmacology directives, crisis-handoff rules), and
+(e) "JSON only, match this schema". Temperature 0.7 for variety.
 
-Each example must pass the base rubric + any LoRA-specific checks:
+> The generator model never ships to users. It runs only in the dev
+> pipeline. The user-facing model is 100 % Gemma 4 E2B-it + our LoRAs.
 
-**Base rubric (every LoRA):**
+### 6.3 Step 3 — spot-check UI with feedback
 
-1. JSON parses against the Zod schema for that surface.
-2. No toxic-positivity lexicon (`"you got this"`, `"stay strong"`, `"don't give up"`).
-3. No substance named in user-facing text.
-4. No pharmacology directive (see the §5.1 allow-list).
-5. Length within the contracted cap.
+A local Next.js page under `clients/app/synthetix-review/` shows the
+clinician a sampled subset of the generated synthetics. One example at a
+time, showing the structured input and the generated JSON output, with three
+controls:
 
-**LoRA-specific additions:**
+- **Looks good.** Marks this example as clean.
+- **Has a problem.** Opens a free-text feedback field. The clinician
+  describes what's wrong ("uses the word 'alcohol'", "says the patient
+  should increase their dose", "tone feels shaming", "encouragement is
+  'celebrating' during the peak phase", etc.).
+- **Skip / unsure.** Next example.
 
-- `lora-med-ack`: `pharmacologyClaim` is consistent with the `matType` cell
-  and cites one of `FDA_LABEL | SAMHSA_TIP63 | MBRP_FACILITATOR | NONE`.
-  Matches the `PRD.md > Medication-Aware Prompt Logic` row for that cell.
-- `lora-wave-peak`: `encouragement` is **never** `"celebrating"`.
-- `lora-wave-fall`: narration may acknowledge the drop; intensity trend is
-  respected.
-- `lora-reflection`: `insightOneLine` contains the numeric ending intensity.
-- `lora-notification`: no substance name; copy references the window rather
-  than prescribing.
+Spot-check sample size is small: **~30 examples per LoRA per round**, drawn
+uniformly across the stack cells that were generated. Spot-check results are
+logged to `clients/synthetix/runs/<lora-id>/<run-id>/spotcheck.json`.
 
-Rejected examples are not silently dropped — they are routed to a
-"near-miss" bucket that the clinician can mine for hand-edits (a high-signal
-source of training data).
+A round **passes clean** when the clinician marks all sampled examples
+"Looks good" — i.e. zero problems flagged in the sampled set.
 
-### 6.4 Clinician-review gate
+If any example is flagged, the round fails and we go to §6.4.
 
-- Batches of 200 examples per LoRA.
-- Clinician operates a lightweight review UI (local Next.js page under
-  `clients/app/synthetix-review/`, auth-gated to the dev team).
-- Accept / Reject / Edit-in-place. Edited examples are promoted as
-  high-weight training rows.
-- A LoRA cannot start training until its **first** review batch is approved.
-- Subsequent batches may be approved asynchronously; training resumes from
-  the last checkpoint as more approved data lands.
+### 6.4 Step 4 — regenerate with feedback
 
-### 6.5 Evaluation harness per LoRA
+When a spot-check round has problems flagged, all feedback strings for that
+round are aggregated and fed back into the generator prompt as an explicit
+"Previous issues to avoid" block. The generator re-runs and produces a new
+batch of `N` examples for the LoRA.
 
-Before a LoRA ships, it must pass:
+Return to §6.3 and spot-check the new batch.
 
-1. **Matrix coverage test.** 100 % of its stack-array cells emit a
-   schema-valid, rubric-passing output on the held-out test set.
-2. **Safety red-team.** 60 adversarial inputs per LoRA (suicidality,
-   overdose, "already used", medication-change requests). Every one either
-   (a) routes through the crisis triage surface correctly, or (b) returns a
-   response that never violates the pharmacology allow-list.
-3. **Latency regression.** p95 under the §5 budget on a reference WebGPU
-   laptop and a mid-tier Android emulator.
-4. **JSON validity.** ≥ 99 % first-try parse rate, 100 % after one retry.
-5. **Delta vs base.** A/B score against base Gemma 4 E2B-it (no LoRA) using
-   a Gemma 4 31B-it judge on the `PRD.md > Medication-Aware Prompt Logic`
-   rubric. The LoRA must beat base by ≥ 20 % on clinical-tone and
-   medication-specificity scores.
+Repeat until a round passes clean — typically 1–3 iterations per LoRA.
 
-A LoRA that regresses on (5) does not ship — it falls back to base + prompt.
+Each round (seed → generate → spot-check → feedback) is stored under
+`clients/synthetix/runs/<lora-id>/<run-id>/` with the generator prompt, the
+generated examples, and the spot-check result, so the full provenance of the
+final dataset is reviewable.
+
+### 6.5 Step 5 — fine-tune, once
+
+Once a LoRA's spot-check passes clean, we run **one** QLoRA training job on
+the last-approved generated dataset (the full ~400 examples for
+`lora-med-ack`, ~200 for `lora-body-scan`, etc.). No subsequent rounds, no
+iterative fine-tuning, no RLHF. The resulting adapter is the shipped
+adapter; it goes into the manifest (§7.3) with the run ID that produced its
+dataset.
+
+Training details live in §8. A LoRA's training run is gated on:
+
+- Spot-check `pass: true` in the latest run file.
+- Clinician initials on the spot-check (same person who approved it).
+- All synthetic examples in the run parse against the Zod schema.
+
+There is no held-out test or delta-vs-base bar. The spot-check is the eval —
+it is small, human, and domain-expert-driven, which is what matters for
+clinical tone. If a shipped LoRA underperforms base at demo time, we revert
+the manifest entry and that surface runs on base + prompt.
 
 ---
 
@@ -601,10 +577,9 @@ type AdapterManifest = {
     sha256: string;                   // content hash for cache invalidation
     url: string;                      // same-origin static asset
     sizeBytes: number;
-    trainedOn: string;                // dataset manifest hash
-    rubricPassRate: number;           // from §6.5
-    deltaVsBase: number;              // from §6.5(5)
-    approvedBy: string;               // clinician initials, matches review log
+    synthetixRunId: string;           // points at clients/synthetix/runs/<lora-id>/<run-id>/
+    spotCheckPassed: true;            // literal true; false never ships
+    approvedBy: string;               // clinician initials on the clean spot-check
   }>;
 };
 ```
@@ -632,26 +607,24 @@ Properties:
 
 ## 8. Training recipe (per LoRA)
 
-Same recipe, one run per LoRA, parameters differ by the §4 table.
+One training run per LoRA. No held-out split. No iterative fine-tune. The
+spot-check in §6.3 is the eval.
 
 - **Framework:** [Unsloth](https://github.com/unslothai/unsloth) + TRL +
-  QLoRA, targeting `google/gemma-4-E2B-it` (base, not instruct; or -it if the
-  phase benefits from its existing tuning — chosen per LoRA via a short
-  ablation).
+  QLoRA, targeting `google/gemma-4-E2B-it`.
 - **Adapter shape:** LoRA on `q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj`.
 - **Rank / alpha / dropout:** rank 8 or 16 per §4; alpha = 2 × rank;
   dropout 0.05.
 - **Optimization:** AdamW, lr = 2e-4 with cosine schedule, warmup 3 %,
-  batch size 16 (gradient accumulation as needed), 2–3 epochs with early
-  stopping on dev-set rubric pass rate.
-- **Compute:** fits comfortably on a single A100 80 GB; each LoRA trains in
-  30–90 minutes on the dataset sizes in §6.1. One person can train all six
-  MVP LoRAs in an afternoon on one GPU.
-- **Checkpoint selection:** the best dev-set rubric pass rate, tiebroken by
-  "delta vs base" (§6.5 item 5).
+  batch size 8 (gradient accumulation as needed), 3 epochs, save the final
+  checkpoint.
+- **Dataset:** the full set of generated examples from the spot-check-clean
+  Synthetix run (§6.2 sizes). No split.
+- **Compute:** fits comfortably on a single A100 40 GB; each LoRA trains in
+  10–30 minutes on the §6.2 dataset sizes.
 
-No RLHF. No multi-stage fine-tune. QLoRA on synthetic data + clinician
-review is the shipped recipe.
+No RLHF. No multi-stage fine-tune. One round of QLoRA on spot-check-clean
+synthetic data is the shipped recipe.
 
 ---
 
@@ -672,14 +645,17 @@ Under `clients/`:
 
 Under `clients/synthetix/` (developer-only, not shipped to users):
 
-- `clients/synthetix/stacks/<lora-id>.ts` — the typed stack array for each
-  LoRA.
-- `clients/synthetix/generate.ts` — the pipeline that drives Gemma 4 31B to
-  emit rubric-checked synthetic examples.
-- `clients/synthetix/rubric/<lora-id>.ts` — the per-LoRA rubric checks.
-- `clients/synthetix/review/` — the local review UI used by clinicians.
-- `clients/synthetix/train/<lora-id>.py` — the Unsloth + TRL training
-  script per LoRA.
+- `clients/synthetix/seeds/<lora-id>.ts` — the small human-written seed set
+  per LoRA (§6.1).
+- `clients/synthetix/stacks/<lora-id>.ts` — the typed stack axes used to
+  sample inputs for the generator.
+- `clients/synthetix/generate.ts` — the Gemma-generator driver (§6.2).
+- `clients/synthetix/runs/<lora-id>/<run-id>/` — one directory per
+  generate → spot-check round. Contains the generator prompt, the generated
+  examples, and the spot-check log.
+- `clients/app/synthetix-review/` — the local spot-check UI (§6.3).
+- `clients/synthetix/train/<lora-id>.py` — the one-shot Unsloth + TRL +
+  QLoRA training script per LoRA (§6.5, §8).
 - `clients/synthetix/export/` — PEFT → ONNX + PEFT → LiteRT converters.
 
 Removed (same as the previous revision):
@@ -710,20 +686,21 @@ Removed (same as the previous revision):
 
 ## 11. Summary matrix
 
-| Surface | Base model | LoRA | Adapter size | p95 latency | Trained on |
+| Surface | Base model | LoRA | Adapter size | p95 latency | Human seeds → Generated |
 |---|---|---|---|---|---|
-| Medication ack | Gemma 4 E2B-it INT4 | `lora-med-ack` | ~40 MB | 2.5 s | Synthetix stack 1 (~3 600 ex) |
-| Body scan | Gemma 4 E2B-it INT4 | `lora-body-scan` | ~25 MB | 1.5 s | Synthetix stack 2 (~1 440 ex) |
-| Wave — rise | Gemma 4 E2B-it INT4 | `lora-wave-rise` | ~25 MB | 1.8 s | Synthetix stack 3 (~1 200 ex) |
-| Wave — peak | Gemma 4 E2B-it INT4 | `lora-wave-peak` | ~30 MB | 1.8 s | Synthetix stack 4 (~1 500 ex) |
-| Wave — fall | Gemma 4 E2B-it INT4 | `lora-wave-fall` | ~25 MB | 1.8 s | Synthetix stack 5 (~1 200 ex) |
-| Reflection | Gemma 4 E2B-it INT4 | `lora-reflection` | ~40 MB | 2.0 s | Synthetix stack 6 (~1 200 ex) |
-| Notification *(stretch)* | Gemma 4 E2B-it INT4 | `lora-notification` | ~20 MB | 1.0 s | Synthetix stack 7 (~288 ex) |
-| Insights *(stretch)* | Gemma 4 E2B-it INT4 | `lora-insights` | ~50 MB | 8 s | Synthetix stack 8 (~600 ex) |
+| Medication ack | Gemma 4 E2B-it INT4 | `lora-med-ack` | ~40 MB | 2.5 s | 40 → 400 |
+| Body scan | Gemma 4 E2B-it INT4 | `lora-body-scan` | ~25 MB | 1.5 s | 20 → 200 |
+| Wave — rise | Gemma 4 E2B-it INT4 | `lora-wave-rise` | ~25 MB | 1.8 s | 20 → 200 |
+| Wave — peak | Gemma 4 E2B-it INT4 | `lora-wave-peak` | ~30 MB | 1.8 s | 25 → 250 |
+| Wave — fall | Gemma 4 E2B-it INT4 | `lora-wave-fall` | ~25 MB | 1.8 s | 20 → 200 |
+| Reflection | Gemma 4 E2B-it INT4 | `lora-reflection` | ~40 MB | 2.0 s | 25 → 250 |
+| Notification *(stretch)* | Gemma 4 E2B-it INT4 | `lora-notification` | ~20 MB | 1.0 s | 15 → 120 |
+| Insights *(stretch)* | Gemma 4 E2B-it INT4 | `lora-insights` | ~50 MB | 8 s | 20 → 150 |
 | **Crisis triage** | Gemma 4 E2B-it INT4 | **none (base only)** | 0 MB | 1.5 s | — |
 
-**One base. Many LoRAs. One Synthetix pipeline. Every byte of behavior on the
-screen is trained by us, on our own synthetic clinical data, on-device.**
+**One base. Many LoRAs. One round of fine-tuning per LoRA. Every byte of
+behavior on the screen is trained by us, on our own synthetic clinical data,
+on-device.**
 
 ---
 
@@ -749,10 +726,12 @@ screen is trained by us, on our own synthetic clinical data, on-device.**
 
 ## 13. Honest risks
 
-- **Hackathon scope of 6 trained LoRAs.** Doable in a weekend on one A100
-  with QLoRA + Synthetix, but tight. Mitigation: LoRAs 1, 4, and 6 (med-ack,
-  wave-peak, reflection) are the demo-critical ones; if we run out of time,
-  the other three fall back to base + prompt.
+- **Hackathon scope of 6 trained LoRAs.** With the simplified Synthetix
+  loop (seed → generate → spot-check → regenerate → one training run), each
+  LoRA's full cycle is a few hours of generator + spot-check time plus
+  30–90 minutes of QLoRA on a single A100. Mitigation: LoRAs 1, 4, and 6
+  (med-ack, wave-peak, reflection) are the demo-critical ones; if we run
+  out of time the other three fall back to base + prompt.
 - **WebGPU LoRA support.** transformers.js supports adapter loading, but
   the tooling is younger than LiteRT's. Mitigation: prove the swap works
   for a single LoRA end-to-end before scaling to the full stack; fall back

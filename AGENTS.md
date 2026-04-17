@@ -36,7 +36,7 @@ The production vision is a **React Native mobile app** that runs **Gemma 4 entir
 **Hackathon web demo (Gemma end-to-end — what runs today):**
 - Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4
 - **One Gemma 4 E2B-it (INT4) base + a stack of small LoRA adapters — one LoRA per clinical situation.** The base and the adapters run in the browser via `@huggingface/transformers` (transformers.js) + WebGPU. An Adapter Manager hot-swaps LoRAs per session phase. No server-side LLM, no cloud LLM, no API key. See `docs/gemma-4-integration.md`.
-- **Synthetix** pipeline (developer-only, not shipped to users) generates per-LoRA synthetic training data from a typed "stack array" of clinical conditions, filters it with a Gemma-judge rubric, gates it on clinician review, and trains each LoRA with Unsloth + TRL + QLoRA. Source of truth: `clients/synthetix/`.
+- **Synthetix** pipeline (developer-only, not shipped to users) produces each LoRA's training set in a four-step loop: (1) small human-written seed set → (2) Gemma expands it into `N` synthetic examples → (3) clinician spot-checks a sample in a small UI and leaves feedback on anything wrong → (4) regenerate with that feedback until a spot-check passes clean. Then **one** QLoRA run (Unsloth + TRL) produces the shipped adapter. Source of truth: `clients/synthetix/`.
 - **Crisis triage runs on base Gemma with no LoRA** — the safety boundary that must never be fine-tuned. Routing to 988 / SAMHSA / local emergency is rule-based and never trusted to the model.
 - Supabase Postgres (stand-in for encrypted on-device SQLite) for session/medication/journal logs
 - Lottie for the wave animation
@@ -86,7 +86,7 @@ The production vision is a **React Native mobile app** that runs **Gemma 4 entir
 - Run lint and typecheck before committing. Fix any errors you introduced.
 - Keep diffs small and focused. Split prompt-copy changes from code changes where possible so clinicians can review prompt PRs without noise.
 - Every PR that changes session prompts must link the MBRP / SAMHSA / FDA source that justifies the new copy, or cite the synthetic clinical dialogue in the training set.
-- Every PR that ships or updates a LoRA adapter must (a) bump the adapter's `version` + `sha256` in `clients/lib/gemma/adapter-manifest.ts`, (b) link the Synthetix dataset manifest hash it was trained on, (c) include its eval scores from `docs/gemma-4-integration.md > §6.5`, and (d) name the clinician who approved the review batches. Never ship a LoRA for crisis triage — that surface is base-only on purpose.
+- Every PR that ships or updates a LoRA adapter must (a) bump the adapter's `version` + `sha256` in `clients/lib/gemma/adapter-manifest.ts`, (b) point at the Synthetix run ID under `clients/synthetix/runs/<lora-id>/<run-id>/` that produced its training data, (c) include the spot-check log from that run showing `pass: true` with zero flagged problems, and (d) name the clinician whose initials are on the clean spot-check. Never ship a LoRA for crisis triage — that surface is base-only on purpose.
 - Include a manual test path in the PR description (see Testing Instructions).
 
 ## Domain Constraints
