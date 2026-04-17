@@ -39,9 +39,9 @@ These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every 
 ## Privacy
 
 - No third-party analytics, error tracking, or ad scripts anywhere in `clients/`.
-- Do not send craving, medication, or journal content to an endpoint unless it is explicitly the user's export action.
-- Medication photos (when added) must be processed client-side. Do not upload them.
-- The session route must make as few network calls as possible, and every call must have a scripted local fallback so the demo works offline.
+- Do not send craving, medication, or journal content to an endpoint unless it is explicitly the user's export action or the user has opted into cross-device sync.
+- Medication photos (when added) must be processed client-side (WebGPU / WASM / `<canvas>`). Do not upload them.
+- The session route must make as few network calls as possible. After initial page load, the session path should hit zero network. Every narration call must have a scripted local fallback so the session works offline.
 
 ## Build hygiene
 
@@ -51,6 +51,7 @@ These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every 
 
 ## Out of scope for the frontend
 
-- Authentication. WAVE has no account.
+- Authentication. WAVE has no account by default. (Opt-in cross-device sync is the only exception, and is off unless a PRD update adds it.)
 - A separate Python backend. `PRD.md > Backend Needed?` is `No`; do not introduce one.
-- Persistence beyond `localStorage` (web demo) or encrypted SQLite (mobile) without an explicit PRD update.
+- React Native / Expo / native mobile builds. WAVE is a Next.js web app with an optional PWA layer.
+- Persistence beyond IndexedDB (via `localforage`) with a `localStorage` fallback, unless a PRD update explicitly adds another store.
