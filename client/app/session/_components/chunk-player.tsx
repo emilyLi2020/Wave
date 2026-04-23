@@ -34,7 +34,7 @@
  * only the time we wait before advancing is shortened.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AnimatedWave } from "./animated-wave";
 import type { Chunk, Segment } from "@/types/session";
@@ -43,6 +43,13 @@ interface Props {
   chunk: Chunk;
   onComplete: () => void;
   demoMode?: boolean;
+  /**
+   * Current craving intensity (1-10) the ambient wave should render at.
+   * SessionMachine passes the most recent check-in score when one
+   * exists, otherwise the intake intensity, so the wave's height stays
+   * consistent with whatever rating the patient owns right now.
+   */
+  currentIntensity?: number;
 }
 
 const MIN_TEXT_DISPLAY_MS = 3000;
@@ -51,8 +58,14 @@ const DEMO_BEAT_MS = 2000;
 const DEMO_MIN_TEXT_DISPLAY_MS = 1200;
 const DEMO_TEXT_MS_PER_CHAR = 22;
 
-export function ChunkPlayer({ chunk, onComplete, demoMode = false }: Props) {
+export function ChunkPlayer({
+  chunk,
+  onComplete,
+  demoMode = false,
+  currentIntensity,
+}: Props) {
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
+  const advanceHandleRef = useRef<number | null>(null);
 
   // Reset when the chunk changes (re-mounted by the session machine on
   // every chunk boundary, but defensive in case parents reuse the
@@ -86,8 +99,28 @@ export function ChunkPlayer({ chunk, onComplete, demoMode = false }: Props) {
     }
 
     const handle = window.setTimeout(advance, delayMs);
-    return () => window.clearTimeout(handle);
+    advanceHandleRef.current = handle;
+    return () => {
+      window.clearTimeout(handle);
+      advanceHandleRef.current = null;
+    };
   }, [segment, onComplete, demoMode]);
+
+  // Skip the current non-breath segment. Breath segments are deliberately
+  // not skippable — the paced breath *is* the intervention, not waiting on
+  // it. The button in the UI is only rendered for text/pause anyway; this
+  // guard is defensive.
+  const skipSegment = useCallback(() => {
+    if (!segment) return;
+    if (segment.type === "breath") return;
+    if (advanceHandleRef.current !== null) {
+      window.clearTimeout(advanceHandleRef.current);
+      advanceHandleRef.current = null;
+    }
+    setCurrentSegmentIndex((idx) => idx + 1);
+  }, [segment]);
+
+  const canSkip = segment ? segment.type !== "breath" : false;
 
   // The line we render is the most recent text or breath instruction.
   // During pure `pause` segments we keep the previous line on screen
@@ -120,13 +153,24 @@ export function ChunkPlayer({ chunk, onComplete, demoMode = false }: Props) {
           }
         />
       ) : (
-        <AnimatedWave mode="ambient" />
+        <AnimatedWave mode="ambient" intensity={currentIntensity} />
       )}
 
-      <article className="rounded-2xl border border-border bg-surface p-6">
-        <p className="min-h-[3.5rem] text-lg leading-relaxed text-foreground/90">
+      <article className="relative rounded-2xl border border-border bg-surface p-6">
+        <p className="min-h-[3.5rem] pr-20 text-lg leading-relaxed text-foreground/90">
           {visibleText}
         </p>
+        {canSkip ? (
+          <button
+            type="button"
+            onClick={skipSegment}
+            aria-label="Skip pause"
+            className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border border-border bg-surface-muted px-3 py-1 text-xs font-medium text-foreground/60 transition hover:border-accent hover:text-accent focus:border-accent focus:text-accent focus:outline-none"
+          >
+            Skip pause
+            <span aria-hidden>→</span>
+          </button>
+        ) : null}
       </article>
     </div>
   );

@@ -250,6 +250,15 @@ export function SessionMachine() {
     [state.checkIns],
   );
 
+  // Most recent craving rating the patient has given us. Drives the
+  // ambient wave's fill height so the visualization mirrors whatever
+  // number the patient just owned on the slider. Before the first
+  // check-in we fall back to the intake intensity.
+  const currentIntensity =
+    priorScores.length > 0
+      ? priorScores[priorScores.length - 1]
+      : intakeIntensity;
+
   // Start the audio bed when the patient enters the chunk loop.
   useEffect(() => {
     if (state.phase === "loadingChunk" && state.currentChunk === 1) {
@@ -385,6 +394,7 @@ export function SessionMachine() {
           key={`chunk-${state.currentChunk}`}
           chunk={state.generatedChunk}
           demoMode={state.demoMode}
+          currentIntensity={currentIntensity}
           onComplete={() => dispatch({ type: "chunkCompleted" })}
         />
       ) : null}

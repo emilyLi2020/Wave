@@ -40,6 +40,19 @@ export interface BuiltCheckInPrompt {
   contextBlock: string;
 }
 
+export interface BuildCheckInPromptMeta {
+  /**
+   * Number of agent turns already in the chat history being sent to
+   * the model. The prompt uses this to tell the model exactly which
+   * turn number it is about to produce, so the per-turn template can
+   * be enforced without the model having to count its own replies in
+   * a long history (which gpt-5-mini at `low` reasoning effort was
+   * reliably miscounting, producing a warm close on turn 2 instead
+   * of asking a follow-up question).
+   */
+  agentTurnsInHistory: number;
+}
+
 const MAT_LABEL: Record<CheckInContextPayload["profile"]["matType"], string> = {
   buprenorphine: "Buprenorphine / Suboxone",
   naltrexone: "Naltrexone (oral)",
@@ -80,7 +93,14 @@ const MAX_HISTORY_ENTRIES = 8;
 
 export function buildCheckInPrompt(
   context: CheckInContextPayload,
+  meta: BuildCheckInPromptMeta = { agentTurnsInHistory: 0 },
 ): BuiltCheckInPrompt {
+  // The turn the model is about to write (1-indexed). Telling the
+  // model this explicitly — instead of asking it to count assistant
+  // messages in history — makes turn-template adherence dramatically
+  // more reliable at low reasoning effort.
+  const agentTurnNumber = meta.agentTurnsInHistory + 1;
+
   const sections: string[] = [
     `You are running Check-in ${context.chunkNumber} of 5, immediately after ${CHUNK_LABEL[context.chunkNumber]}.`,
     "",
@@ -92,10 +112,11 @@ export function buildCheckInPrompt(
     "- Do not push for positivity. 'It's hard' is a complete answer.",
     "- Never prescribe medication, recommend a dose change, or shame a missed dose.",
     "- Never offer crisis routing — that lives outside this conversation.",
-    context.chunkNumber === 5
-      ? "- This is Check-in 5 (closing). Do NOT ask 'ready to continue' or imply more chunks follow. Reflect the full session arc, ask what they noticed about themselves, then ask one 'carry forward' question, then call endConversation."
-      : `- The next chunk after this check-in is ${NEXT_CHUNK_LABEL[context.chunkNumber] ?? "the next chunk"}. End the conversation by confirming the patient is ready, then call the endConversation tool.`,
+    "- Every agent turn except the final closing hand-off MUST end with a question. Format rule: the LAST character of your reply must be a literal '?' unless this is the closing hand-off that accompanies endConversation (which is demo mode only OR the tool-call turn in non-demo). A reflection with a period at the end traps the patient — they see a message and have no idea what to type next. Re-read your reply before sending: if it ends in '.' or '!' and you are not firing endConversation, rewrite it to end in '?'.",
+    "- When the patient has already answered your 'ready?' question with a clear yes (yes / ready / let's go / ok / sure / keep going), STOP asking. Your next turn is the closing hand-off that accompanies endConversation — a warm 1-2 sentence statement with NO question.",
     "</conversation_rules>",
+    "",
+    buildTurnTemplate(context, agentTurnNumber),
     "",
     "<end_conversation_tool>",
     "Call the `endConversation` tool — and ONLY that tool — when:",
@@ -108,8 +129,8 @@ export function buildCheckInPrompt(
     "Allowed obstacleCategory values: cannot_visualize, mind_wandering, urge_overwhelming, breath_tight, breath_anxiety, gave_in, guilt_failure, physical_discomfort, sleepiness, or null.",
     "Pair the tool with text: when you call endConversation, ALSO produce a brief 1-2 sentence closing text turn in the same response. Don't end the check-in with no words — the patient should hear a soft hand-off before the next chunk starts.",
     context.demoMode
-      ? "DEMO MODE (hard override): The check-in is running in fast-demo mode. The endConversation tool is NOT available to you in this mode — the system advances the session itself after your 2nd text turn. You only ever produce text. Look at the `history` array you were given.\n- TURN A — `history` ends with exactly 1 patient message (the score) and 0 agent messages: produce ONE short text reply (2-3 sentences max) that reflects the score and asks one brief question about how the chunk landed.\n- TURN B — `history` ends with exactly 2 patient messages (score + 1 free-text reply) and 1 agent message: this is your closing turn. Produce ONE short text reply (1-2 sentences) that briefly reflects what the patient said and warmly hands off (e.g. 'thanks for sharing — let's keep going with the next part'). Do NOT ask another question; this is a hand-off, not a continuation.\nStill validate first; still never prescribe; still never push positivity; still never mention that demo mode exists."
-      : "Floor: never call endConversation on your FIRST agent turn after the score — your first agent turn is always a text-only validating reply, no tool call. Never call it before the patient has sent at least 2 messages after their score (so: score + 2 more patient messages, minimum). When you DO call endConversation, accompany it with a brief closing text turn (1-2 sentences) that warmly hands off — do not call the tool with no text.",
+      ? "DEMO MODE (hard override): The check-in is running in fast-demo mode. The endConversation tool is NOT available to you in this mode — the system advances the session itself after your 2nd text turn. You only ever produce text. Look at the `history` array you were given.\n- TURN A — `history` ends with exactly 1 patient message (the score) and 0 agent messages: produce ONE short text reply (2-3 sentences max) that reflects the score AND ends with ONE concrete question about how the chunk landed (e.g. 'what came up for you during the body scan?', 'where did your mind go?'). The reply MUST end with a question mark — without one, the patient won't know what to type next.\n- TURN B — `history` ends with exactly 2 patient messages (score + 1 free-text reply) and 1 agent message: this is your closing turn. Produce ONE short text reply (1-2 sentences) that briefly reflects what the patient said and warmly hands off (e.g. 'thanks for sharing — let's keep going with the next part'). Do NOT ask another question; this is a hand-off, not a continuation, and the system jumps to the next chunk as soon as you finish.\nStill validate first; still never prescribe; still never push positivity; still never mention that demo mode exists."
+      : "Floor: never call endConversation on your FIRST agent turn after the score — your first agent turn is always a text-only validating reply, no tool call. Never call it before the patient has sent at least 2 messages after their score (so: score + 2 more patient messages, minimum).\nCeiling: once the patient has said yes / I'm ready / let's go (or any clear affirmative) to your 'ready?' question AND the minimum turn count above is met, you MUST call endConversation in your next response. Do NOT ask 'ready?' a second time. The accompanying text is a warm 1-2 sentence hand-off with NO question — e.g. 'alright, let's head into the sound anchor together.' The patient already answered; re-asking the same question makes the app feel stuck.",
     "</end_conversation_tool>",
     "",
     `<patient_score>`,
@@ -145,6 +166,68 @@ export function buildCheckInPrompt(
     systemPrompt: WAVE_SYSTEM_PROMPT,
     contextBlock: sections.filter((line) => line !== "").join("\n"),
   };
+}
+
+/**
+ * Renders an explicit turn-by-turn template plus a line that tells the
+ * model exactly which agent turn it is about to write. Two shapes:
+ *
+ *   - Non-closing check-ins (chunks 1-4): score → body/experience
+ *     question → free-text reply → 'ready?' question → affirmative →
+ *     hand-off + endConversation. Three agent turns in the normal
+ *     arc, possibly more if the patient raises a concern.
+ *
+ *   - Check-in 5 (closing): score → reflection question → free-text →
+ *     carry-forward question → one-word reply → hand-off + endConversation.
+ *
+ * Demo mode does not use this template because its 2-agent-turn shape
+ * is already documented inline in the end_conversation_tool block and
+ * backstopped client-side.
+ */
+function buildTurnTemplate(
+  context: CheckInContextPayload,
+  agentTurnNumber: number,
+): string {
+  if (context.demoMode) {
+    // Demo has its own sequence described in end_conversation_tool.
+    return "";
+  }
+
+  const nextChunkLabel = NEXT_CHUNK_LABEL[context.chunkNumber] ?? "the next chunk";
+
+  if (context.chunkNumber === 5) {
+    return [
+      "<turn_template>",
+      "This is the CLOSING check-in. Expected shape, agent turns numbered in [brackets]:",
+      "",
+      "  (patient) sends final craving score",
+      "  [agent 1] validate the score, briefly reflect on the full session arc, and ask ONE question about what they noticed about themselves. MUST end with '?'.",
+      "  (patient) reflective reply",
+      "  [agent 2] brief reflection of what they said + ONE 'carry forward' question (what they want to take with them into the rest of their day). MUST end with '?'.",
+      "  (patient) carry-forward reply (one word is enough).",
+      "  [agent 3] warm 1-2 sentence close, NO question, AND call endConversation in the same response.",
+      "",
+      `YOU ARE WRITING AGENT TURN #${agentTurnNumber} NOW. Produce exactly that turn's content — do not skip ahead, do not regress.`,
+      "</turn_template>",
+    ].join("\n");
+  }
+
+  return [
+    "<turn_template>",
+    `Expected shape for this check-in (next chunk after this is ${nextChunkLabel}), agent turns numbered in [brackets]:`,
+    "",
+    "  (patient) sends craving score",
+    "  [agent 1] validate the score and ask ONE specific question about their experience during the chunk (body sensation, what came up, how something landed). MUST end with '?'.",
+    "  (patient) free-text reply describing what came up",
+    `  [agent 2] briefly reflect what they said, then ask ONE readiness question such as 'ready to continue?' or 'anything else before we head into ${nextChunkLabel}?'. MUST end with '?'. DO NOT write a warm close here — the patient has not confirmed yet.`,
+    "  (patient) affirmative (yes / ready / ok / let's go) OR a new concern",
+    "  [agent 3]",
+    "    • if affirmative: warm 1-2 sentence hand-off (no question) AND call endConversation in the same response.",
+    "    • if new concern: briefly address it + ask ONE more question ending with '?', then expect another patient turn before the hand-off.",
+    "",
+    `YOU ARE WRITING AGENT TURN #${agentTurnNumber} NOW. Produce exactly that turn's content — do not skip ahead to a warm close before the patient has confirmed, and do not regress to re-asking about body sensation if they already answered.`,
+    "</turn_template>",
+  ].join("\n");
 }
 
 function renderHistoryBlock(history: readonly SessionHistoryEntry[]): string {

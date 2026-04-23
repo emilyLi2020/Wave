@@ -113,6 +113,48 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
 
     useEffect(() => teardown, [teardown]);
 
+    // Safety net: if the tab is being closed / backgrounded / hidden
+    // (browser closed, tab closed, switched to another tab, OS suspended
+    // the tab), tear the audio graph down or suspend the context so we
+    // never keep generating ocean noise for a user who is no longer
+    // looking at the page. React's normal unmount cleanup does NOT run
+    // reliably on tab close, so these listeners are the only correct
+    // place to do this.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+
+      const handlePageHide = () => {
+        teardown();
+      };
+
+      const handleVisibilityChange = () => {
+        const ctx = audioContextRef.current;
+        if (!ctx) return;
+        if (document.hidden) {
+          // Suspend (not close) so the user can return and resume
+          // without a gap. If they close the tab entirely, pagehide
+          // fires and tears everything down for good.
+          if (ctx.state === "running") {
+            void ctx.suspend();
+          }
+        } else {
+          if (ctx.state === "suspended" && !muted) {
+            void ctx.resume();
+          }
+        }
+      };
+
+      window.addEventListener("pagehide", handlePageHide);
+      window.addEventListener("beforeunload", handlePageHide);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        window.removeEventListener("pagehide", handlePageHide);
+        window.removeEventListener("beforeunload", handlePageHide);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+    }, [teardown, muted]);
+
     useImperativeHandle(
       ref,
       (): AmbientAudioBedHandle => ({

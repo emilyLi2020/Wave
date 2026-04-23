@@ -81,7 +81,17 @@ type ResponseInputItem =
   | { role: "assistant"; content: string };
 
 function buildResponseInput(req: CheckInRequest): ResponseInputItem[] {
-  const { systemPrompt, contextBlock } = buildCheckInPrompt(req.context);
+  // Count agent turns already in history so the prompt can tell the
+  // model exactly which turn number it is about to write. The model
+  // was miscounting on its own, which caused warm closes on turn 2
+  // instead of the expected follow-up question.
+  const agentTurnsInHistory = req.history.filter(
+    (turn) => turn.role === "agent",
+  ).length;
+
+  const { systemPrompt, contextBlock } = buildCheckInPrompt(req.context, {
+    agentTurnsInHistory,
+  });
 
   const items: ResponseInputItem[] = [
     { role: "system", content: systemPrompt },
@@ -143,6 +153,84 @@ interface EndConversationArgs {
   obstacleCategory: string | null;
 }
 
+/**
+ * Narrow, conservative affirmative detector used only to decide whether
+ * to force the `endConversation` tool call. This is NOT a readiness
+ * gate — the model still owns the decision in every other case. It
+ * exists solely to break the "patient says yes, model re-asks ready?,
+ * patient says yes, model re-asks ready?" loop.
+ *
+ * Rules:
+ *   - Strip outer punctuation + whitespace, lowercase.
+ *   - Exact match against a short list of unambiguous affirmatives, OR
+ *   - Short reply (≤ 30 chars) whose first word is a clear yes.
+ * Anything longer or ambiguous ("yes but my chest is tight") is left
+ * to the model — forcing a tool call there would drop real content.
+ */
+function isAffirmativeReply(text: string): boolean {
+  const normalized = text
+    .toLowerCase()
+    .trim()
+    .replace(/^[\s\p{P}]+|[\s\p{P}]+$/gu, "")
+    .replace(/\s+/g, " ");
+
+  const exact = new Set([
+    "yes",
+    "yeah",
+    "yep",
+    "yup",
+    "sure",
+    "ok",
+    "okay",
+    "ready",
+    "go",
+    "yes please",
+    "yeah ok",
+    "yeah okay",
+    "i'm ready",
+    "im ready",
+    "i am ready",
+    "i'm good",
+    "im good",
+    "i am good",
+    "all good",
+    "let's go",
+    "lets go",
+    "let's continue",
+    "lets continue",
+    "let's keep going",
+    "lets keep going",
+    "keep going",
+    "move on",
+    "continue",
+    "next",
+    "next please",
+  ]);
+
+  if (exact.has(normalized)) return true;
+
+  if (normalized.length <= 30) {
+    const firstWord = normalized.split(" ")[0] ?? "";
+    if (
+      firstWord === "yes" ||
+      firstWord === "yeah" ||
+      firstWord === "yep" ||
+      firstWord === "yup" ||
+      firstWord === "sure" ||
+      firstWord === "ok" ||
+      firstWord === "okay" ||
+      firstWord === "ready"
+    ) {
+      // Reject "yes but..." / "yeah kind of, but..." — a BUT clause
+      // carries real content the model should address, not skip.
+      if (/\bbut\b/.test(normalized)) return false;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function safeParseToolArgs(raw: string): EndConversationArgs | null {
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -192,6 +280,23 @@ export async function POST(request: Request) {
   const minPatientMessages = req.context.demoMode ? 2 : 3;
   const toolCallAllowed = patientMessageCount >= minPatientMessages;
 
+  // "I already said yes" backstop. When the last patient message is an
+  // unambiguous affirmative AND we're past the minimum turn count, we
+  // flip `tool_choice` from "auto" to "required". Under `auto` the
+  // model occasionally chooses to re-ask "ready?" instead of firing
+  // the tool, trapping the patient in a loop where every "yes" gets
+  // answered with another "ready?". Forcing the tool removes that
+  // failure mode; the model still owns the obstacleCategory arg so
+  // the classification quality is unchanged.
+  const lastPatient = [...req.history]
+    .reverse()
+    .find((turn) => turn.role === "patient");
+  const forceEndConversation =
+    toolCallAllowed &&
+    !req.context.demoMode &&
+    lastPatient !== undefined &&
+    isAffirmativeReply(lastPatient.content);
+
   let client: OpenAI;
   try {
     client = getClient();
@@ -230,18 +335,37 @@ export async function POST(request: Request) {
             input,
             text: { format: { type: "text" } },
             ...(useTool
-              ? { tools: [END_CONVERSATION_TOOL], tool_choice: "auto" as const }
+              ? {
+                  tools: [END_CONVERSATION_TOOL],
+                  // `required` forces a tool call on the affirmative
+                  // backstop path; otherwise `auto` lets the model
+                  // decide when the conversation is actually done.
+                  tool_choice: (forceEndConversation
+                    ? { type: "function" as const, name: "endConversation" }
+                    : ("auto" as const)),
+                }
               : {}),
             stream: true,
-            // Multi-turn check-in conversation. `low` (rather than
-            // `minimal`) is enough budget for the model to remember
-            // the multi-step rule "produce a brief closing text AND
-            // call endConversation in the same turn" on the closing
-            // beat — at `minimal` the model reliably picks one or the
-            // other but flakes on doing both. The added latency is on
-            // the order of a few hundred ms, well within the
-            // patient-paced check-in rhythm.
-            reasoning: { effort: "low" as const },
+            // Reasoning effort is tuned per mode:
+            //   • demo mode keeps `low` — the 2-agent-turn demo shape
+            //     is tightly scripted in the prompt and the whole
+            //     session is backstopped client-side, so the extra
+            //     latency of `medium` is not worth it for a reviewer
+            //     flow.
+            //   • non-demo bumps to `medium` because the turn template
+            //     (score → question → reply → 'ready?' → affirmative →
+            //     endConversation) requires the model to count its own
+            //     prior turns and produce the right turn shape. At
+            //     `low` we saw reliable failures where agent turn 2
+            //     was a warm close with no question, trapping the
+            //     patient. The extra ~1-2s latency is well inside the
+            //     patient-paced check-in rhythm and disappears once the
+            //     in-browser Gemma + check-in LoRA lands (docs/models.md).
+            reasoning: {
+              effort: (req.context.demoMode
+                ? ("low" as const)
+                : ("medium" as const)),
+            },
           },
           { signal: upstreamAbort.signal },
         );
