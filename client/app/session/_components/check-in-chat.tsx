@@ -20,7 +20,7 @@
  *     within a single check-in.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   streamCheckInTurn,
@@ -51,6 +51,14 @@ interface Props {
    * already heard and said.
    */
   sessionHistory: readonly SessionHistoryEntry[];
+  /**
+   * When true the check-in runs in fast-demo mode: the LLM is
+   * instructed to end after the patient's first free-text reply (so
+   * score + 1 free-text turn → endConversation). A client-side
+   * backstop also force-finalizes at that point in case the model
+   * produces a text turn instead of the tool call.
+   */
+  demoMode: boolean;
   onComplete: (checkIn: CheckIn) => void;
 }
 
@@ -67,6 +75,7 @@ export function CheckInChat({
   intakeIntensity,
   profile,
   sessionHistory,
+  demoMode,
   onComplete,
 }: Props) {
   const startedAtRef = useRef(Date.now());
@@ -78,6 +87,12 @@ export function CheckInChat({
   const [pendingScore, setPendingScore] = useState<number | null>(null);
   const [composerText, setComposerText] = useState("");
   const [agentBusy, setAgentBusy] = useState(false);
+
+  // Mirror `turns` so we can read the latest snapshot inside async
+  // handlers without calling setTurns just to read it — calling
+  // parent callbacks (which dispatch on SessionMachine) from inside a
+  // setTurns updater would be a setState-during-render warning.
+  const turnsRef = useRef<InternalTurn[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -105,7 +120,27 @@ export function CheckInChat({
       },
       intakeIntensity,
       sessionHistory: [...sessionHistory],
+      demoMode,
     };
+  }
+
+  /**
+   * Updates both `turns` state and `turnsRef` in lock-step so async
+   * handlers can read the latest snapshot without opening a setTurns
+   * updater callback. Accepts either a next value or a (prev) => next
+   * function for parity with React's setState.
+   */
+  function applyTurns(
+    next: InternalTurn[] | ((prev: InternalTurn[]) => InternalTurn[]),
+  ) {
+    setTurns((prev) => {
+      const resolved =
+        typeof next === "function"
+          ? (next as (p: InternalTurn[]) => InternalTurn[])(prev)
+          : next;
+      turnsRef.current = resolved;
+      return resolved;
+    });
   }
 
   async function streamAgentReply(
@@ -114,7 +149,7 @@ export function CheckInChat({
   ) {
     setAgentBusy(true);
 
-    setTurns((prev) => [
+    applyTurns((prev) => [
       ...prev,
       {
         index: prev.length + 1,
@@ -133,7 +168,7 @@ export function CheckInChat({
         history: historyForLLM,
         context,
         onDelta: (accumulated) => {
-          setTurns((prev) => {
+          applyTurns((prev) => {
             const next = [...prev];
             const last = next[next.length - 1];
             if (last && last.role === "agent") {
@@ -147,7 +182,7 @@ export function CheckInChat({
         },
       });
 
-      setTurns((prev) => {
+      applyTurns((prev) => {
         const next = [...prev];
         const last = next[next.length - 1];
         if (last && last.role === "agent") {
@@ -170,15 +205,27 @@ export function CheckInChat({
       });
 
       // If the model called endConversation during this turn,
-      // finalize the check-in. Use the latest snapshot of `turns`
-      // via a setTurns callback so we don't race with the streaming
-      // updates above.
+      // finalize the check-in using the latest `turnsRef` snapshot.
+      // Reading from the ref (not from a setTurns updater) keeps the
+      // parent dispatch out of React's render phase.
       if (endSignalRef.current) {
-        const signal = endSignalRef.current;
-        setTurns((prev) => {
-          finalizeCheckIn(prev, activeScore, signal);
-          return prev;
-        });
+        finalizeCheckIn(turnsRef.current, activeScore, endSignalRef.current);
+      } else if (demoMode) {
+        // Demo-mode backstop: after the patient has sent their score
+        // + at least one free-text reply, force-finalize even if the
+        // model produced a text turn instead of the endConversation
+        // tool call. The demo arc is meant to flow in ~2 turns per
+        // check-in, and we can't let a chatty model stall it.
+        const patientTurns = turnsRef.current.filter(
+          (t) => t.role === "patient",
+        ).length;
+        if (patientTurns >= 2 && !completedRef.current) {
+          const fallbackSignal: EndConversationSignal = {
+            cravingScore: activeScore,
+            obstacleCategory: null,
+          };
+          finalizeCheckIn(turnsRef.current, activeScore, fallbackSignal);
+        }
       }
     } finally {
       setAgentBusy(false);
@@ -204,7 +251,7 @@ export function CheckInChat({
       via: "patient",
     };
     const newTurns = [...turns, patientTurn];
-    setTurns(newTurns);
+    applyTurns(newTurns);
 
     const llmHistory: CheckInChatTurnPayload[] = newTurns.map((t) => ({
       role: t.role,
@@ -226,7 +273,7 @@ export function CheckInChat({
       via: "patient",
     };
     const newTurns = [...turns, newPatientTurn];
-    setTurns(newTurns);
+    applyTurns(newTurns);
     setComposerText("");
 
     const llmHistory: CheckInChatTurnPayload[] = newTurns.map((t) => ({
@@ -267,10 +314,11 @@ export function CheckInChat({
     onComplete(checkIn);
   }
 
-  const lastTurnIsStreamingPlaceholder = useMemo(() => {
-    const last = turns[turns.length - 1];
-    return Boolean(last?.streaming && last.content.length === 0);
-  }, [turns]);
+  // Note: the streaming agent bubble already renders an inline
+  // ShimmerLine when its content is empty (see ChatBubble below), so
+  // we deliberately do NOT render a second row-level indicator here.
+  // An older version showed both, which produced two stacked
+  // "still with you..." rows during the same agent turn.
 
   return (
     <div className="flex flex-col gap-4">
@@ -292,7 +340,6 @@ export function CheckInChat({
         {turns.map((turn) => (
           <ChatBubble key={turn.index} turn={turn} />
         ))}
-        {lastTurnIsStreamingPlaceholder ? <ShimmerLine /> : null}
       </div>
 
       <div className="rounded-2xl border border-border bg-surface p-4">

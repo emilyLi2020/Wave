@@ -178,6 +178,20 @@ export async function POST(request: Request) {
   const req = parsed.data;
   const input = buildResponseInput(req);
 
+  // Minimum patient-message count before an `endConversation` tool
+  // call is allowed to leave this route. Suppressing it server-side
+  // is a safety net so a prompt-drift bug can't short-circuit the
+  // check-in and jump straight to the next chunk with no conversation
+  // visible to the patient.
+  //
+  //   demo   : score + 1 free-text reply = 2 patient messages minimum
+  //   normal : score + 2 free-text replies = 3 patient messages minimum
+  const patientMessageCount = req.history.filter(
+    (turn) => turn.role === "patient",
+  ).length;
+  const minPatientMessages = req.context.demoMode ? 2 : 3;
+  const toolCallAllowed = patientMessageCount >= minPatientMessages;
+
   let client: OpenAI;
   try {
     client = getClient();
@@ -201,18 +215,33 @@ export async function POST(request: Request) {
       // them and parse on the matching `output_item.done`.
       const toolArgBuffer = new Map<string, string>();
       try {
+        // In demo mode the agent only ever produces text — the
+        // 4-turn demo pattern (user → AI text → user → AI text → jump)
+        // is driven by a client-side backstop in CheckInChat that
+        // synthesizes the end-conversation signal after the AI's 2nd
+        // text turn completes. Removing the tool from the request
+        // avoids a known failure mode where the model picks tool-only
+        // OR text-only when asked to do both, leaving the patient
+        // staring at a silent transition.
+        const useTool = !req.context.demoMode;
         const events = await client.responses.create(
           {
             model: MODEL,
             input,
             text: { format: { type: "text" } },
-            tools: [END_CONVERSATION_TOOL],
-            tool_choice: "auto",
+            ...(useTool
+              ? { tools: [END_CONVERSATION_TOOL], tool_choice: "auto" as const }
+              : {}),
             stream: true,
-            // Multi-turn check-in conversation. Keep reasoning effort
-            // at `minimal` so first-token latency stays under the
-            // 500ms target.
-            reasoning: { effort: "minimal" as const },
+            // Multi-turn check-in conversation. `low` (rather than
+            // `minimal`) is enough budget for the model to remember
+            // the multi-step rule "produce a brief closing text AND
+            // call endConversation in the same turn" on the closing
+            // beat — at `minimal` the model reliably picks one or the
+            // other but flakes on doing both. The added latency is on
+            // the order of a few hundred ms, well within the
+            // patient-paced check-in rhythm.
+            reasoning: { effort: "low" as const },
           },
           { signal: upstreamAbort.signal },
         );
@@ -239,13 +268,16 @@ export async function POST(request: Request) {
             const argsText =
               toolArgBuffer.get(itemId) ?? event.arguments ?? "";
             const parsedArgs = safeParseToolArgs(argsText);
-            if (parsedArgs) {
+            if (parsedArgs && toolCallAllowed) {
               controller.enqueue(
                 encoder.encode(
                   sseFrame("end_conversation", parsedArgs),
                 ),
               );
             }
+            // If the tool call arrived too early we silently drop it.
+            // The client will keep the check-in open; the model's
+            // accompanying text (if any) still streams normally.
             toolArgBuffer.delete(itemId);
           } else if (event.type === "response.completed") {
             finished = true;

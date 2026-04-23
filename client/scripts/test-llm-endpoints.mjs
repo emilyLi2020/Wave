@@ -257,6 +257,105 @@ async function testCheckInEndConversation(firstAgentReply) {
 }
 
 // ---------------------------------------------------------------------------
+// Test 4a — server MUST suppress endConversation on the first agent turn
+// (regression: model was sometimes firing the tool right after the score,
+// which short-circuited the check-in and skipped the conversation entirely)
+// ---------------------------------------------------------------------------
+
+async function testCheckInNoEarlyEnd() {
+  console.log("\n[4a] /api/checkin  demoMode=true, only score sent — no early end");
+  const ctx = {
+    chunkNumber: 1,
+    cravingScore: 7,
+    scoreHistory: [],
+    obstacleHint: null,
+    profile: PROFILE,
+    intakeIntensity: INTAKE_INTENSITY,
+    sessionHistory: [{ kind: "chunk", chunkNumber: 1, lines: ["Welcome.", "Settle in."] }],
+    demoMode: true,
+  };
+  const history = [{ role: "patient", content: "7/10" }];
+  const events = await postSSE("/api/checkin", { history, context: ctx });
+  const ends = events.filter((e) => e.event === "end_conversation");
+  const deltas = events.filter((e) => e.event === "delta");
+  const errors = events.filter((e) => e.event === "error");
+  assert(errors.length === 0, "no error events", errors.map((e) => e.data).join(" / "));
+  assert(
+    ends.length === 0,
+    `no end_conversation on first agent turn (got ${ends.length})`,
+    "server-side early-end guard may be missing",
+  );
+  assert(deltas.length > 0, `agent produced text (got ${deltas.length} delta events)`);
+}
+
+// ---------------------------------------------------------------------------
+// Test 4b — demo mode forces endConversation after one free-text patient turn
+// ---------------------------------------------------------------------------
+
+async function testCheckInDemoMode() {
+  console.log(
+    "\n[4b] /api/checkin  demoMode=true — closing turn is text only (no tool, client backstop drives the jump)",
+  );
+  const ctx = {
+    chunkNumber: 2,
+    cravingScore: 5,
+    scoreHistory: [6],
+    obstacleHint: null,
+    profile: PROFILE,
+    intakeIntensity: INTAKE_INTENSITY,
+    sessionHistory: [
+      { kind: "chunk", chunkNumber: 1, lines: ["Welcome.", "Settle in."] },
+      { kind: "chunk", chunkNumber: 2, lines: ["Body scan.", "Notice the chest."] },
+    ],
+    demoMode: true,
+  };
+  // score + 1 agent reply + 1 free-text patient reply — the model's next
+  // output should be the endConversation tool call, not more text.
+  const history = [
+    { role: "patient", content: "5/10" },
+    {
+      role: "agent",
+      content:
+        "5 out of 10 — thanks for that. How was the body scan for you?",
+    },
+    { role: "patient", content: "Still a bit tight in my chest." },
+  ];
+
+  const events = await postSSE("/api/checkin", { history, context: ctx });
+  const ends = events.filter((e) => e.event === "end_conversation");
+  const deltas = events.filter((e) => e.event === "delta");
+  const errors = events.filter((e) => e.event === "error");
+  const dones = events.filter((e) => e.event === "done");
+  // New demo contract: tool is unavailable in demo mode and the
+  // client-side backstop in CheckInChat synthesizes the end-conversation
+  // signal after the AI's 2nd text turn finishes streaming. So we
+  // expect text-only here — no end_conversation event.
+  assert(errors.length === 0, "no error events", errors.map((e) => e.data).join(" / "));
+  assert(dones.length === 1, "exactly one done event");
+  assert(
+    ends.length === 0,
+    `no end_conversation event in demo mode (got ${ends.length}); the client backstop drives the jump`,
+  );
+  assert(
+    deltas.length > 0,
+    `closing turn includes hand-off text (got ${deltas.length} text deltas)`,
+  );
+  // Quick eyeball on the closing reply (each delta data is a
+  // JSON-encoded string fragment).
+  const closing = deltas
+    .map((e) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        return typeof parsed === "string" ? parsed : "";
+      } catch {
+        return "";
+      }
+    })
+    .join("");
+  console.log(`  ---- closing reply ----\n  ${closing.slice(0, 240)}`);
+}
+
+// ---------------------------------------------------------------------------
 // Test 5 — invalid bodies (schema validation)
 // ---------------------------------------------------------------------------
 
@@ -309,6 +408,8 @@ async function testValidation() {
     await testChunk2(chunk1Lines);
     const reply = await testCheckInTurn1();
     await testCheckInEndConversation(reply);
+    await testCheckInNoEarlyEnd();
+    await testCheckInDemoMode();
     await testValidation();
   } catch (err) {
     failedAssertions += 1;

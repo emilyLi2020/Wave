@@ -33,6 +33,7 @@ import { IntakeForm, type IntakeAnswers } from "./intake-form";
 import { NarrationCard } from "./narration-card";
 import { NextStepChips } from "./next-step-chips";
 import { ReflectionProgress } from "./reflection-progress";
+import { RelaxingLoader } from "./relaxing-loader";
 import { SafetyHandoff } from "./safety-handoff";
 import { SafetyScreen, type SafetyOutcome } from "./safety-screen";
 import { ScoreArc } from "./score-arc";
@@ -148,7 +149,7 @@ function reducer(state: State, action: Action): State {
     case "chunkGenerated":
       // The effect that fetches the chunk may resolve after the
       // patient has navigated forward. Only honor the result if we
-      // were actually waiting for it.
+      // were still waiting for it.
       if (
         state.phase !== "loadingChunk" ||
         action.chunk.id !== state.currentChunk
@@ -204,6 +205,10 @@ function reducer(state: State, action: Action): State {
           phase: "reflection",
         };
       }
+      // Hand off to the chunk loader. The RelaxingLoader stays on
+      // screen — pulsing soft breath cues — until the next chunk's
+      // lines arrive from `/api/chunk`. There is no fixed-duration
+      // countdown; the meditation paces with the network.
       return {
         ...state,
         checkIns,
@@ -260,8 +265,12 @@ export function SessionMachine() {
   }, [state.phase]);
 
   // Drive chunk generation whenever we enter the loadingChunk phase.
+  // The RelaxingLoader is the patient-facing cover during this wait.
   useEffect(() => {
     if (state.phase !== "loadingChunk") return;
+    // Skip if we already have the chunk (defensive — chunkGenerated
+    // already moves the phase out of loadingChunk).
+    if (state.generatedChunk) return;
     if (!profile || !state.intake) return;
 
     const controller = new AbortController();
@@ -305,6 +314,7 @@ export function SessionMachine() {
   }, [
     state.phase,
     state.currentChunk,
+    state.generatedChunk,
     profile,
     state.intake,
     state.sessionHistory,
@@ -364,7 +374,10 @@ export function SessionMachine() {
       {state.phase === "safetyHandoff" ? <SafetyHandoff /> : null}
 
       {state.phase === "loadingChunk" ? (
-        <ChunkLoading chunkNumber={state.currentChunk} />
+        <RelaxingLoader
+          key={`loader-${state.currentChunk}`}
+          pool={state.currentChunk === 1 ? "start" : "between"}
+        />
       ) : null}
 
       {state.phase === "chunk" && state.generatedChunk ? (
@@ -384,6 +397,7 @@ export function SessionMachine() {
           intakeIntensity={intakeIntensity}
           profile={profile}
           sessionHistory={state.sessionHistory}
+          demoMode={state.demoMode}
           onComplete={(checkIn) =>
             dispatch({ type: "checkInCompleted", checkIn })
           }
@@ -431,19 +445,6 @@ export function SessionMachine() {
       ) : null}
 
       <SessionFooter phase={state.phase} />
-    </div>
-  );
-}
-
-function ChunkLoading({ chunkNumber }: { chunkNumber: ChunkNumber }) {
-  return (
-    <div
-      className="flex min-h-[280px] items-center justify-center rounded-2xl border border-border bg-surface p-8 text-sm text-foreground/60"
-      aria-live="polite"
-    >
-      <span className="animate-shimmer">
-        Composing the next chunk{chunkNumber > 1 ? " for you" : ""}…
-      </span>
     </div>
   );
 }

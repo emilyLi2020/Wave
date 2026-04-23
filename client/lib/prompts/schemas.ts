@@ -460,6 +460,14 @@ export const checkInContextSchema = z.object({
   intakeIntensity: z.number().int().min(1).max(10),
   /** Every prior chunk + check-in this session, oldest first. */
   sessionHistory: z.array(sessionHistoryEntrySchema).max(20),
+  /**
+   * When true, the check-in is running in demo mode: the LLM should
+   * wrap in a single patient free-text turn after the score (so the
+   * conversation is score -> 1 agent validation -> 1 patient reply ->
+   * endConversation). Clinical invariants (validate before technique,
+   * no prescribing, no toxic positivity) still apply.
+   */
+  demoMode: z.boolean().default(false),
 });
 
 export type CheckInContextPayload = z.infer<typeof checkInContextSchema>;

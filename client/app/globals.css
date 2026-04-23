@@ -113,3 +113,19 @@ body {
 @utility animate-shimmer {
   animation: wave-shimmer 1.6s ease-in-out infinite;
 }
+
+@keyframes wave-relax-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@utility animate-relax-pulse {
+  animation: wave-relax-pulse 4.2s ease-in-out infinite;
+}
