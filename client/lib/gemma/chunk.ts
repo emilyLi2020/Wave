@@ -85,7 +85,7 @@ export async function generateChunk(
         continue;
       }
 
-      const lines = parsed.data.lines;
+      const lines = sanitizeChunkLines(parsed.data.lines);
       return {
         chunk: chunkFromLines(options.context.chunkNumber, lines),
         lines,
@@ -110,12 +110,23 @@ export async function generateChunk(
   const fallback: ChunkLinesPayload = fallbackChunk(
     options.context.chunkNumber,
   );
+  const fallbackLines = sanitizeChunkLines(fallback.lines);
   return {
-    chunk: chunkFromLines(options.context.chunkNumber, fallback.lines),
-    lines: fallback.lines,
+    chunk: chunkFromLines(options.context.chunkNumber, fallbackLines),
+    lines: fallbackLines,
     source: "fallback",
     attempts,
   };
+}
+
+function sanitizeChunkLines(lines: readonly string[]): string[] {
+  return lines.map((line) =>
+    line
+      .replace(/[\[\]]/g, "")
+      .replace(/\s+([,.;:?])/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
 }
 
 /**

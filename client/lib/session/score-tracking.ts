@@ -132,7 +132,7 @@ function scoreReflectionPhrase(
     case "steady":
       return `Still at ${now} — holding steady without acting is the practice.`;
     case "increased":
-      return `It went up to ${now}. That's normal — urges often spike before they crest.`;
+      return `It moved from ${prev} to ${now}. That's not failure — urges often spike before they crest, and staying with it still counts.`;
     case "stays-high":
       return `Still sitting at ${now}. This one is really holding on — and you are too.`;
     case "stays-low":

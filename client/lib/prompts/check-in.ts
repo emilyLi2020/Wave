@@ -26,10 +26,12 @@
  */
 
 import { WAVE_SYSTEM_PROMPT } from "./wave-system";
+import { CHECK_IN_OPENERS } from "./check-in-openers";
 import type {
   CheckInContextPayload,
   SessionHistoryEntry,
 } from "./schemas";
+import { fillScoreReflection } from "@/lib/session/score-tracking";
 
 export interface BuiltCheckInPrompt {
   systemPrompt: string;
@@ -100,6 +102,17 @@ export function buildCheckInPrompt(
   // messages in history — makes turn-template adherence dramatically
   // more reliable at low reasoning effort.
   const agentTurnNumber = meta.agentTurnsInHistory + 1;
+  const scoreHistoryIncludingCurrent =
+    context.scoreHistory[context.scoreHistory.length - 1] ===
+    context.cravingScore
+      ? context.scoreHistory
+      : [...context.scoreHistory, context.cravingScore];
+  const priorScores = scoreHistoryIncludingCurrent.slice(0, -1);
+  const trendAwareTurn2 = fillScoreReflection(
+    CHECK_IN_OPENERS[context.chunkNumber].turn2,
+    scoreHistoryIncludingCurrent,
+    context.chunkNumber,
+  );
 
   const sections: string[] = [
     `You are running Check-in ${context.chunkNumber} of 5, immediately after ${CHUNK_LABEL[context.chunkNumber]}.`,
@@ -111,6 +124,7 @@ export function buildCheckInPrompt(
     "- Validation must be specific enough to feel heard. Do NOT use 'that makes sense' as the whole reply. Name what sounds hard, affirm that they are still trying, and then ask the next concrete question.",
     "- Use gentle encouragement without toxic positivity: 'this is hard and you're still staying with it', 'we can try the next part and see if it helps', 'you don't have to force it'.",
     "- One technique per check-in maximum. If the patient names where the urge lives in the body (for example: stomach, chest, throat, jaw), treat that as enough information to offer one brief body-based practice. Validate first, then guide the practice, then ask what they notice.",
+    "- If the patient reports physical arousal after a practice (heart beating fast, pounding, hot, flushed, shaky), do NOT jump to readiness. Validate it as nervous-system activation and choose exactly ONE easing skill: place one hand on the chest and say 'it's okay'; loosen/remove an extra layer if they feel hot; or use cool water on the face/hands if available. Ask what changes after they try it.",
     "- Do not jump from the patient's body-location answer straight to readiness. The sequence after a Turn 2 answer is: validate → one concrete practice → ask how it landed → then readiness.",
     "- Do not push for positivity. 'It's hard' is a complete answer.",
     "- Never prescribe medication, recommend a dose change, or shame a missed dose.",
@@ -138,9 +152,10 @@ export function buildCheckInPrompt(
     "",
     `<patient_score>`,
     `Just-reported craving: ${context.cravingScore} / 10.`,
-    context.scoreHistory.length === 0
+    priorScores.length === 0
       ? `Intake intensity at session start: ${context.intakeIntensity} / 10. This is the first check-in.`
-      : `Prior check-in scores (oldest → most recent): ${context.scoreHistory.join(" → ")}. Intake intensity at session start: ${context.intakeIntensity} / 10.`,
+      : `Prior check-in scores before this one (oldest → most recent): ${priorScores.join(" → ")}. Intake intensity at session start: ${context.intakeIntensity} / 10.`,
+    `Score trend to reflect now: ${trendAwareTurn2}`,
     `</patient_score>`,
     "",
     "<medication_context>",

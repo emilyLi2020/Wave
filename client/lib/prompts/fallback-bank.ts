@@ -357,6 +357,13 @@ export function fallbackCheckInTurn(
     case 3: {
       // After the patient tried the brief practice, move to readiness
       // (or the closing carry-forward question at C5).
+      if (lastPatient && classifyObstacle(lastPatient.content) === "physical_discomfort") {
+        return {
+          text:
+            "A pounding heartbeat can be your nervous system trying to protect you. Place one hand on your chest if that feels okay, press gently enough to feel contact, and say quietly, 'It's okay, this is a body alarm, and it can pass.' What changes when you stay with that for one breath?",
+          isReadinessAsk: false,
+        };
+      }
       return {
         text: openers.turn5,
         isReadinessAsk: chunkNumber !== 5,

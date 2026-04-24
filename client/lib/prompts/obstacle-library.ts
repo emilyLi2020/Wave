@@ -111,7 +111,7 @@ export const OBSTACLE_LIBRARY: Record<ObstacleCategory, ObstacleEntry> = {
   },
   physical_discomfort: {
     id: "physical_discomfort",
-    label: "Physical discomfort (tension, headache, restlessness)",
+    label: "Physical discomfort (tension, headache, restlessness, pounding heart)",
     validate:
       "That physical discomfort is real. Let's work with it, not against it.",
     technique:
@@ -196,7 +196,7 @@ export function classifyObstacle(text: string): ObstacleCategory | null {
   ) {
     return "urge_overwhelming";
   }
-  if (/\b(headache|tension|restless|pain|sore|tight (in|in my)|nausea|nauseous)\b/.test(t)) {
+  if (/\b(headache|tension|restless|pain|sore|tight (in|in my)|nausea|nauseous|heart ?beats?|heartbeat|heart (is )?(pounding|racing|beating fast)|pulse|palpitations?|hot|flushed|shaky|shaking)\b/.test(t)) {
     return "physical_discomfort";
   }
   return null;

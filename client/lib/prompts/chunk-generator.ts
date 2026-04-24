@@ -158,7 +158,7 @@ Hard formatting rules for the \`lines\` array:
   using any delimiter (no " / ", no " — ", no " | ", no semicolons-as-separators, no
   CJK quotation marks like 「」 or 」「, no ASCII art, no line breaks inside an element).
 - Each element is one to three short sentences of plain prose. No bullets, no numbering,
-  no markdown, no stage directions ("(pause)", "[breathe]"), no announcements of the
+  no markdown, no square brackets, no stage directions ("(pause)", "[breathe]"), no announcements of the
   chunk number, and no announcements of "chunk complete" — the next surface mounts
   seamlessly.
 - If you find yourself wanting to write three sentences separated by a slash, that is a
@@ -181,6 +181,7 @@ Generate the narration for this chunk as a JSON object of the form:
 Requirements:
 - Exactly the number of lines the response schema requires.
 - Each line is plain text, one to three short sentences.
+- Never use square brackets. Do not include bracketed pauses, bracketed breath cues, or stage directions.
 - Lines flow as a meditation script — each one a beat the patient sits with for ~7 seconds before the next line.
 - Tone: trauma-informed, unhurried, second person, no toxic positivity.
 - Reference the patient's prior session entries when it is useful (e.g. if a check-in mentioned a body location or a specific obstacle), but do NOT explicitly name a "check-in" or quote their words back verbatim.

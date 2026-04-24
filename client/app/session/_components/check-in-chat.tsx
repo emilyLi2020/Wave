@@ -116,7 +116,7 @@ export function CheckInChat({
     return {
       chunkNumber,
       cravingScore: activeScore,
-      scoreHistory: priorScores,
+      scoreHistory: [...priorScores, activeScore],
       obstacleHint: null,
       profile: {
         matType: profile.matType,
