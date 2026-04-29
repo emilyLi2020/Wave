@@ -1,6 +1,13 @@
 /**
  * /api/narrate/stream — TEMPORARY scaffolding (streaming text phases).
  *
+ * @deprecated The five-chunk session rewrite removed the body-scan
+ * and wave-rise/peak/fall streaming surfaces from the session shell
+ * (PRD § Session Structure). Their replacement is the scripted Chunk
+ * 4 breathing copy plus the multi-turn check-in chat streaming via
+ * `/api/checkin`. This route is no longer wired into the session
+ * page; slated for `git rm` in a follow-up cleanup PR.
+ *
  * Companion to /api/narrate. This handler covers the four narration
  * phases that stream plain prose into the UI: body-scan and the three
  * wave sub-phases. It calls OpenAI gpt-5-mini through the Responses API

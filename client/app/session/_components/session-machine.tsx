@@ -1,42 +1,68 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useReducer, useState } from "react";
+/**
+ * Session shell for the five-chunk urge surfing flow.
+ *
+ *   intake → safety → loop(loadingChunk → chunk N → check-in N) for N=1..5 → reflection → done
+ *
+ * Both the chunk narration and the check-in agent are now LLM-driven.
+ *   - Each chunk's lines come from `generateChunk()`. The generator
+ *     receives the patient profile + the FULL prior session history
+ *     (every prior chunk's lines + every prior check-in's transcript)
+ *     so the new narration can ground itself in what the patient has
+ *     already heard and said.
+ *   - Each check-in is a multi-turn LLM conversation that ends when
+ *     the model calls the `endConversation` tool. There is no
+ *     regex-based readiness gate — the chat surface treats the tool
+ *     call as the "we're done" signal.
+ *
+ * The ambient audio bed is mounted ONCE here at the shell so it never
+ * restarts on a chunk → check-in → chunk transition (PRD § Risk Areas
+ * #6, audio continuity invariant). It starts on the intake "Continue"
+ * gesture (which doubles as the audio-context unlock) and fades out at
+ * the reflection screen.
+ */
 
-import { BodyScanDiagram } from "./body-scan-diagram";
+import Link from "next/link";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+
+import { AmbientAudioBed, type AmbientAudioBedHandle } from "./ambient-audio-bed";
+import { CheckInChat } from "./check-in-chat";
+import { ChunkPlayer } from "./chunk-player";
 import { IntakeForm, type IntakeAnswers } from "./intake-form";
-import { IntensitySlider } from "./intensity-slider";
-import { NarratedPhase } from "./narrated-phase";
 import { NarrationCard } from "./narration-card";
 import { NextStepChips } from "./next-step-chips";
 import { ReflectionProgress } from "./reflection-progress";
+import { RelaxingLoader } from "./relaxing-loader";
 import { SafetyHandoff } from "./safety-handoff";
 import { SafetyScreen, type SafetyOutcome } from "./safety-screen";
-import { StreamedNarration } from "./streamed-narration";
+import { ScoreArc } from "./score-arc";
 
-import type { BodyScanLocation, SessionOutcome } from "@/types/models";
-import type {
-  BodyScanContext,
-  IntakeContext,
-  PhasePayloadMap,
-  ReflectionContext,
-  WaveContext,
-} from "@/lib/prompts/schemas";
+import { generateChunk } from "@/lib/gemma/chunk";
 import {
   generateReflection,
   type ReflectionTitle,
 } from "@/lib/gemma/session";
-import { encouragementForPhase } from "@/lib/prompts/encouragement-bank";
+import type {
+  PhasePayloadMap,
+  ReflectionContext,
+  SessionHistoryEntry,
+} from "@/lib/prompts/schemas";
+import type { SessionOutcome } from "@/types/models";
+import type {
+  CheckIn,
+  Chunk,
+  ChunkNumber,
+  SessionUserProfile,
+} from "@/types/session";
 
 type Phase =
   | "intake"
   | "safety"
   | "safetyHandoff"
-  | "ack"
-  | "bodyScan"
-  | "waveRise"
-  | "wavePeak"
-  | "waveFall"
+  | "loadingChunk"
+  | "chunk"
+  | "checkIn"
   | "reflection"
   | "done";
 
@@ -45,22 +71,39 @@ interface State {
   startedAt: string;
   intake: IntakeAnswers | null;
   usedSubstanceToday: boolean;
-  bodyLocation: BodyScanLocation | null;
-  currentIntensity: number;
-  endingIntensity: number | null;
+  currentChunk: ChunkNumber;
+  /** The generated chunk for `currentChunk`, or null while loading. */
+  generatedChunk: Chunk | null;
+  /** Provenance for the most recently generated chunk (for DevTools). */
+  generatedChunkSource: "model" | "fallback" | null;
+  checkIns: CheckIn[];
+  /**
+   * Cross-chunk conversation log. One entry per completed chunk
+   * (kind: "chunk", lines = the LLM-generated narration that played)
+   * and one per completed check-in (kind: "checkIn", with the
+   * cravingScore + obstacleCategory + full transcript). Forwarded to
+   * BOTH the chunk generator and the check-in chat so each new
+   * surface grounds itself in everything that has already happened.
+   */
+  sessionHistory: SessionHistoryEntry[];
   outcome: SessionOutcome | null;
   pickedNextStep: string | null;
-  intensitySamples: { timestamp: string; intensity: number }[];
+  demoMode: boolean;
 }
 
 type Action =
   | { type: "intakeSubmitted"; answers: IntakeAnswers }
   | { type: "safetyResolved"; outcome: SafetyOutcome }
-  | { type: "advance"; from: Phase }
-  | { type: "bodyLocationPicked"; location: BodyScanLocation }
-  | { type: "intensityChanged"; value: number }
-  | { type: "intensitySampled"; value: number }
-  | { type: "nextStepPicked"; choice: string };
+  | {
+      type: "chunkGenerated";
+      chunk: Chunk;
+      lines: string[];
+      source: "model" | "fallback";
+    }
+  | { type: "chunkCompleted" }
+  | { type: "checkInCompleted"; checkIn: CheckIn }
+  | { type: "nextStepPicked"; choice: string }
+  | { type: "sessionFinished" };
 
 function initialState(): State {
   return {
@@ -68,23 +111,16 @@ function initialState(): State {
     startedAt: new Date().toISOString(),
     intake: null,
     usedSubstanceToday: false,
-    bodyLocation: null,
-    currentIntensity: 5,
-    endingIntensity: null,
+    currentChunk: 1,
+    generatedChunk: null,
+    generatedChunkSource: null,
+    checkIns: [],
+    sessionHistory: [],
     outcome: null,
     pickedNextStep: null,
-    intensitySamples: [],
+    demoMode: false,
   };
 }
-
-const NEXT_PHASE: Partial<Record<Phase, Phase>> = {
-  ack: "bodyScan",
-  bodyScan: "waveRise",
-  waveRise: "wavePeak",
-  wavePeak: "waveFall",
-  waveFall: "reflection",
-  reflection: "done",
-};
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -92,7 +128,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         intake: action.answers,
-        currentIntensity: action.answers.intakeIntensity,
+        demoMode: action.answers.demoMode,
         phase: "safety",
       };
     case "safetyResolved":
@@ -106,37 +142,86 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         usedSubstanceToday: action.outcome.usedSubstanceToday,
-        phase: "ack",
+        phase: "loadingChunk",
+        currentChunk: 1,
+        generatedChunk: null,
       };
-    case "advance": {
-      const next = NEXT_PHASE[action.from];
-      if (!next) return state;
-      if (next === "reflection") {
-        return {
-          ...state,
-          phase: next,
-          endingIntensity: state.currentIntensity,
-        };
+    case "chunkGenerated":
+      // The effect that fetches the chunk may resolve after the
+      // patient has navigated forward. Only honor the result if we
+      // were still waiting for it.
+      if (
+        state.phase !== "loadingChunk" ||
+        action.chunk.id !== state.currentChunk
+      ) {
+        return state;
       }
-      if (next === "done") {
-        return { ...state, phase: next, outcome: "completed" };
-      }
-      return { ...state, phase: next };
-    }
-    case "bodyLocationPicked":
-      return { ...state, bodyLocation: action.location };
-    case "intensityChanged":
-      return { ...state, currentIntensity: action.value };
-    case "intensitySampled":
       return {
         ...state,
-        intensitySamples: [
-          ...state.intensitySamples,
-          { timestamp: new Date().toISOString(), intensity: action.value },
-        ],
+        generatedChunk: action.chunk,
+        generatedChunkSource: action.source,
+        phase: "chunk",
       };
+    case "chunkCompleted": {
+      // Append the chunk to the history snapshot the next surface
+      // (the check-in chat) will read.
+      const lines = state.generatedChunk
+        ? state.generatedChunk.segments
+            .filter((segment) => segment.type === "text")
+            .map((segment) =>
+              segment.type === "text" ? segment.content : "",
+            )
+        : [];
+      const newEntry: SessionHistoryEntry = {
+        kind: "chunk",
+        chunkNumber: state.currentChunk,
+        lines,
+      };
+      return {
+        ...state,
+        phase: "checkIn",
+        sessionHistory: [...state.sessionHistory, newEntry],
+      };
+    }
+    case "checkInCompleted": {
+      const checkIns = [...state.checkIns, action.checkIn];
+      const checkInEntry: SessionHistoryEntry = {
+        kind: "checkIn",
+        chunkNumber: action.checkIn.chunkNumber,
+        cravingScore: action.checkIn.cravingScore,
+        obstacleCategory: action.checkIn.obstacleCategory,
+        turns: action.checkIn.turns.map((turn) => ({
+          role: turn.role,
+          content: turn.content,
+        })),
+      };
+      const sessionHistory = [...state.sessionHistory, checkInEntry];
+
+      if (action.checkIn.chunkNumber === 5) {
+        return {
+          ...state,
+          checkIns,
+          sessionHistory,
+          phase: "reflection",
+        };
+      }
+      // Hand off to the chunk loader. The RelaxingLoader stays on
+      // screen — pulsing soft breath cues — until the next chunk's
+      // lines arrive from `/api/chunk`. There is no fixed-duration
+      // countdown; the meditation paces with the network.
+      return {
+        ...state,
+        checkIns,
+        sessionHistory,
+        phase: "loadingChunk",
+        currentChunk: (action.checkIn.chunkNumber + 1) as ChunkNumber,
+        generatedChunk: null,
+      };
+    }
     case "nextStepPicked":
       return { ...state, pickedNextStep: action.choice };
+    case "sessionFinished":
+      return { ...state, phase: "done", outcome: "completed" };
     default: {
       const _exhaustive: never = action;
       return _exhaustive;
@@ -146,45 +231,139 @@ function reducer(state: State, action: Action): State {
 
 export function SessionMachine() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
+  const audioRef = useRef<AmbientAudioBedHandle>(null);
 
-  const intakeContext: IntakeContext | null = useMemo(() => {
+  const profile: SessionUserProfile | null = useMemo(() => {
     if (!state.intake) return null;
+    return {
+      matType: state.intake.matType,
+      medicationStatus: state.intake.medicationStatus,
+      trigger: state.intake.trigger,
+      triggerOther: null,
+      usedSubstanceToday: state.usedSubstanceToday,
+    };
+  }, [state.intake, state.usedSubstanceToday]);
+
+  const intakeIntensity = state.intake?.intakeIntensity ?? 5;
+  const priorScores = useMemo(
+    () => state.checkIns.map((c) => c.cravingScore),
+    [state.checkIns],
+  );
+
+  // Most recent craving rating the patient has given us. Drives the
+  // ambient wave's fill height so the visualization mirrors whatever
+  // number the patient just owned on the slider. Before the first
+  // check-in we fall back to the intake intensity.
+  const currentIntensity =
+    priorScores.length > 0
+      ? priorScores[priorScores.length - 1]
+      : intakeIntensity;
+
+  // Start the audio bed when the patient enters the chunk loop.
+  useEffect(() => {
+    if (state.phase === "loadingChunk" && state.currentChunk === 1) {
+      void audioRef.current?.start();
+    }
+  }, [state.phase, state.currentChunk]);
+
+  // Fade out at reflection.
+  useEffect(() => {
+    if (state.phase === "reflection") {
+      void audioRef.current?.fade(2.5);
+    }
+  }, [state.phase]);
+
+  // Drive chunk generation whenever we enter the loadingChunk phase.
+  // The RelaxingLoader is the patient-facing cover during this wait.
+  useEffect(() => {
+    if (state.phase !== "loadingChunk") return;
+    // Skip if we already have the chunk (defensive — chunkGenerated
+    // already moves the phase out of loadingChunk).
+    if (state.generatedChunk) return;
+    if (!profile || !state.intake) return;
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    void generateChunk({
+      context: {
+        chunkNumber: state.currentChunk,
+        intakeIntensity: state.intake.intakeIntensity,
+        profile: {
+          matType: profile.matType,
+          medicationStatus: profile.medicationStatus,
+          trigger: profile.trigger,
+          triggerOther: profile.triggerOther,
+          usedSubstanceToday: profile.usedSubstanceToday,
+        },
+        sessionHistory: [...state.sessionHistory],
+      },
+      signal: controller.signal,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        dispatch({
+          type: "chunkGenerated",
+          chunk: result.chunk,
+          lines: result.lines,
+          source: result.source,
+        });
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        if (typeof console !== "undefined") {
+          console.error("[wave] chunk generation error", err);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [
+    state.phase,
+    state.currentChunk,
+    state.generatedChunk,
+    profile,
+    state.intake,
+    state.sessionHistory,
+  ]);
+
+  const showAmbientToggle =
+    state.phase === "loadingChunk" ||
+    state.phase === "chunk" ||
+    state.phase === "checkIn";
+
+  const reflectionContext: ReflectionContext | null = useMemo(() => {
+    if (!profile || !state.intake || state.checkIns.length < 5) return null;
+    const finalScore = state.checkIns[state.checkIns.length - 1].cravingScore;
+    const durationSeconds = Math.max(
+      0,
+      Math.round((Date.now() - new Date(state.startedAt).getTime()) / 1000),
+    );
     return {
       intakeIntensity: state.intake.intakeIntensity,
       matType: state.intake.matType,
       medicationStatus: state.intake.medicationStatus,
       trigger: state.intake.trigger,
       usedSubstanceToday: state.usedSubstanceToday,
-    };
-  }, [state.intake, state.usedSubstanceToday]);
-
-  const bodyContext: BodyScanContext | null = useMemo(() => {
-    if (!intakeContext || !state.bodyLocation) return null;
-    return { ...intakeContext, bodyLocation: state.bodyLocation };
-  }, [intakeContext, state.bodyLocation]);
-
-  const waveContext: WaveContext | null = useMemo(() => {
-    if (!bodyContext) return null;
-    return { ...bodyContext, currentIntensity: state.currentIntensity };
-  }, [bodyContext, state.currentIntensity]);
-
-  const reflectionContext: ReflectionContext | null = useMemo(() => {
-    if (!waveContext || state.endingIntensity === null) return null;
-    const durationSeconds = Math.max(
-      0,
-      Math.round(
-        (Date.now() - new Date(state.startedAt).getTime()) / 1000,
-      ),
-    );
-    return {
-      ...waveContext,
-      endingIntensity: state.endingIntensity,
+      bodyLocation: "other",
+      currentIntensity: finalScore,
+      endingIntensity: finalScore,
       durationSeconds,
     };
-  }, [waveContext, state.endingIntensity, state.startedAt]);
+  }, [
+    profile,
+    state.intake,
+    state.checkIns,
+    state.usedSubstanceToday,
+    state.startedAt,
+  ]);
 
   return (
     <div className="space-y-8">
+      <AmbientAudioBed ref={audioRef} showMuteButton={showAmbientToggle} />
+
       {state.phase === "intake" ? (
         <IntakeForm
           onSubmit={(answers) =>
@@ -203,83 +382,49 @@ export function SessionMachine() {
 
       {state.phase === "safetyHandoff" ? <SafetyHandoff /> : null}
 
-      {state.phase === "ack" && intakeContext ? (
-        <NarratedPhase
-          phase="med-ack"
-          input={intakeContext}
-          loadingFallback={
-            <NarrationCard
-              title="Acknowledgment"
-              badge="Phase 1 of 5"
-              loading
-            />
-          }
-        >
-          {(payload, source) => (
-            <NarrationCard
-              title="Acknowledgment"
-              badge="Phase 1 of 5"
-              loading={false}
-              source={source}
-              footer={
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wide text-foreground/50">
-                    Source: {payload.citationKey}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: "advance", from: "ack" })}
-                    className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
-                  >
-                    Body scan →
-                  </button>
-                </div>
-              }
-            >
-              <p>{payload.acknowledgment}</p>
-            </NarrationCard>
-          )}
-        </NarratedPhase>
-      ) : null}
-
-      {state.phase === "bodyScan" && intakeContext ? (
-        <BodyScanPhase
-          intakeContext={intakeContext}
-          selected={state.bodyLocation}
-          onSelect={(location) =>
-            dispatch({ type: "bodyLocationPicked", location })
-          }
-          onAdvance={() => dispatch({ type: "advance", from: "bodyScan" })}
+      {state.phase === "loadingChunk" ? (
+        <RelaxingLoader
+          key={`loader-${state.currentChunk}`}
+          pool={state.currentChunk === 1 ? "start" : "between"}
         />
       ) : null}
 
-      {(state.phase === "waveRise" ||
-        state.phase === "wavePeak" ||
-        state.phase === "waveFall") &&
-      waveContext ? (
-        <WavePhaseBlock
-          key={state.phase}
-          phase={state.phase}
-          waveContext={waveContext}
-          currentIntensity={state.currentIntensity}
-          onIntensityChange={(value) =>
-            dispatch({ type: "intensityChanged", value })
+      {state.phase === "chunk" && state.generatedChunk ? (
+        <ChunkPlayer
+          key={`chunk-${state.currentChunk}`}
+          chunk={state.generatedChunk}
+          demoMode={state.demoMode}
+          currentIntensity={currentIntensity}
+          onComplete={() => dispatch({ type: "chunkCompleted" })}
+        />
+      ) : null}
+
+      {state.phase === "checkIn" && profile ? (
+        <CheckInChat
+          key={`checkin-${state.currentChunk}`}
+          chunkNumber={state.currentChunk}
+          priorScores={priorScores}
+          intakeIntensity={intakeIntensity}
+          profile={profile}
+          sessionHistory={state.sessionHistory}
+          demoMode={state.demoMode}
+          onComplete={(checkIn) =>
+            dispatch({ type: "checkInCompleted", checkIn })
           }
-          onIntensitySample={(value) =>
-            dispatch({ type: "intensitySampled", value })
-          }
-          onAdvance={(from) => dispatch({ type: "advance", from })}
         />
       ) : null}
 
       {state.phase === "reflection" && reflectionContext ? (
-        <ReflectionPhaseBlock
-          reflectionContext={reflectionContext}
-          onPickNextStep={(choice) => {
-            dispatch({ type: "nextStepPicked", choice });
-            dispatch({ type: "advance", from: "reflection" });
-          }}
-        />
+        <div className="space-y-4">
+          <ScoreArc scores={priorScores} intakeIntensity={intakeIntensity} />
+          <ReflectionPhaseBlock
+            reflectionContext={reflectionContext}
+            onPickNextStep={(choice) => {
+              dispatch({ type: "nextStepPicked", choice });
+              dispatch({ type: "sessionFinished" });
+            }}
+          />
+        </div>
       ) : null}
 
       {state.phase === "done" ? (
@@ -314,248 +459,6 @@ export function SessionMachine() {
   );
 }
 
-function BodyScanPhase({
-  intakeContext,
-  selected,
-  onSelect,
-  onAdvance,
-}: {
-  intakeContext: IntakeContext;
-  selected: BodyScanLocation | null;
-  onSelect: (location: BodyScanLocation) => void;
-  onAdvance: () => void;
-}) {
-  const phaseInput: BodyScanContext | null = selected
-    ? { ...intakeContext, bodyLocation: selected }
-    : null;
-
-  return (
-    <div className="space-y-4">
-      <NarrationCard
-        title="Body scan"
-        badge="Phase 2 of 5"
-        loading={false}
-      >
-        <p className="text-foreground/80">
-          Pick the spot in your body where the craving is sitting. WAVE will
-          narrate the scan from there.
-        </p>
-        <div className="mt-4">
-          <BodyScanDiagram selected={selected} onSelect={onSelect} />
-        </div>
-      </NarrationCard>
-
-      {phaseInput ? (
-        <StreamedNarration
-          key={phaseInput.bodyLocation}
-          phase="body-scan"
-          input={phaseInput}
-          loadingFallback={
-            <NarrationCard
-              title="Body scan narration"
-              badge="Phase 2 of 5"
-              loading
-            />
-          }
-        >
-          {(text, source, isStreaming) => (
-            <NarrationCard
-              title="Body scan narration"
-              badge="Phase 2 of 5"
-              loading={false}
-              source={source}
-              footer={
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={onAdvance}
-                    className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
-                  >
-                    Start the wave →
-                  </button>
-                </div>
-              }
-            >
-              <p>
-                {text}
-                {isStreaming ? <StreamingCaret /> : null}
-              </p>
-            </NarrationCard>
-          )}
-        </StreamedNarration>
-      ) : null}
-    </div>
-  );
-}
-
-const WAVE_PHASE_META: Record<
-  "waveRise" | "wavePeak" | "waveFall",
-  {
-    phase: "wave-rise" | "wave-peak" | "wave-fall";
-    title: string;
-    badge: string;
-    cta: string;
-    barClass: string;
-  }
-> = {
-  waveRise: {
-    phase: "wave-rise",
-    title: "The wave is rising",
-    badge: "Phase 3 of 5 · rise",
-    cta: "At the peak →",
-    barClass: "bg-wave-rise",
-  },
-  wavePeak: {
-    phase: "wave-peak",
-    title: "You're at the peak",
-    badge: "Phase 3 of 5 · peak",
-    cta: "Coming down →",
-    barClass: "bg-wave-peak",
-  },
-  waveFall: {
-    phase: "wave-fall",
-    title: "The wave is falling",
-    badge: "Phase 4 of 5 · fall",
-    cta: "Reflect →",
-    barClass: "bg-wave-fall",
-  },
-};
-
-function WavePhaseBlock({
-  phase,
-  waveContext,
-  currentIntensity,
-  onIntensityChange,
-  onIntensitySample,
-  onAdvance,
-}: {
-  phase: "waveRise" | "wavePeak" | "waveFall";
-  waveContext: WaveContext;
-  currentIntensity: number;
-  onIntensityChange: (value: number) => void;
-  onIntensitySample: (value: number) => void;
-  onAdvance: (from: Phase) => void;
-}) {
-  const meta = WAVE_PHASE_META[phase];
-  // Snapshot the wave context at phase entry so the live slider does not
-  // re-trigger generateText on every drag. The parent passes
-  // `key={state.phase}` so this initializer reruns when the patient
-  // advances rise → peak → fall.
-  const [phaseInput] = useState<WaveContext>(waveContext);
-  // Sample the encouragement once per phase so it stays stable while
-  // the narration streams in and while the patient drags the slider.
-  const [encouragement] = useState<string>(() =>
-    encouragementForPhase(meta.phase),
-  );
-  return (
-    <div className="space-y-4">
-      <div
-        aria-hidden
-        className="h-32 rounded-2xl border border-border bg-surface relative overflow-hidden"
-      >
-        <div
-          className={`absolute inset-x-0 bottom-0 ${meta.barClass} opacity-60 transition-all duration-700`}
-          style={{ height: `${currentIntensity * 10}%` }}
-        />
-        <div className="absolute inset-0 flex items-end justify-center p-3 text-xs uppercase tracking-wide text-foreground/60">
-          {meta.badge}
-        </div>
-      </div>
-
-      <StreamedNarration
-        phase={meta.phase}
-        input={phaseInput}
-        loadingFallback={
-          <NarrationCard
-            title={meta.title}
-            badge={meta.badge}
-            loading
-            footer={
-              <WaveFooter
-                encouragement={encouragement}
-                currentIntensity={currentIntensity}
-                onIntensityChange={onIntensityChange}
-                onIntensitySample={onIntensitySample}
-                onAdvanceClick={() => onAdvance(phase)}
-                cta={meta.cta}
-              />
-            }
-          />
-        }
-      >
-        {(text, source, isStreaming) => (
-          <NarrationCard
-            title={meta.title}
-            badge={meta.badge}
-            loading={false}
-            source={source}
-            footer={
-              <WaveFooter
-                encouragement={encouragement}
-                currentIntensity={currentIntensity}
-                onIntensityChange={onIntensityChange}
-                onIntensitySample={onIntensitySample}
-                onAdvanceClick={() => onAdvance(phase)}
-                cta={meta.cta}
-              />
-            }
-          >
-            <p>
-              {text}
-              {isStreaming ? <StreamingCaret /> : null}
-            </p>
-          </NarrationCard>
-        )}
-      </StreamedNarration>
-    </div>
-  );
-}
-
-function WaveFooter({
-  encouragement,
-  currentIntensity,
-  onIntensityChange,
-  onIntensitySample,
-  onAdvanceClick,
-  cta,
-}: {
-  encouragement: string;
-  currentIntensity: number;
-  onIntensityChange: (value: number) => void;
-  onIntensitySample: (value: number) => void;
-  onAdvanceClick: () => void;
-  cta: string;
-}) {
-  return (
-    <div className="space-y-4">
-      <p className="text-sm italic text-foreground/70">{encouragement}</p>
-      <IntensitySlider
-        value={currentIntensity}
-        onChange={onIntensityChange}
-        onSample={onIntensitySample}
-      />
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onAdvanceClick}
-          className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
-        >
-          {cta}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function StreamingCaret() {
-  return (
-    <span
-      aria-hidden
-      className="ml-1 inline-block h-4 w-[2px] -mb-0.5 bg-accent align-middle animate-pulse"
-    />
-  );
-}
-
 type ReflectionState =
   | { kind: "loading"; titles: ReflectionTitle[] }
   | {
@@ -564,14 +467,6 @@ type ReflectionState =
       source: "model" | "fallback";
     };
 
-/**
- * Drives the reflection phase: streams reasoning-summary titles into
- * <ReflectionProgress /> while the model is still composing the
- * structured insight, then swaps to the regular NarrationCard +
- * NextStepChips when the payload arrives. Snapshots the
- * ReflectionContext at mount so any downstream state changes during
- * the long medium-effort call don't cancel the in-flight stream.
- */
 function ReflectionPhaseBlock({
   reflectionContext,
   onPickNextStep,
@@ -595,12 +490,7 @@ function ReflectionPhaseBlock({
         if (cancelled) return;
         setState((prev) => {
           if (prev.kind !== "loading") return prev;
-          // Dedupe by index — the route guarantees one emit per
-          // summary part but the client also enforces it so a route
-          // bug never produces duplicate rows.
           if (prev.titles.some((t) => t.index === title.index)) return prev;
-          // Sort by index so out-of-order arrivals still render in
-          // the model's intended sequence.
           const next = [...prev.titles, title].sort(
             (a, b) => a.index - b.index,
           );
@@ -636,7 +526,7 @@ function ReflectionPhaseBlock({
   return (
     <NarrationCard
       title="Reflection"
-      badge="Phase 5 of 5"
+      badge="Closing"
       loading={false}
       source={state.source}
       footer={

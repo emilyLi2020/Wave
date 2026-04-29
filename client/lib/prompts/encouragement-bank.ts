@@ -1,4 +1,15 @@
 /**
+ * @deprecated Legacy per-phase encouragement bank for the rise / peak /
+ * fall wave sub-phases.
+ *
+ * The five-chunk session rewrite removed the rise/peak/fall sub-phase
+ * UI; the equivalent affirmations now live inside the scripted Chunk 4
+ * breathing copy and inside the multi-turn check-in chat's scripted
+ * fallback bank (`client/lib/prompts/fallback-bank.ts`). This file is
+ * retained only for the Synthetix scaffolding and will be removed in a
+ * follow-up cleanup PR. Do not import from here in new code.
+ *
+ * ---
  * Per-phase encouragement banks for the three wave sub-phases. The model
  * never produces these lines — the wave block samples one at phase entry
  * and shows it under the streaming narration. Voice intentionally

@@ -61,6 +61,34 @@ import {
 
 const MAX_MODEL_ATTEMPTS = 2;
 
+function sanitizePatientFacingText(text: string): string {
+  return text
+    .replace(/\]\s*\[/g, " ")
+    .replace(/[\[\]]/g, "")
+    .replace(/[–—]/g, ",")
+    .replace(/\s+([,.;:?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeStructuredPayload<T>(value: T): T {
+  if (typeof value === "string") {
+    return sanitizePatientFacingText(value) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeStructuredPayload(item)) as T;
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        sanitizeStructuredPayload(entry),
+      ]),
+    ) as T;
+  }
+  return value;
+}
+
 // ---------------------------------------------------------------------------
 // generateJSON — structured payload phases (med-ack, reflection)
 // ---------------------------------------------------------------------------
@@ -119,7 +147,9 @@ export async function generateJSON<P extends JSONNarrationPhase>(
       }
 
       return {
-        payload: parsed.data as PhasePayloadMap[P],
+        payload: sanitizeStructuredPayload(
+          parsed.data as PhasePayloadMap[P],
+        ),
         source: "model",
         attempts,
       };
@@ -139,7 +169,7 @@ export async function generateJSON<P extends JSONNarrationPhase>(
   }
 
   return {
-    payload: fallbackJSONForPhase(phase, input),
+    payload: sanitizeStructuredPayload(fallbackJSONForPhase(phase, input)),
     source: "fallback",
     attempts,
   };
@@ -214,7 +244,11 @@ export async function generateText<P extends TextNarrationPhase>(
         continue;
       }
 
-      return { text: result.text, source: "model", attempts };
+      return {
+        text: sanitizePatientFacingText(result.text),
+        source: "model",
+        attempts,
+      };
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         throw err;
@@ -230,7 +264,7 @@ export async function generateText<P extends TextNarrationPhase>(
     );
   }
 
-  const fallback = fallbackTextForPhase(phase, input);
+  const fallback = sanitizePatientFacingText(fallbackTextForPhase(phase, input));
   // Push the fallback through the same onDelta channel so the UI's
   // "streaming" branch doesn't have a special case for fallback copy.
   options.onDelta?.(fallback);
@@ -315,7 +349,7 @@ export async function generateReflection(
       }
 
       return {
-        payload: validated.data,
+        payload: sanitizeStructuredPayload(validated.data),
         source: "model",
         attempts,
       };
@@ -340,7 +374,7 @@ export async function generateReflection(
   options.onTitle?.({ index: 0, text: "Pulling a saved reflection" });
 
   return {
-    payload: fallbackJSONForPhase("reflection", input),
+    payload: sanitizeStructuredPayload(fallbackJSONForPhase("reflection", input)),
     source: "fallback",
     attempts,
   };
@@ -389,14 +423,17 @@ async function consumeSSE(
         if (event === "delta") {
           const chunk = (data as { text?: string }).text;
           if (typeof chunk === "string" && chunk.length > 0) {
-            accumulated += chunk;
+            accumulated += sanitizePatientFacingText(chunk);
             onDelta?.(accumulated);
           }
         } else if (event === "done") {
           const finalText = (data as { text?: string }).text;
           return {
             kind: "done",
-            text: typeof finalText === "string" ? finalText : accumulated,
+            text:
+              typeof finalText === "string"
+                ? sanitizePatientFacingText(finalText)
+                : accumulated,
           };
         } else if (event === "error") {
           const message =
@@ -495,10 +532,13 @@ async function consumeReflectionSSE(
             !seen.has(obj.index)
           ) {
             seen.add(obj.index);
-            onTitle?.({ index: obj.index, text: obj.text });
+            onTitle?.({
+              index: obj.index,
+              text: sanitizePatientFacingText(obj.text),
+            });
           }
         } else if (event === "payload") {
-          return { kind: "done", payload: data };
+          return { kind: "done", payload: sanitizeStructuredPayload(data) };
         } else if (event === "error") {
           const message =
             (data as { message?: string }).message ?? "stream_error";

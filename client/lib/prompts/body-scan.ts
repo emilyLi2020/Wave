@@ -1,3 +1,13 @@
+/**
+ * @deprecated Legacy body-scan one-shot stream prompt.
+ *
+ * The body-scan is now woven into Chunk 2 of the scripted five-chunk
+ * session (see `client/lib/prompts/session-script.ts`) and no longer
+ * collects a body-region tap target up front. This file is retained
+ * only for the Synthetix scaffolding and will be removed in a
+ * follow-up cleanup PR. Do not import from here in new code.
+ */
+
 import type { BodyScanContext } from "./schemas";
 import type { BuiltPrompt } from "./medication-ack";
 import type { BodyScanLocation } from "@/types/models";

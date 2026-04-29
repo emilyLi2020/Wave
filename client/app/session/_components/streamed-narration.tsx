@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @deprecated Legacy StreamedNarration wrapper for the body-scan and
+ * three wave sub-phases. The streaming surface for the new flow is the
+ * multi-turn check-in chat (`check-in-chat.tsx` + `streamCheckInTurn`
+ * in `client/lib/gemma/checkin.ts`); the chunk meditation copy is
+ * scripted, not streamed. Slated for removal in a follow-up cleanup
+ * PR. Do not import from here in new code.
+ */
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { generateText } from "@/lib/gemma/session";

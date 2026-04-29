@@ -22,8 +22,29 @@ import type {
  * The intake safety screen is intentionally absent from both lists: it is
  * rule-based and never touches an LLM (PRD.md > Domain Constraints >
  * Crisis handoff).
+ *
+ * Legacy-shape phases
+ * -------------------
+ * `med-ack`, `body-scan`, `wave-rise`, `wave-peak`, and `wave-fall` are
+ * the legacy one-shot phase contracts replaced by the five-chunk
+ * session in PRD § Session Structure. They are kept here only so the
+ * `reflection` phase keeps validating against the same `WaveContext`
+ * type and so the Synthetix LoRA scaffolding under `client/synthetix/`
+ * keeps compiling. The new session path consumes none of them — see
+ * `client/lib/prompts/check-in.ts`, `wave-system.ts`, and the chunk
+ * scripts in `session-script.ts` instead. Slated for removal in the
+ * post-rewrite cleanup PR.
+ *
+ * @deprecated The `med-ack`, `body-scan`, and three `wave-*` entries
+ * are no longer mounted by the session shell. Only `reflection`
+ * remains live.
  */
 export const JSON_NARRATION_PHASES = ["med-ack", "reflection"] as const;
+/**
+ * @deprecated The body-scan and wave-rise/peak/fall phases were
+ * replaced by the five-chunk session script and the multi-turn
+ * check-in chat. Kept temporarily so `synthetix/` scaffolding compiles.
+ */
 export const TEXT_NARRATION_PHASES = [
   "body-scan",
   "wave-rise",
@@ -338,3 +359,197 @@ export const narrateReflectionStreamRequestSchema = z.object({
 export type NarrateReflectionStreamRequest = z.infer<
   typeof narrateReflectionStreamRequestSchema
 >;
+
+/**
+ * Multi-turn check-in chat — request shape for /api/checkin.
+ *
+ * Distinct from the legacy one-shot narrate routes above because the
+ * check-in is a conversation: the route is called once per agent turn
+ * and gets the full alternating chat history, NOT a single "phase" of
+ * pre-rendered context. The system prompt is the canonical
+ * `WAVE_SYSTEM_PROMPT` from `client/lib/prompts/wave-system.ts`; per-
+ * turn framing is built by `buildCheckInPrompt()` in
+ * `client/lib/prompts/check-in.ts`.
+ *
+ * The check-in agent has a single tool, `endConversation`, that the
+ * model calls when it judges the check-in is complete (the patient is
+ * ready to move into the next chunk, or, at Check-in 5, has shared
+ * their closing reflection). The state machine treats that tool call
+ * as the readiness gate — there is no regex-based affirmative match
+ * any more.
+ */
+const obstacleCategorySchema = z.enum([
+  "cannot_visualize",
+  "mind_wandering",
+  "urge_overwhelming",
+  "breath_tight",
+  "breath_anxiety",
+  "gave_in",
+  "guilt_failure",
+  "physical_discomfort",
+  "sleepiness",
+]);
+
+const checkInChatTurnSchema = z.object({
+  role: z.enum(["agent", "patient"]),
+  content: z.string().min(1).max(2000),
+});
+
+const sessionUserProfileSchema = z.object({
+  matType: z.enum([
+    "buprenorphine",
+    "naltrexone",
+    "methadone",
+    "vivitrol",
+    "none",
+  ]),
+  medicationStatus: z.enum(["on_time", "late", "missed", "none"]),
+  trigger: z.enum(["social", "stress", "physical", "unknown", "other"]),
+  triggerOther: z.string().max(120).nullable(),
+  usedSubstanceToday: z.boolean(),
+});
+
+/**
+ * One entry in the cross-chunk session history. Both the chunk
+ * generator and the check-in chat take the full ordered list of these
+ * so the LLM can ground every new line in everything the patient has
+ * already heard / said this session.
+ */
+const sessionHistoryEntrySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("chunk"),
+    chunkNumber: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+      z.literal(5),
+    ]),
+    /** The lines the chunk player narrated, in display order. */
+    lines: z.array(z.string().min(1).max(600)).min(1).max(20),
+  }),
+  z.object({
+    kind: z.literal("checkIn"),
+    chunkNumber: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+      z.literal(5),
+    ]),
+    cravingScore: z.number().int().min(1).max(10),
+    obstacleCategory: obstacleCategorySchema.nullable(),
+    turns: z.array(checkInChatTurnSchema).max(40),
+  }),
+]);
+
+export type SessionHistoryEntry = z.infer<typeof sessionHistoryEntrySchema>;
+
+export const checkInContextSchema = z.object({
+  chunkNumber: z.union([
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+  ]),
+  cravingScore: z.number().int().min(1).max(10),
+  scoreHistory: z.array(z.number().int().min(1).max(10)).max(5),
+  obstacleHint: obstacleCategorySchema.nullable(),
+  profile: sessionUserProfileSchema,
+  intakeIntensity: z.number().int().min(1).max(10),
+  /** Every prior chunk + check-in this session, oldest first. */
+  sessionHistory: z.array(sessionHistoryEntrySchema).max(20),
+  /**
+   * When true, the check-in is running in demo mode: the LLM should
+   * wrap in a single patient free-text turn after the score (so the
+   * conversation is score -> 1 agent validation -> 1 patient reply ->
+   * endConversation). Clinical invariants (validate before technique,
+   * no prescribing, no toxic positivity) still apply.
+   */
+  demoMode: z.boolean().default(false),
+});
+
+export type CheckInContextPayload = z.infer<typeof checkInContextSchema>;
+
+export const checkInRequestSchema = z.object({
+  history: z.array(checkInChatTurnSchema).max(40),
+  context: checkInContextSchema,
+});
+
+export type CheckInRequest = z.infer<typeof checkInRequestSchema>;
+
+/**
+ * Chunk generation — request + response shapes for /api/chunk.
+ *
+ * Each chunk's narration is now LLM-generated rather than read from
+ * the static `session-script.ts` bank. The generator receives the
+ * patient profile + the full prior session history (every chunk's
+ * lines + every check-in's transcript) so it can ground the next
+ * chunk's copy in what the patient has already heard and said.
+ *
+ * Output is a fixed-length list of plain-text lines. The chunk player
+ * wraps each line as a `text` segment and inserts a default-length
+ * `pause` segment between consecutive lines — pause durations are a
+ * client-side runtime concern, not part of the model contract.
+ */
+export const CHUNK_LINE_COUNT = 6;
+const MIN_LINE_LENGTH = 12;
+// Tight cap so the model can't pack multiple meditation beats into a
+// single array element with a delimiter (e.g. ` / `, `; `, or CJK
+// `」「`). One beat per element is part of the runtime contract — the
+// chunk player drops a fixed pause between every element.
+const MAX_LINE_LENGTH = 200;
+
+export const chunkGenerationContextSchema = z.object({
+  chunkNumber: z.union([
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+  ]),
+  intakeIntensity: z.number().int().min(1).max(10),
+  profile: sessionUserProfileSchema,
+  sessionHistory: z.array(sessionHistoryEntrySchema).max(20),
+});
+
+export type ChunkGenerationContextPayload = z.infer<
+  typeof chunkGenerationContextSchema
+>;
+
+export const chunkGenerationRequestSchema = z.object({
+  context: chunkGenerationContextSchema,
+});
+
+export type ChunkGenerationRequest = z.infer<
+  typeof chunkGenerationRequestSchema
+>;
+
+export const chunkLinesSchema = z.object({
+  lines: z
+    .array(z.string().min(MIN_LINE_LENGTH).max(MAX_LINE_LENGTH))
+    .length(CHUNK_LINE_COUNT),
+});
+
+export type ChunkLinesPayload = z.infer<typeof chunkLinesSchema>;
+
+export const CHUNK_LINES_JSON_SCHEMA_NAME = "WaveChunkLines";
+
+export const chunkLinesJsonSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["lines"],
+  properties: {
+    lines: {
+      type: "array",
+      minItems: CHUNK_LINE_COUNT,
+      maxItems: CHUNK_LINE_COUNT,
+      items: {
+        type: "string",
+        minLength: MIN_LINE_LENGTH,
+        maxLength: MAX_LINE_LENGTH,
+      },
+    },
+  },
+};

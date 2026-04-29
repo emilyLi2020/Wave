@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @deprecated Legacy NarratedPhase wrapper for the JSON-narration
+ * phases (med-ack and reflection). The five-chunk session shell no
+ * longer mounts a generic per-phase wrapper; reflection is rendered
+ * directly by `session-machine.tsx` and med-ack was folded into the
+ * multi-turn check-in chat. Slated for removal in a follow-up cleanup
+ * PR. Do not import from here in new code.
+ */
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { generateJSON } from "@/lib/gemma/session";

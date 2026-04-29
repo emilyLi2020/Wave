@@ -1,6 +1,14 @@
 /**
  * /api/narrate — TEMPORARY scaffolding (JSON phases only).
  *
+ * @deprecated for the `med-ack` phase. The five-chunk session rewrite
+ * (PRD § Session Structure) folded medication-aware copy into the
+ * multi-turn check-in chat at `/api/checkin`; med-ack is no longer
+ * called by the session shell. The `reflection` phase still uses this
+ * route via the streaming reflection sibling at
+ * `/api/narrate/reflection-stream`. Slated for cleanup once the
+ * in-browser Gemma stack ships.
+ *
  * The production WAVE session path is offline-first and runs Gemma 4
  * E2B-it in the browser via @huggingface/transformers + WebGPU
  * (PRD.md > Backend Needed?, AGENTS.md > Tech Stack). This Route Handler

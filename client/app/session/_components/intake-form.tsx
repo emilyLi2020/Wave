@@ -37,6 +37,14 @@ export interface IntakeAnswers {
   matType: MatType;
   medicationStatus: MedicationStatus;
   trigger: TriggerCategory;
+  /**
+   * Demo mode collapses every scripted `pause` and `breath` segment in
+   * the chunk player to a flat 2-second beat so a reviewer can watch
+   * the entire 5-chunk + 5-check-in arc end-to-end in a couple of
+   * minutes. Strictly a UI rehearsal aid — never set this for a
+   * patient-facing run.
+   */
+  demoMode: boolean;
 }
 
 interface Props {
@@ -49,6 +57,7 @@ export function IntakeForm({ onSubmit }: Props) {
   const [medicationStatus, setMedicationStatus] =
     useState<MedicationStatus | null>(null);
   const [trigger, setTrigger] = useState<TriggerCategory | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
 
   const needsMedicationStatus = matType !== null && matType !== "none";
   const ready =
@@ -68,11 +77,14 @@ export function IntakeForm({ onSubmit }: Props) {
         ? (medicationStatus as MedicationStatus)
         : "none",
       trigger,
+      demoMode,
     });
   }
 
   return (
     <div className="space-y-8">
+      <DemoModeToggle value={demoMode} onChange={setDemoMode} />
+
       <article className="rounded-2xl border border-border bg-surface p-6">
         <header className="flex items-center justify-between">
           <h2 className="font-semibold">
@@ -179,5 +191,55 @@ export function IntakeForm({ onSubmit }: Props) {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Demo-mode toggle. Lives at the top of the intake screen so a
+ * reviewer can flip it on before answering anything else. Visually
+ * de-emphasized (dashed border, smaller copy) so a real patient
+ * doesn't feel pulled toward it.
+ */
+function DemoModeToggle({
+  value,
+  onChange,
+}: {
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      onClick={() => onChange(!value)}
+      className={`flex w-full items-center justify-between gap-4 rounded-2xl border border-dashed px-5 py-3 text-left text-sm transition ${
+        value
+          ? "border-accent bg-accent-soft text-accent"
+          : "border-border bg-surface-muted text-foreground/70 hover:border-accent hover:text-accent"
+      }`}
+    >
+      <span className="flex flex-col">
+        <span className="font-medium">
+          Demo mode {value ? "is on" : "is off"}
+        </span>
+        <span className="text-xs text-foreground/60">
+          Shortens every meditation pause to 2 seconds so you can preview
+          the full session in about 2 minutes.
+        </span>
+      </span>
+      <span
+        aria-hidden
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+          value ? "bg-accent" : "bg-border"
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow transition ${
+            value ? "translate-x-5" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+    </button>
   );
 }

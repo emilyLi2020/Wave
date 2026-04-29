@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * @deprecated Legacy body-region tap diagram used at intake by the
+ * old session machine. The five-chunk session does not collect a body
+ * region up front — the body scan happens inside Chunk 2 as a guided
+ * observation. Slated for removal in a follow-up cleanup PR. Do not
+ * import from here in new code.
+ */
+
 import type { BodyScanLocation } from "@/types/models";
 
 const REGIONS: { value: BodyScanLocation; label: string; hint: string }[] = [

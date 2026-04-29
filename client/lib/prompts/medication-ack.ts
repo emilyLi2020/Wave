@@ -1,11 +1,17 @@
-import { outputContractFor, type IntakeContext, type CitationKey } from "./schemas";
-
 /**
- * Medication-aware acknowledgment prompts. The (matType, medicationStatus)
- * grid mirrors PRD.md > Medication-Aware Prompt Logic. Any change to copy
- * here requires a citation key drawn from CITATION_KEYS in schemas.ts and a
- * matching FDA/SAMHSA/MBRP source in the PR description.
+ * @deprecated Legacy one-shot medication-acknowledgment prompt.
+ *
+ * The five-chunk session rewrite (PRD § Session Structure) folded
+ * medication-aware copy into the validation slot of the multi-turn
+ * check-in chat (see `client/lib/prompts/wave-system.ts` and
+ * `client/lib/prompts/check-in.ts`). The standalone "med-ack" phase is
+ * no longer mounted by the session shell. This file is retained only
+ * so the Synthetix LoRA scaffolding under `client/synthetix/` keeps
+ * compiling while we land the rewrite. It will be removed in a
+ * follow-up cleanup PR — do not import from here in new code.
  */
+
+import { outputContractFor, type IntakeContext, type CitationKey } from "./schemas";
 
 const SYSTEM_PROMPT = `<role>
 You write medication-aware urge-surfing acknowledgments for WAVE, a tool for adults in Substance Use Disorder recovery.
