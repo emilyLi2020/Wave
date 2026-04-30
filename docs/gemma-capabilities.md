@@ -124,11 +124,13 @@ vLLM, llama.cpp, and Transformers all parse this natively. The HF chat
 template (visible in the model card) handles the formatting — you do not hand-
 craft the tool grammar.
 
-**For WAVE:** the session path does not use tool calls. The Adapter Manager
-chooses LoRAs with **rule-based routing** (see [`models.md`](./models.md)), so
-the model is never given the option to drift into a tool that, for example,
-changes a medication. This is intentional. Tool calling may show up in
-non-clinical surfaces later (e.g. an analytics dashboard).
+**For WAVE:** tool calls are allowed only for narrow control-plane signals, not
+for clinical routing. The current temporary `/api/checkin` stand-in uses a
+single `endConversation` tool call to signal that the check-in is complete; the
+session state machine still owns the transition. The Adapter Manager chooses
+LoRAs with rule-based routing (see [`models.md`](./models.md)), so the model is
+never given a tool that can change medication, pick a hotline, write storage, or
+route around the intake safety screen.
 
 ### JSON / structured output
 
@@ -161,12 +163,13 @@ A few things that follow from this table:
   WebGPU), function calling is also the most portable option since the
   guarantee comes from the model, not the server.
 
-**For WAVE specifically:** we ship via `transformers.js` + WebGPU, which has
-no built-in JSON mode. Where we need structured output (e.g. crisis-triage
-classification labels), we currently constrain on the **prompt + parser**
-side and validate the JSON before trusting it. If we ever move to a vLLM-
-backed server surface, we'll switch to `response_format: json_schema` because
-that gives a hard guarantee instead of a probabilistic one.
+**For WAVE specifically:** the final web runtime ships via `transformers.js` +
+WebGPU, which has no built-in JSON mode. Where we need structured output, the
+Gemma path will constrain on the prompt/tool shape, parse the output, validate
+with Zod, retry once, then fall back to scripted local copy. The current
+temporary OpenAI stand-ins use Responses API JSON Schema where useful
+(`/api/narrate`, `/api/narrate/reflection`, `/api/insights`) so the client-side
+contracts can stabilize before the Gemma swap.
 
 ---
 
@@ -213,7 +216,7 @@ whole reason WAVE picked it.
 | Runtime | Status | WAVE uses it |
 |---|---|---|
 | 🤗 Transformers (PyTorch) | First-class. Use `AutoModelForImageTextToText` for vision/audio, `AutoModelForCausalLM` for text-only. | Yes — for the developer-machine smoke test and LoRA training in [`models/`](../models/). |
-| `transformers.js` + WebGPU | Supported on E2B/E4B (web `.task` build). | **Yes — production web demo.** |
+| `transformers.js` + WebGPU | Supported on E2B/E4B (web `.task` build). | Final web-demo runtime. Temporary route handlers stand in today. |
 | LiteRT-LM (`.litertlm`) | Official build for Android, iOS, Desktop, IoT. Hardware accel via XNNPack (CPU) and ML Drift (GPU). | Yes — post-hackathon mobile port. |
 | vLLM | Native Gemma 4 support, including a dedicated `gemma4_utils` tool-call parser and OpenAI-compatible API. | Not yet — would be the play if we ever add a server-side surface. |
 | llama.cpp / Ollama | Official GGUF builds, OpenAI-compatible HTTP. | Not yet. |
@@ -242,11 +245,12 @@ server in front of it.
 | **OpenAI Assistants API** | ❌ | Same — server-side product, not a model contract. |
 | **LangChain / LlamaIndex / DSPy** | ✅ | Via the same OpenAI-compatible server pattern, or via the `transformers` integration. |
 
-**For WAVE:** we do not run an OpenAI-compatible server in the session path —
-we call the model directly through `transformers.js` in the browser. The
-OpenAI Agents SDK is therefore not in our stack today. If we ever stand up a
-clinician-facing dashboard that wants agentic workflows, the recipe above is
-the path.
+**For WAVE:** the settled architecture does not run an OpenAI-compatible server
+in the session path; it calls Gemma directly through `transformers.js` in the
+browser. The current checked-in web demo temporarily calls OpenAI `gpt-5-mini`
+from Next.js Route Handlers while that runtime is unfinished. Those routes are
+scaffolding, not the target serving architecture. The OpenAI Agents SDK is not
+in our stack.
 
 ---
 

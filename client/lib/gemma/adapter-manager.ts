@@ -6,9 +6,9 @@
  * the base model. Call sites in `lib/gemma/session.ts` do not change.
  *
  * TODO:replace-with-gemma — switch the return value from a prompt-template
- * id to the LoRA adapter id (e.g. `lora-med-ack`, `lora-body-scan`,
- * `lora-wave-rise|peak|fall`, `lora-reflection`) once the LoRA stack ships.
- * Keep the function signature and the phase keys stable.
+ * id to the final LoRA adapter ids. The legacy one-shot narration phases
+ * below are slated for cleanup; the settled MVP LoRA stack is
+ * `lora-check-in-1` through `lora-check-in-5` plus `lora-reflection`.
  */
 
 import type { NarrationPhase } from "@/lib/prompts/schemas";

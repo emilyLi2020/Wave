@@ -69,8 +69,9 @@ Per LoRA, before any generation happens:
    live in `client/lib/prompts/schemas.ts`.
 
 3. **The LoRA's stack axes.** The typed enumerations the generator
-   samples from — e.g. for `lora-med-ack`, the axes are `matType`,
-   `medicationStatus`, `trigger`, `intensityBucket`, `timeOfDay`. The
+   samples from — e.g. for `lora-check-in-1`, the axes are `matType`,
+   `medicationStatus`, `trigger`, `intensityBucket`, `scoreTrend`, and
+   `obstacleCategory`. The
    stack axes live under `client/synthetix/stacks/<lora-id>.ts`. They
    do **not** need to be enumerated exhaustively; they are just the
    bag the generator samples inputs from.
@@ -288,10 +289,10 @@ One QLoRA run per LoRA, on the 80 % train split.
   + QLoRA, targeting `google/gemma-4-E2B-it`.
 - **Target modules.** `q_proj, k_proj, v_proj, o_proj, gate_proj,
   up_proj, down_proj`.
-- **Rank / alpha / dropout.** Per-LoRA; see `models.md`. Common
-  settings are rank 8 (alpha 16) for the short-copy LoRAs and rank 16
-  (alpha 32) for the denser surfaces (`lora-med-ack`,
-  `lora-reflection`).
+- **Rank / alpha / dropout.** Per-LoRA; see `models.md`. The settled
+  check-in and reflection surfaces use rank 16 (alpha 32) because they
+  need to preserve multi-turn structure, medication-aware validation,
+  and safety invariants.
 - **Optimizer.** AdamW, lr `2e-4` with cosine schedule, warmup 3 %.
 - **Batch size.** 8, with gradient accumulation as needed.
 - **Epochs.** 3. Save the **final** checkpoint. No early stopping, no
@@ -362,7 +363,7 @@ The harness emits one file:
 ```
 client/synthetix/runs/<lora-id>/<run-id>/eval.json
 {
-  "loraId": "lora-med-ack",
+  "loraId": "lora-check-in-1",
   "runId": "2026-04-17-001",
   "testSetSize": 80,
   "jsonValidityFirstTryRate": 0.9875,
@@ -493,7 +494,8 @@ client/app/synthetix-review/   # local-only Next.js UI for §3 spot-check
   matrix. Seed sets and invariants must match it.
 - `AGENTS.md > Domain Constraints` — the source of truth for tone
   rules and crisis handoff. `tone-rules.ts` encodes these.
-- `client/lib/gemma/adapter-manager.ts` (future) — the runtime that
-  consumes the adapters this process produces.
-- `client/lib/prompts/schemas.ts` (future) — the Zod schemas that
-  define the input / output contract every LoRA is trained against.
+- `client/lib/gemma/adapter-manager.ts` — the runtime contract that
+  consumes the adapters this process produces. Today it returns prompt ids
+  for temporary scaffolding; after the Gemma swap it returns LoRA ids.
+- `client/lib/prompts/schemas.ts` — the Zod schemas that define the input /
+  output contract every LoRA is trained against.

@@ -39,9 +39,9 @@ These rules mirror `AGENTS.md` and `PRD.md` at the repo root and apply to every 
 ## Privacy
 
 - No third-party analytics, error tracking, or ad scripts anywhere in `client/`.
-- Do not send craving, medication, or journal content to an endpoint unless it is explicitly the user's export action.
+- Do not send craving, medication, or journal content to a new endpoint. The existing `/api/checkin`, `/api/narrate/reflection`, and `/api/insights` routes are temporary `gpt-5-mini` scaffolding behind the Gemma boundaries and should be deleted when in-browser Gemma ships.
 - Medication photos (when added) must be processed client-side. Do not upload them.
-- The session route must make as few network calls as possible, and every call must have a scripted local fallback so the demo works offline.
+- The final session route must make zero LLM network calls. During temporary scaffolding, every model-backed route must have a scripted local fallback so the demo never blocks the patient.
 
 ## Build hygiene
 

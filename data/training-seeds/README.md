@@ -4,11 +4,11 @@ This directory holds the (input, output) seed examples a clinician
 collects through the dev-only `/training` UI in `client/`. One JSON file
 per LoRA is created on the first save:
 
-- `lora-med-ack.json`
-- `lora-body-scan.json`
-- `lora-wave-rise.json`
-- `lora-wave-peak.json`
-- `lora-wave-fall.json`
+- `lora-check-in-1.json`
+- `lora-check-in-2.json`
+- `lora-check-in-3.json`
+- `lora-check-in-4.json`
+- `lora-check-in-5.json`
 - `lora-reflection.json`
 - `lora-notification.json`
 - `lora-insights.json`
@@ -19,7 +19,7 @@ Each file is a JSON array of seed records:
 [
   {
     "id": "<uuid>",
-    "loraId": "lora-med-ack",
+    "loraId": "lora-check-in-1",
     "input": { "...": "..." },
     "output": { "...": "..." },
     "authorInitials": "RM",
