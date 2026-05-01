@@ -24,6 +24,7 @@ no full-model reload between check-ins.
 We still train future specialized LoRAs as demonstration artifacts:
 
 ```
+lora-phase-narration
 lora-check-in-1 ... lora-check-in-5
 lora-reflection
 ```
@@ -75,13 +76,14 @@ session.
 | Base | `google/gemma-4-E2B-it` (INT4) |
 | Runtime artifact | Merged ONNX model: base + LoRA |
 | Where used | Browser demo session path |
-| Training data | Combined ready rows from `lora-check-in-1` through `lora-check-in-5` and `lora-reflection` |
-| Target sample count | 120 human-written seed rows total: 20 per specialized set |
+| Training data | Combined ready rows from `lora-phase-narration`, `lora-check-in-1` through `lora-check-in-5`, and `lora-reflection` |
+| Target sample count | 140 human-written seed rows total: 20 per specialized set |
 | Browser behavior | One model is loaded once; no LoRA hot-swap at runtime |
 
 **What it is fine-tuned for.** `lora-wave-session` is a multitask session LoRA.
 The input includes a `surface` discriminator so the same adapter can produce:
 
+- phase narration for chunks 1-5
 - check-in turns after chunks 1-5
 - the final reflection card
 
@@ -112,6 +114,14 @@ hot-swapping is not mature enough yet.
 Each specialized adapter collects **20 human-written seed examples** in the
 developer training UI. The same examples are included in the combined
 `lora-wave-session` fine-tune.
+
+### `lora-phase-narration`
+
+| Field | Value |
+|---|---|
+| Where used in future runtime | Meditation phase narration for chunks 1-5 |
+| Seed target | 20 examples total, distributed across `chunkNumber` 1-5 |
+| Focus | Six-line narration scripts that preserve the MBRP phase order: settle, body scan, sound anchor, breathing, close |
 
 ### `lora-check-in-1`
 
@@ -164,6 +174,33 @@ developer training UI. The same examples are included in the combined
 ---
 
 ## Shared Input / Output Contracts
+
+### Phase Narration Input
+
+```ts
+type PhaseNarrationInput = {
+  surface: "phase_narration";
+  chunkNumber: 1 | 2 | 3 | 4 | 5;
+  intakeIntensity: number;
+  medicationStatus: "on_time" | "late" | "missed" | "none";
+  matType: "buprenorphine" | "naltrexone" | "methadone" | "vivitrol" | "none";
+  trigger: "social" | "stress" | "physical" | "unknown" | "other";
+  triggerOther?: string;
+  usedSubstanceToday: boolean;
+  latestCravingScore?: number;
+  obstacleHint?: string;
+  scoreHistorySummary?: string;
+  priorSessionSummary?: string;
+};
+```
+
+### Phase Narration Output
+
+```ts
+type PhaseNarrationOutput = {
+  lines: [string, string, string, string, string, string];
+};
+```
 
 ### Check-In Input
 
@@ -284,6 +321,7 @@ adapter entries when their LoRA hot-swap APIs are production-ready.
 
 ```ts
 type LoRAId =
+  | "lora-phase-narration"
   | "lora-wave-session"
   | "lora-check-in-1"
   | "lora-check-in-2"

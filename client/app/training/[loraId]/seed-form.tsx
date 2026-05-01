@@ -36,6 +36,9 @@ function defaultsFor(fields: readonly FieldSpec[]): Json {
       case "text":
         out[field.key] = "";
         break;
+      case "text-array":
+        out[field.key] = Array.from({ length: field.maxItems }, () => "");
+        break;
       case "number":
         out[field.key] = "";
         break;
@@ -71,6 +74,17 @@ function coerce(fields: readonly FieldSpec[], state: Json): Json {
         const value = typeof raw === "string" ? raw : "";
         if (field.optional && value.trim() === "") break;
         out[field.key] = value;
+        break;
+      }
+      case "text-array": {
+        const rawItems = Array.isArray(raw) ? raw : [];
+        const items = rawItems
+          .slice(0, field.maxItems)
+          .map((item) => (typeof item === "string" ? item : ""));
+        while (items.length < field.minItems) {
+          items.push("");
+        }
+        out[field.key] = items;
         break;
       }
       case "number": {
@@ -133,6 +147,15 @@ function rehydrateForState(
       case "text":
         merged[field.key] = typeof value === "string" ? value : "";
         break;
+      case "text-array": {
+        const rawItems = Array.isArray(value) ? value : [];
+        const items = Array.from({ length: field.maxItems }, (_, index) => {
+          const item = rawItems[index];
+          return typeof item === "string" ? item : "";
+        });
+        merged[field.key] = items;
+        break;
+      }
       case "number":
         merged[field.key] =
           value === undefined || value === null ? "" : String(value);
@@ -168,6 +191,10 @@ export function SeedForm({ spec, existing }: Props) {
     () => `wave-training-draft:${spec.loraId}:${existing?.id ?? "new"}`,
     [spec.loraId, existing?.id],
   );
+  const lastInputKey = useMemo(
+    () => `wave-training-last-input:${spec.loraId}`,
+    [spec.loraId],
+  );
 
   const initialInput = useMemo(
     () => rehydrateForState(spec.inputFields, existing?.input as Json),
@@ -187,12 +214,22 @@ export function SeedForm({ spec, existing }: Props) {
   const [status, setStatus] = useState<SeedStatus>(existing?.status ?? "draft");
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
 
-  // Restore from localStorage on first mount.
+  // Restore from localStorage on first mount. Drafts win over the last
+  // completed input so an unfinished example is never overwritten.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(draftKey);
-      if (!raw) return;
+      if (!raw) {
+        if (!existing) {
+          const lastInput = window.localStorage.getItem(lastInputKey);
+          if (lastInput) {
+            const payload = JSON.parse(lastInput) as Json;
+            setInputState(rehydrateForState(spec.inputFields, payload));
+          }
+        }
+        return;
+      }
       const draft = JSON.parse(raw) as DraftSnapshot;
       setInputState(rehydrateForState(spec.inputFields, draft.input));
       setOutputState(rehydrateForState(spec.outputFields, draft.output));
@@ -204,7 +241,7 @@ export function SeedForm({ spec, existing }: Props) {
       // ignore malformed drafts
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
+  }, [draftKey, lastInputKey, existing]);
 
   // Persist on every change.
   useEffect(() => {
@@ -247,9 +284,10 @@ export function SeedForm({ spec, existing }: Props) {
     setSubmitting(true);
     setServerError(null);
 
+    const coercedInput = coerce(spec.inputFields, inputState);
     const body = {
       loraId: spec.loraId,
-      input: coerce(spec.inputFields, inputState),
+      input: coercedInput,
       output: coerce(spec.outputFields, outputState),
       authorInitials: authorInitials.trim() || null,
       notes: notes.trim() || null,
@@ -289,6 +327,7 @@ export function SeedForm({ spec, existing }: Props) {
       // Success — clear the local draft and refresh.
       try {
         window.localStorage.removeItem(draftKey);
+        window.localStorage.setItem(lastInputKey, JSON.stringify(coercedInput));
       } catch {
         // ignore
       }
@@ -333,7 +372,7 @@ export function SeedForm({ spec, existing }: Props) {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
         <FieldSection
           title="Patient context (input)"
           description="What WAVE is reading when it generates this response."
@@ -448,7 +487,7 @@ function FieldSection({
   onChange,
 }: FieldSectionProps) {
   return (
-    <fieldset className="rounded-2xl border border-border bg-surface p-5 space-y-4">
+    <fieldset className="min-w-0 rounded-2xl border border-border bg-surface p-5 space-y-4">
       <legend className="px-1 text-xs uppercase tracking-wide text-foreground/55">
         {title}
       </legend>
@@ -521,6 +560,55 @@ function FieldRenderer({
           ) : null}
         </FieldShell>
       );
+    case "text-array": {
+      const items = Array.isArray(value) ? value : [];
+      return (
+        <FieldShell field={field} id={id}>
+          <div className="space-y-3">
+            {Array.from({ length: field.maxItems }, (_, index) => {
+              const itemId = `${id}-${index}`;
+              const itemValue = items[index];
+              return (
+                <div key={itemId}>
+                  <label
+                    htmlFor={itemId}
+                    className="block text-xs font-medium text-foreground/60"
+                  >
+                    {field.itemLabel} {index + 1}
+                  </label>
+                  <textarea
+                    id={itemId}
+                    value={typeof itemValue === "string" ? itemValue : ""}
+                    onChange={(event) => {
+                      const next = Array.from(
+                        { length: field.maxItems },
+                        (_, itemIndex) =>
+                          typeof items[itemIndex] === "string"
+                            ? items[itemIndex]
+                            : "",
+                      );
+                      next[index] = event.target.value;
+                      onChange(side, fullPath, next);
+                    }}
+                    rows={2}
+                    maxLength={field.maxLength}
+                    minLength={field.minLength}
+                    placeholder={field.placeholder}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed focus:outline-none focus:border-accent"
+                  />
+                  {field.maxLength ? (
+                    <p className="mt-1 text-xs text-foreground/45 text-right">
+                      {(typeof itemValue === "string" ? itemValue.length : 0)}/
+                      {field.maxLength}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </FieldShell>
+      );
+    }
     case "number":
       return (
         <FieldShell field={field} id={id}>
@@ -532,6 +620,7 @@ function FieldRenderer({
             min={field.min}
             max={field.max}
             step={field.step ?? (field.integer ? 1 : "any")}
+            placeholder={field.placeholder}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:border-accent"
           />
         </FieldShell>

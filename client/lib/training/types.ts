@@ -8,6 +8,7 @@ import { z } from "zod";
 export const DEMO_LORA_ID = "lora-wave-session" as const;
 
 export const LORA_IDS = [
+  "lora-phase-narration",
   "lora-check-in-1",
   "lora-check-in-2",
   "lora-check-in-3",
@@ -33,6 +34,7 @@ export type SeedStatus = (typeof SEED_STATUSES)[number];
  */
 export type FieldSpec =
   | TextFieldSpec
+  | TextArrayFieldSpec
   | NumberFieldSpec
   | EnumFieldSpec
   | BooleanFieldSpec
@@ -54,12 +56,23 @@ export interface TextFieldSpec extends BaseField {
   placeholder?: string;
 }
 
+export interface TextArrayFieldSpec extends BaseField {
+  kind: "text-array";
+  minItems: number;
+  maxItems: number;
+  itemLabel: string;
+  minLength?: number;
+  maxLength?: number;
+  placeholder?: string;
+}
+
 export interface NumberFieldSpec extends BaseField {
   kind: "number";
   min: number;
   max: number;
   integer?: boolean;
   step?: number;
+  placeholder?: string;
 }
 
 export interface EnumFieldSpec extends BaseField {

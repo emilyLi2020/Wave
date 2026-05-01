@@ -19,6 +19,7 @@ yet mature enough for a reliable PWA demo.
 
 We still collect data under specialized future adapter IDs:
 
+- `lora-phase-narration`
 - `lora-check-in-1`
 - `lora-check-in-2`
 - `lora-check-in-3`
@@ -118,11 +119,11 @@ They are not mounted in the browser demo.
 
 ## 3. Optional Synthetic Expansion
 
-For the hackathon demo, the minimum training source is the 120 human-written
+For the hackathon demo, the minimum training source is the 140 human-written
 rows:
 
 ```
-6 specialized sets x 20 examples = 120 examples
+7 specialized sets x 20 examples = 140 examples
 ```
 
 If time allows, a larger Gemma model running on a developer workstation can
@@ -202,6 +203,7 @@ adapters can be exported separately and selected by rule-based routing:
 - check-in 3 -> `lora-check-in-3`
 - check-in 4 -> `lora-check-in-4`
 - check-in 5 -> `lora-check-in-5`
+- phases 1-5 narration -> `lora-phase-narration`
 - reflection -> `lora-reflection`
 - crisis/intake safety -> no LoRA
 
@@ -263,6 +265,7 @@ client/app/api/training/export/route.ts
                                       # specialized and combined JSONL export
 client/lib/training/lora-specs.ts     # form specs + Zod validators
 data/training-seeds/
+  lora-phase-narration.json
   lora-check-in-1.json
   lora-check-in-2.json
   lora-check-in-3.json

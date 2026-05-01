@@ -51,6 +51,10 @@ const STACK_AXES_BY_STATUS_AND_TRIGGER = {
   colOptions: TRIGGER_CATEGORIES,
 } as const;
 
+const CHUNK_LINE_COUNT = 6;
+const CHUNK_LINE_MIN_LENGTH = 12;
+const CHUNK_LINE_MAX_LENGTH = 200;
+
 const COMMON_SESSION_CONTEXT_FIELDS = [
   {
     key: "intakeIntensity",
@@ -59,6 +63,7 @@ const COMMON_SESSION_CONTEXT_FIELDS = [
     min: 1,
     max: 10,
     integer: true,
+    placeholder: "Example: 7",
     help: "What the patient tapped before the session started.",
   },
   {
@@ -98,6 +103,7 @@ const COMMON_SESSION_CONTEXT_FIELDS = [
     label: "Trigger detail, if other",
     maxLength: 120,
     optional: true,
+    placeholder: "Example: argument with roommate",
   },
   {
     key: "usedSubstanceToday",
@@ -115,6 +121,161 @@ const commonSessionContextSchema = z.object({
   triggerOther: z.string().max(120).optional(),
   usedSubstanceToday: z.boolean(),
 });
+
+function chunkNumberSchema() {
+  return z.union([
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+  ]);
+}
+
+function phaseInputFields(): readonly FieldSpec[] {
+  return [
+    {
+      key: "surface",
+      kind: "const",
+      label: "Surface",
+      value: "phase_narration",
+    },
+    {
+      key: "chunkNumber",
+      kind: "number",
+      label: "Phase number",
+      min: 1,
+      max: 5,
+      integer: true,
+      placeholder: "Example: 2",
+      help: "Which of the five meditation phases this narration is for.",
+    },
+    ...COMMON_SESSION_CONTEXT_FIELDS,
+    {
+      key: "latestCravingScore",
+      kind: "number",
+      label: "Latest craving score (1-10)",
+      min: 1,
+      max: 10,
+      integer: true,
+      optional: true,
+      placeholder: "Example: 6",
+      help: "Most recent check-in score if this phase follows a check-in.",
+    },
+    {
+      key: "obstacleHint",
+      kind: "enum",
+      label: "Obstacle from prior check-in",
+      options: OBSTACLE_CATEGORIES,
+      optional: true,
+      help: "Optional summary of what got in the way before this phase.",
+    },
+    {
+      key: "scoreHistorySummary",
+      kind: "text",
+      label: "Score history summary",
+      multiline: true,
+      maxLength: 500,
+      optional: true,
+      placeholder: "Example: intake 8, check-in 1 held at 8, check-in 2 dropped to 6.",
+      help: "Example: intake 8, check-in 1 held at 8, check-in 2 dropped to 6.",
+    },
+    {
+      key: "priorSessionSummary",
+      kind: "text",
+      label: "Prior session summary",
+      multiline: true,
+      maxLength: 1200,
+      optional: true,
+      placeholder:
+        "Example: Phase 1 introduced the wave metaphor. Patient said the urge felt tight in their chest and rated it 7/10.",
+      help: "Briefly summarize prior narration and patient check-in replies. Do not paste real patient data.",
+    },
+  ];
+}
+
+const phaseInputSchema = commonSessionContextSchema.extend({
+  surface: z.literal("phase_narration"),
+  chunkNumber: chunkNumberSchema(),
+  latestCravingScore: z.number().int().min(1).max(10).optional(),
+  obstacleHint: z.enum(OBSTACLE_CATEGORIES).optional(),
+  scoreHistorySummary: z.string().max(500).optional(),
+  priorSessionSummary: z.string().max(1200).optional(),
+});
+
+const phaseOutputFields = [
+  {
+    key: "lines",
+    kind: "text-array",
+    label: "Six narration lines",
+    itemLabel: "Line",
+    minItems: CHUNK_LINE_COUNT,
+    maxItems: CHUNK_LINE_COUNT,
+    minLength: CHUNK_LINE_MIN_LENGTH,
+    maxLength: CHUNK_LINE_MAX_LENGTH,
+    placeholder:
+      "Example: Notice where the urge is strongest right now, without trying to change it.",
+    help: "Exactly six plain-text beats. The player inserts pauses between lines, so do not write pause markers.",
+  },
+] as const;
+
+const phaseOutputSchema = z
+  .object({
+    lines: z
+      .array(
+        z.string().min(CHUNK_LINE_MIN_LENGTH).max(CHUNK_LINE_MAX_LENGTH),
+      )
+      .length(CHUNK_LINE_COUNT),
+  })
+  .superRefine((output, ctx) => {
+    output.lines.forEach((line, index) => {
+      if (/you got this|stay strong|don't give up/i.test(line)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lines", index],
+          message: "Avoid toxic-positivity phrases.",
+        });
+      }
+      if (/[\[\]]|\(pause\)|\(breathe\)|stage direction/i.test(line)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lines", index],
+          message: "No brackets, pause markers, or stage directions.",
+        });
+      }
+      if (/chunk\s+\d|phase\s+\d/i.test(line)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lines", index],
+          message: "Do not announce chunk or phase numbers to the patient.",
+        });
+      }
+    });
+  });
+
+const phaseNarration: LoraFormSpec = {
+  loraId: "lora-phase-narration",
+  title: "lora-phase-narration - five-phase meditation narration",
+  shortTitle: "Phase narration",
+  whereUsed:
+    "Future adapter for all five meditation phase narration surfaces. The chunkNumber input tells the model which phase to write.",
+  clinicalRationale:
+    "The five narration phases share one simple output shape: six plain-text beats that preserve the MBRP flow. Keeping them in one adapter gives the model enough variety without fragmenting a small seed set.",
+  invariants: [
+    `Output exactly ${CHUNK_LINE_COUNT} lines in the lines array.`,
+    "Each line is one plain-text narration beat, with no bullets, numbering, markdown, or pause markers.",
+    "Use chunkNumber to preserve the phase order: settle, body scan, sound anchor, breathing, close.",
+    "Do not announce chunk or phase numbers in patient-facing text.",
+    "Never prescribe, never shame, never use toxic positivity, and never offer crisis routing.",
+  ],
+  targetCount: SPECIALIZED_TARGET_COUNT,
+  isStretch: false,
+  inputFields: phaseInputFields(),
+  outputFields: phaseOutputFields,
+  inputSchema: phaseInputSchema,
+  outputSchema: phaseOutputSchema,
+  stackAxes: STACK_AXES_BY_STATUS_AND_TRIGGER,
+};
 
 function checkInInputFields(
   chunkNumber: 1 | 2 | 3 | 4 | 5,
@@ -136,6 +297,7 @@ function checkInInputFields(
       max: 10,
       integer: true,
       optional: true,
+      placeholder: "Example: 6",
       help: "Most recent score if the patient has already answered the score prompt.",
     },
     {
@@ -151,6 +313,8 @@ function checkInInputFields(
       multiline: true,
       minLength: 8,
       maxLength: 500,
+      placeholder:
+        "Example: The previous chunk invited a body scan and asked the patient to notice where the urge felt strongest.",
       help: "Briefly summarize the scripted chunk or generated lines the patient just heard.",
     },
     {
@@ -160,6 +324,8 @@ function checkInInputFields(
       multiline: true,
       maxLength: 1200,
       optional: true,
+      placeholder:
+        "Example: patient: 7. WAVE: A 7 is a lot to sit with. Where do you feel it most? patient: chest.",
       help: "Use role labels if helpful. Leave blank for check-in 1 openers.",
     },
   ];
@@ -188,6 +354,8 @@ const checkInOutputFields = [
     multiline: true,
     minLength: 12,
     maxLength: 600,
+    placeholder:
+      "Example: A 7 is a lot to sit with, and you are still staying with it. What did you notice in your body during that last part?",
     help: "One WAVE turn only: validate, ask one question or offer one technique, then stop.",
   },
   {
@@ -329,6 +497,7 @@ const reflection: LoraFormSpec = {
       min: 1,
       max: 10,
       integer: true,
+      placeholder: "Example: 7",
     },
     {
       key: "endingIntensity",
@@ -337,6 +506,7 @@ const reflection: LoraFormSpec = {
       min: 1,
       max: 10,
       integer: true,
+      placeholder: "Example: 2",
     },
     {
       key: "durationSeconds",
@@ -345,6 +515,7 @@ const reflection: LoraFormSpec = {
       min: 30,
       max: 60 * 60,
       integer: true,
+      placeholder: "Example: 420",
     },
     {
       key: "medicationStatus",
@@ -371,6 +542,7 @@ const reflection: LoraFormSpec = {
       min: 1,
       max: 10000,
       integer: true,
+      placeholder: "Example: 4",
       help: "Used for longitudinal framing in the insight line.",
     },
     {
@@ -386,6 +558,7 @@ const reflection: LoraFormSpec = {
       multiline: true,
       maxLength: 500,
       optional: true,
+      placeholder: "Example: intake 7, check-in scores 6, 5, 3, ending 2.",
     },
   ],
   outputFields: [
@@ -396,6 +569,8 @@ const reflection: LoraFormSpec = {
       multiline: true,
       minLength: 10,
       maxLength: 500,
+      placeholder:
+        "Example: You surfed a 7 down to a 2. That drop does not mean the urge was easy; it means you stayed close enough to notice it changing.",
       help: "Must include the numeric ending intensity, e.g. \"You surfed a 7 down to 2.\"",
     },
     {
@@ -405,6 +580,8 @@ const reflection: LoraFormSpec = {
       multiline: true,
       minLength: 10,
       maxLength: 200,
+      placeholder:
+        "Example: What helped you stay with the wave when it started to shift?",
     },
     {
       key: "nextSteps",
@@ -417,6 +594,7 @@ const reflection: LoraFormSpec = {
           label: "Next step 1",
           minLength: 3,
           maxLength: 80,
+          placeholder: "Example: Drink water",
         },
         {
           key: "two",
@@ -424,6 +602,7 @@ const reflection: LoraFormSpec = {
           label: "Next step 2",
           minLength: 3,
           maxLength: 80,
+          placeholder: "Example: Walk one block",
         },
         {
           key: "three",
@@ -431,6 +610,7 @@ const reflection: LoraFormSpec = {
           label: "Next step 3",
           minLength: 3,
           maxLength: 80,
+          placeholder: "Example: Text a safe person",
         },
         {
           key: "four",
@@ -438,6 +618,7 @@ const reflection: LoraFormSpec = {
           label: "Next step 4",
           minLength: 3,
           maxLength: 80,
+          placeholder: "Example: Rest for 10 min",
         },
       ],
     },
@@ -468,6 +649,7 @@ const reflection: LoraFormSpec = {
 };
 
 export const LORA_SPECS: Record<LoRAId, LoraFormSpec> = {
+  "lora-phase-narration": phaseNarration,
   "lora-check-in-1": checkInSpec(
     "lora-check-in-1",
     1,
