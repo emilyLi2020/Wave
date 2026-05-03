@@ -55,10 +55,12 @@ OUTPUT:  Patient sees a one-screen insight at close ("You surfed a 7
 ```
 
 **Implementation note:** the above is the product target. The current `client/`
-demo keeps the same UX and boundaries, and now runs Gemma 4 E2B-it locally
-through `@huggingface/transformers` for chunk narration, check-in chat,
-reflection, and insight regeneration. The remaining model gap is loading the
-LoRA adapters.
+demo keeps the same UX and boundaries, and now runs Gemma 4 E2B-it locally.
+Chunk narration, reflection, and insight regeneration use the direct
+`@huggingface/transformers` boundary. Check-in chat uses AI SDK `streamText()`
+with `@browser-ai/transformers-js`, streaming patient-facing text while
+surfacing `endConversation` as an app-validated tool. The remaining model gap is
+loading the LoRA adapters.
 
 ## Core Features (MVP)
 

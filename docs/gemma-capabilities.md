@@ -120,17 +120,26 @@ function:
 { "name": "get_dose_status", "arguments": { "patient_id": "abc-123" } }
 ```
 
-vLLM, llama.cpp, and Transformers all parse this natively. The HF chat
-template (visible in the model card) handles the formatting — you do not hand-
-craft the tool grammar.
+vLLM and llama.cpp can parse this through their OpenAI-compatible serving
+layers. Hugging Face chat templates can format tool definitions for Gemma, but
+the direct `@huggingface/transformers` pipeline does not execute tools for the
+app. In browser code, the verified framework path is the Vercel AI SDK
+`streamText()` API with `@browser-ai/transformers-js`: the provider passes
+function tools into the Transformers.js chat template, streams normal text
+deltas, detects fenced `<tool_call>` tags and fenced `tool_call` code blocks,
+validates tool input through AI SDK/Zod, and surfaces the tool result to app
+code.
 
 **For WAVE:** tool-like signals are allowed only for narrow control-plane
-events, not for clinical routing. The local check-in runtime asks Gemma to
-return an `endConversation` JSON signal when the check-in is complete; the
-session state machine still owns the transition. Runtime routing chooses
-LoRAs by code (see [`models.md`](./models.md)), so the model is
-never given a tool that can change medication, pick a hotline, write storage, or
-route around the intake safety screen.
+events, not for clinical routing. The checked-in check-in runtime currently asks
+Gemma to return an `endConversation` JSON signal when the check-in is complete;
+the session state machine still owns the transition. The next browser-runtime
+upgrade should move that control signal to an AI SDK `endConversation` tool so
+patient-facing text can stream while the app still validates and executes the
+conversation-ending action. Runtime routing chooses LoRAs by code (see
+[`models.md`](./models.md)), so the model is never given a tool that can change
+medication, pick a hotline, write storage, or route around the intake safety
+screen.
 
 ### JSON / structured output
 
@@ -150,7 +159,8 @@ Sources:
 | **Vertex AI / Google AI Studio (hosted Gemma)** | `response_mime_type: "application/json"` + `response_schema` (a.k.a. "Controlled Generation") | Schema-enforced. Same flag the Gemini API uses. |
 | **vLLM** (OpenAI-compatible server) | `response_format: {"type": "json_schema", …}` or `guided_json` | Schema-enforced via constrained decoding. |
 | **llama.cpp / Ollama** | `response_format: {"type": "json_object"}` for "any valid JSON"; GBNF grammar or **LLGuidance** for full JSON-Schema enforcement | Schema-enforced when you supply a grammar/schema; ~50 µs/token with LLGuidance. |
-| **Raw `transformers` / `transformers.js`** (what WAVE ships) | Nothing built-in | DIY: Outlines / LMQL / a custom `LogitsProcessor`, or rely on function calling. |
+| **Raw `transformers` / `transformers.js`** (current WAVE runtime boundary) | Nothing built-in | Prompt, parse, validate, retry, and fall back in app code. |
+| **AI SDK + `@browser-ai/transformers-js`** (verified browser framework path) | No JSON mode, but function tools are declared with JSON Schema/Zod and streamed through AI SDK parts | App validates tool inputs and executes tools; the provider detects supported tool-call fences in streamed model text. |
 | **Native function calling** (any runtime) | Tool-call format itself is JSON; schema declared via JSON Schema in the tool definition | **Model-native** — Gemma 4 was trained on the OpenAI tool-call shape, so this is the only structured-output path that doesn't depend on the serving layer. |
 
 A few things that follow from this table:
@@ -166,7 +176,9 @@ A few things that follow from this table:
 **For WAVE specifically:** the web runtime ships via `transformers.js` +
 WebGPU, which has no built-in JSON mode. Where we need structured output, the
 Gemma path constrains on the prompt/tool shape, parses the output, validates
-with Zod, retries once, then falls back to scripted local copy.
+with Zod, retries once, then falls back to scripted local copy. For check-in
+streaming plus `endConversation`, prefer the AI SDK browser-provider path over
+the current whole-response JSON wrapper.
 
 ---
 
@@ -213,7 +225,8 @@ whole reason WAVE picked it.
 | Runtime | Status | WAVE uses it |
 |---|---|---|
 | 🤗 Transformers (PyTorch) | First-class. Use `AutoModelForImageTextToText` for vision/audio, `AutoModelForCausalLM` for text-only. | Yes — for the developer-machine smoke test and LoRA training in [`models/`](../models/). |
-| `transformers.js` + WebGPU | Supported on E2B/E4B (web `.task` build). | Final web-demo runtime. Temporary route handlers stand in today. |
+| `transformers.js` + WebGPU | Supported on E2B/E4B (web `.task` build). | Current web-demo runtime through `client/lib/gemma/local-runtime.ts`. |
+| AI SDK + `@browser-ai/transformers-js` | Wraps local Transformers.js models as AI SDK language models with streaming and function-tool orchestration. | Mounted for check-in streaming and the `endConversation` tool path. |
 | LiteRT-LM (`.litertlm`) | Official build for Android, iOS, Desktop, IoT. Hardware accel via XNNPack (CPU) and ML Drift (GPU). | Yes — post-hackathon mobile port. |
 | vLLM | Native Gemma 4 support, including a dedicated `gemma4_utils` tool-call parser and OpenAI-compatible API. | Not yet — would be the play if we ever add a server-side surface. |
 | llama.cpp / Ollama | Official GGUF builds, OpenAI-compatible HTTP. | Not yet. |
@@ -236,6 +249,7 @@ server in front of it.
 | Tool / SDK | Works with Gemma? | How |
 |---|---|---|
 | **OpenAI Agents SDK** (`openai-agents-python`) | ✅ Indirectly | Point it at any OpenAI-compatible server hosting Gemma — Ollama (`http://localhost:11434/v1`), llama.cpp (`http://localhost:8080/v1`), or vLLM. Set `OPENAI_BASE_URL` or pass a custom `AsyncOpenAI(base_url=…)` to `set_default_openai_client`. Tool calls work because Gemma 4 emits the OpenAI tool-call shape natively. |
+| **Vercel AI SDK + `@browser-ai/transformers-js`** | ✅ Directly in browser | No OpenAI-compatible server needed. `streamText()` passes AI SDK tools into the Transformers.js chat template, streams text parts, and surfaces tool-call/tool-result parts to app code. |
 | **OpenAI tool / function calling format** | ✅ Native | Gemma 4's chat template ingests JSON-Schema tools and emits `{name, arguments}` JSON in the OpenAI shape. |
 | **OpenAI-style `messages` ({role, content})** | ✅ Native | `system`, `user`, `assistant` are all first-class. Multimodal content uses the `[{"type":"image"|"audio"|"video"|"text", …}, …]` shape. |
 | **OpenAI Responses API specifics** (tools like web_search, file_search) | ❌ | Those are server-side OpenAI features, not part of the chat protocol. Replicate them yourself if you need them. |
@@ -243,9 +257,12 @@ server in front of it.
 | **LangChain / LlamaIndex / DSPy** | ✅ | Via the same OpenAI-compatible server pattern, or via the `transformers` integration. |
 
 **For WAVE:** the settled architecture does not run an OpenAI-compatible server
-in the session path; it calls Gemma directly through `transformers.js` in the
-browser. The current checked-in web demo follows that shape for check-in,
-reflection, and insights. The OpenAI Agents SDK is not in our stack.
+in the session path; it calls Gemma locally in the browser. The current
+checked-in web demo uses the direct Transformers.js boundary for check-in,
+reflection, chunks, and insights. The AI SDK browser-provider path is the
+preferred framework for adding streamed check-in text plus a validated
+`endConversation` tool without introducing a network LLM call. The OpenAI
+Agents SDK is not in our stack.
 
 ---
 

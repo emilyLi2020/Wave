@@ -3,6 +3,9 @@ import type {
   ProgressInfo,
   TextGenerationPipeline,
 } from "@huggingface/transformers";
+import { transformersJS } from "@browser-ai/transformers-js";
+import { jsonSchema, streamText, stepCountIs, tool } from "ai";
+import { z } from "zod";
 
 import { isAffirmative } from "@/lib/session/is-affirmative";
 import { buildCheckInPrompt } from "@/lib/prompts/check-in";
@@ -24,6 +27,7 @@ import type { ObstacleCategory } from "@/types/session";
 export const GEMMA_MODEL_ID = "onnx-community/gemma-4-E2B-it-ONNX";
 const GEMMA_CACHE_KEY = "wave-gemma4-cache";
 const GEMMA_DTYPE = "q4f16";
+const CHECK_IN_TOOL_NONE_OBSTACLE = "none";
 
 type ChatRole = "system" | "user" | "assistant";
 
@@ -82,8 +86,18 @@ const ALLOWED_OBSTACLES: readonly ObstacleCategory[] = [
   "physical_discomfort",
   "sleepiness",
 ];
+const CHECK_IN_TOOL_OBSTACLES = [
+  CHECK_IN_TOOL_NONE_OBSTACLE,
+  ...ALLOWED_OBSTACLES,
+] as const;
+
+const endConversationToolInputSchema = z.object({
+  cravingScore: z.number().int().min(1).max(10),
+  obstacleCategory: z.enum(CHECK_IN_TOOL_OBSTACLES).default(CHECK_IN_TOOL_NONE_OBSTACLE),
+});
 
 let generatorPromise: Promise<TextGenerationPipeline> | null = null;
+let checkInModelPromise: Promise<ReturnType<typeof transformersJS>> | null = null;
 let modelLoadState: GemmaModelLoadState = {
   phase: "idle",
   status: "idle",
@@ -96,8 +110,10 @@ let modelLoadState: GemmaModelLoadState = {
 
 const modelLoadListeners = new Set<(state: GemmaModelLoadState) => void>();
 const MODEL_LOAD_NOTIFY_INTERVAL_MS = 300;
+const MODEL_LOAD_LOG_PROGRESS_STEP = 10;
 let lastModelLoadPublishedAt = 0;
 let pendingModelLoadPublish: ReturnType<typeof setTimeout> | null = null;
+const modelLoadLogProgressByFile = new Map<string, number>();
 
 export function isLocalGemmaAvailable(): boolean {
   return typeof window !== "undefined" || typeof process !== "undefined";
@@ -151,24 +167,13 @@ export async function generateGemmaCheckIn(
 
   const messages: ChatMessage[] = [
     {
-      role: "system",
-      content: `${systemPrompt}
-
-For this local Gemma runtime, tool calls are unavailable. Instead, return strict JSON only:
-{"reply":"<patient-facing next WAVE turn>","endConversation":null}
-or
-{"reply":"<brief closing hand-off>","endConversation":{"cravingScore":<1-10 integer>,"obstacleCategory":null}}
-
-The reply field is the only patient-facing text. It must still obey every conversation rule. Do not wrap the JSON in markdown.`,
-    },
-    {
       role: "user",
       content: `${contextBlock}
 
 <local_runtime_output_contract>
-Return one JSON object only. No markdown, no commentary, no leading or trailing prose.
-Set endConversation only when the original prompt says the endConversation tool should be called. Otherwise set it to null.
-Allowed obstacleCategory values: ${ALLOWED_OBSTACLES.join(", ")}, or null.
+Stream patient-facing prose directly. Do not wrap the visible reply in JSON or markdown.
+When the check-in is complete, call the endConversation tool after the brief closing hand-off.
+Tool schema compatibility: use obstacleCategory "${CHECK_IN_TOOL_NONE_OBSTACLE}" when no obstacle is clearly present.
 </local_runtime_output_contract>`,
     },
   ];
@@ -180,19 +185,69 @@ Allowed obstacleCategory values: ${ALLOWED_OBSTACLES.join(", ")}, or null.
     });
   }
 
-  const text = await generateChatText(messages, {
-    ...options,
-    // The JSON wrapper adds a little overhead beyond the visible reply.
-    maxNewTokens: Math.max(options.maxNewTokens, 220),
-    onDelta: undefined,
-  });
-  const parsed = parseCheckInPayload(extractFirstJSONObject(text));
-  const endConversation =
-    parsed.endConversation ??
-    inferEndConversationFromHistory(history, context, parsed.reply);
+  const model = await getCheckInLanguageModel();
+  throwIfAborted(options.signal);
 
-  options.onDelta?.(parsed.reply);
-  return { text: parsed.reply, endConversation };
+  let rawAccumulatedText = "";
+  let endConversation: EndConversationSignal | null = null;
+
+  const result = streamText({
+    model,
+    system: systemPrompt,
+    messages,
+    maxOutputTokens: Math.max(options.maxNewTokens, 220),
+    temperature: 0,
+    abortSignal: options.signal,
+    tools: {
+      endConversation: tool({
+        description:
+          "End the WAVE check-in after the patient is ready to continue.",
+        inputSchema: jsonSchema({
+          type: "object",
+          properties: {
+            cravingScore: {
+              type: "integer",
+              minimum: 1,
+              maximum: 10,
+            },
+            obstacleCategory: {
+              type: "string",
+              enum: [...CHECK_IN_TOOL_OBSTACLES],
+            },
+          },
+          required: ["cravingScore", "obstacleCategory"],
+          additionalProperties: false,
+        }),
+        execute: async (input) => {
+          const parsed = endConversationToolInputSchema.parse(input);
+          endConversation = {
+            cravingScore: parsed.cravingScore,
+            obstacleCategory:
+              parsed.obstacleCategory === CHECK_IN_TOOL_NONE_OBSTACLE
+                ? null
+                : parsed.obstacleCategory,
+          };
+          return { ended: true };
+        },
+      }),
+    },
+    stopWhen: stepCountIs(1),
+  });
+
+  for await (const part of result.fullStream) {
+    throwIfAborted(options.signal);
+    if (part.type !== "text-delta") continue;
+
+    rawAccumulatedText += getTextDelta(part);
+    options.onDelta?.(sanitizeCheckInModelText(rawAccumulatedText));
+  }
+
+  const reply = sanitizeCheckInModelText(rawAccumulatedText);
+  return {
+    text: reply,
+    endConversation:
+      endConversation ?? inferEndConversationFromHistory(history, context, reply),
+  };
 }
 
 export async function generateGemmaChunk(
@@ -256,6 +311,88 @@ async function generateChatText(
   throwIfAborted(options.signal);
   const finalText = extractGeneratedText(output).trim();
   return finalText.length > 0 ? finalText : accumulated.trim();
+}
+
+async function getCheckInLanguageModel(): Promise<ReturnType<typeof transformersJS>> {
+  if (checkInModelPromise) return checkInModelPromise;
+
+  checkInModelPromise = (async () => {
+    const { env, LogLevel } = await import("@huggingface/transformers");
+    configureTransformersEnvironment(env, LogLevel);
+    const model = transformersJS(GEMMA_MODEL_ID, {
+      dtype: GEMMA_DTYPE,
+      device: getTransformersJsDevice(),
+      rawInitProgressCallback: logProgress,
+      ...(typeof window === "undefined"
+        ? { cacheDir: "./.cache/transformers" }
+        : {}),
+    });
+
+    await model.createSessionWithProgress();
+    return model;
+  })().catch((err) => {
+    checkInModelPromise = null;
+    throw err;
+  });
+
+  return checkInModelPromise;
+}
+
+function configureTransformersEnvironment(
+  env: {
+    logLevel: unknown;
+    allowRemoteModels: boolean;
+    allowLocalModels: boolean;
+    useBrowserCache?: boolean;
+    useWasmCache?: boolean;
+    cacheKey?: string;
+    useFSCache?: boolean;
+    cacheDir?: string | null;
+  },
+  logLevel: { WARNING: unknown },
+): void {
+  env.logLevel = logLevel.WARNING;
+  env.allowRemoteModels = true;
+  env.allowLocalModels = false;
+
+  if (typeof window !== "undefined") {
+    env.useBrowserCache = true;
+    env.useWasmCache = true;
+    env.cacheKey = GEMMA_CACHE_KEY;
+  } else {
+    env.useFSCache = true;
+    env.useBrowserCache = false;
+    env.cacheDir = "./.cache/transformers";
+  }
+
+  if (typeof globalThis !== "undefined") {
+    (
+      globalThis as typeof globalThis & { AI_SDK_LOG_WARNINGS?: boolean }
+    ).AI_SDK_LOG_WARNINGS = false;
+  }
+}
+
+function getTransformersJsDevice(): "webgpu" | "cpu" {
+  if (typeof navigator !== "undefined" && "gpu" in navigator) return "webgpu";
+  return "cpu";
+}
+
+function getTextDelta(part: unknown): string {
+  const record = part as Record<string, unknown>;
+  const text = record.text;
+  if (typeof text === "string") return text;
+  const delta = record.delta;
+  return typeof delta === "string" ? delta : "";
+}
+
+function sanitizeCheckInModelText(text: string): string {
+  return text
+    .replace(/\]\s*\[/g, " ")
+    .replace(/[\[\]]/g, "")
+    .replace(/[–—]/g, ",")
+    .replace(/\s+([,.;:?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function getGenerator(): Promise<TextGenerationPipeline> {
@@ -512,9 +649,33 @@ function logProgress(progress: ProgressInfo): void {
       : `Gemma model load ${progress.status}`,
   });
 
-  if (typeof console !== "undefined") {
+  if (
+    typeof console !== "undefined" &&
+    shouldLogModelLoadProgress(progress.status, file, fileProgress)
+  ) {
     console.info(`[wave] Gemma model load ${label}`);
   }
+}
+
+function shouldLogModelLoadProgress(
+  status: string,
+  file: string | undefined,
+  progress: number | null,
+): boolean {
+  if (status !== "progress") return true;
+  if (!file || progress === null) return false;
+  if (progress === 100) return true;
+
+  const previous = modelLoadLogProgressByFile.get(file);
+  if (
+    previous !== undefined &&
+    progress < previous + MODEL_LOAD_LOG_PROGRESS_STEP
+  ) {
+    return false;
+  }
+
+  modelLoadLogProgressByFile.set(file, progress);
+  return true;
 }
 
 function updateModelFileLoadStates(
