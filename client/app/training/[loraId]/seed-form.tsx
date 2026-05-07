@@ -11,14 +11,22 @@ import type {
   TrainingSeed,
 } from "@/lib/training/types";
 import { SEED_STATUSES } from "@/lib/training/types";
-import { CHECK_IN_CHUNK2_SCORE_PROMPT, CHECK_IN_CURRENT_URGE_SCALE_PROMPT } from "@/lib/training/check-in-dialogue";
+import {
+  CHECK_IN_CHUNK234_SCORE_PROMPT,
+  CHECK_IN_CURRENT_URGE_SCALE_PROMPT,
+} from "@/lib/training/check-in-dialogue";
 
 import { CheckInDialogueEditor } from "./check-in-dialogue-editor";
 
 function checkInScorePromptFor(loraId: string): string {
-  return loraId === "lora-check-in-2" ?
-      CHECK_IN_CHUNK2_SCORE_PROMPT
-    : CHECK_IN_CURRENT_URGE_SCALE_PROMPT;
+  if (
+    loraId === "lora-check-in-2" ||
+    loraId === "lora-check-in-3" ||
+    loraId === "lora-check-in-4"
+  ) {
+    return CHECK_IN_CHUNK234_SCORE_PROMPT;
+  }
+  return CHECK_IN_CURRENT_URGE_SCALE_PROMPT;
 }
 
 type Json = Record<string, unknown>;

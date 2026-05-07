@@ -1,9 +1,10 @@
 "use client";
 
 import {
-  CHECK_IN_BODY_URGE_LOCATION_PROMPT,
+  CHECK_IN_CHUNK234_SCORE_PROMPT,
+  CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT,
+  CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT,
   CHECK_IN_CHUNK2_READINESS_PROMPT,
-  CHECK_IN_CHUNK2_SCORE_PROMPT,
   CHECK_IN_COPING_BRIDGE_OPENER,
   CHECK_IN_COPING_CONSENT_PROMPT,
   CHECK_IN_CURRENT_URGE_SCALE_PROMPT,
@@ -70,29 +71,43 @@ export function CheckInDialogueEditor({
             </>
           ) : (
             <>
-              Turn 1 must be <strong>WAVE</strong> with the check-in 2 craving prompt (see below).
+              Turn 1 must be <strong>WAVE</strong> with the shared check-in 2–4 craving prompt (see
+              below; same as <code className="text-[11px]">CHECK_IN_CHUNK234_SCORE_PROMPT</code>).
               Turn 2 is the <strong>patient&apos;s number only</strong>. The next WAVE turn should
               open with a <strong>score reflection</strong> vs the prior check-in score (see PRD /
-              <code className="text-[11px]"> score-tracking.ts</code>), then medication + surf
-              validation like check-in 1, then include the body-awareness question verbatim (second
-              block below). Then validate → consent → coping bridge → technique → readiness for the{" "}
-              <strong>sound anchor</strong> (third block). <strong>Every</strong> WAVE line ends with{" "}
-              <strong>?</strong>. End on patient readiness; <strong>reply</strong> matches the last WAVE line.
+              <code className="text-[11px]"> score-tracking.ts</code>), then end with{" "}
+              <strong>CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT</strong> verbatim only (first block
+              below). After the patient answers, the following WAVE turn says{" "}
+              <strong>Great.</strong> if they were fine, or <strong>validates</strong> briefly if
+              they named a struggle, then includes{" "}
+              <strong>CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT</strong> verbatim (second block).
+              Do <strong>not</strong> paste check-in 1&apos;s long medication + surf block on the
+              first post-score turn. Then validate → consent → coping bridge → technique →
+              readiness for the <strong>sound anchor</strong> (third block). <strong>Every</strong>{" "}
+              WAVE line ends with <strong>?</strong>. End on patient readiness;{" "}
+              <strong>reply</strong> matches the last WAVE line.
             </>
           )}
         </p>
         <p className="text-[11px] font-mono text-foreground/70 bg-surface border border-border rounded-lg px-3 py-2">
           {dialoguePack === "check-in-1" ?
             CHECK_IN_CURRENT_URGE_SCALE_PROMPT
-          : CHECK_IN_CHUNK2_SCORE_PROMPT}
+          : CHECK_IN_CHUNK234_SCORE_PROMPT}
         </p>
         {dialoguePack === "check-in-2" ? (
           <>
             <p className="text-[11px] text-foreground/55 mt-2 mb-1">
-              On the first WAVE turn after the score (include verbatim):
+              First WAVE turn after the score — landing only (verbatim):
             </p>
-            <p className="text-[11px] font-mono text-foreground/70 bg-surface border border-border rounded-lg px-3 py-2">
-              {CHECK_IN_BODY_URGE_LOCATION_PROMPT}
+            <p className="text-[11px] font-mono text-foreground/70 bg-surface border border-border rounded-lg px-3 py-2 whitespace-pre-wrap">
+              {CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT}
+            </p>
+            <p className="text-[11px] text-foreground/55 mt-2 mb-1">
+              Next WAVE turn after patient replies — body observe block (verbatim, after Great. or
+              brief validation):
+            </p>
+            <p className="text-[11px] font-mono text-foreground/70 bg-surface border border-border rounded-lg px-3 py-2 whitespace-pre-wrap">
+              {CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT}
             </p>
             <p className="text-[11px] text-foreground/55 mt-2 mb-1">
               Readiness before Chunk 3 (sound anchor):
@@ -119,74 +134,60 @@ export function CheckInDialogueEditor({
       <ul className="space-y-3">
         {turns.map((line, index) => (
           <li
-            key={`${index}-${line.role}`}
-            className="rounded-xl border border-border bg-background p-3 space-y-2"
+            key={index}
+            className="rounded-xl border border-border bg-surface p-3 space-y-2"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-medium text-foreground/70">
-                Turn {index + 1}
-                <select
-                  value={line.role}
-                  onChange={(event) =>
-                    updateLine(index, {
-                      role: event.target.value as DialogueTurn["role"],
-                    })
-                  }
-                  className="ml-2 rounded-md border border-border bg-surface px-2 py-1 text-xs"
-                >
-                  <option value="patient">patient</option>
-                  <option value="agent">WAVE (agent)</option>
-                </select>
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => insertLine(index, "patient")}
-                  className="text-[11px] text-accent hover:underline"
-                >
-                  + patient after
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertLine(index, "agent")}
-                  className="text-[11px] text-accent hover:underline"
-                >
-                  + WAVE after
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeLine(index)}
-                  disabled={turns.length <= 3}
-                  className="text-[11px] text-foreground/45 hover:text-warn disabled:opacity-30"
-                >
-                  Remove
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium text-foreground/50">
+                Line {index + 1}
+              </span>
+              <select
+                className="text-xs rounded-lg border border-border bg-background px-2 py-1"
+                value={line.role}
+                onChange={(event) =>
+                  updateLine(index, {
+                    role: event.target.value as DialogueTurn["role"],
+                  })
+                }
+              >
+                <option value="agent">WAVE (agent)</option>
+                <option value="patient">Patient</option>
+              </select>
+              <button
+                type="button"
+                className="text-[11px] text-accent hover:underline"
+                onClick={() => insertLine(index, "patient")}
+              >
+                + patient after
+              </button>
+              <button
+                type="button"
+                className="text-[11px] text-accent hover:underline"
+                onClick={() => insertLine(index, "agent")}
+              >
+                + WAVE after
+              </button>
+              <button
+                type="button"
+                className="text-[11px] text-destructive hover:underline"
+                onClick={() => removeLine(index)}
+              >
+                Remove
+              </button>
             </div>
             <textarea
+              className="w-full min-h-[72px] rounded-lg border border-border bg-background px-3 py-2 text-sm"
               value={line.content}
-              onChange={(event) => updateLine(index, { content: event.target.value })}
-              rows={line.role === "agent" ? 4 : 2}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono leading-relaxed focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              onChange={(event) =>
+                updateLine(index, { content: event.target.value })
+              }
               placeholder={
-                line.role === "patient"
-                  ? "e.g. 7 or About a 6 (current score only)"
-                  : index === 0
-                    ? dialoguePack === "check-in-1" ?
-                      "Exact 1–10 craving prompt (see text above)"
-                    : "Exact check-in 2 craving prompt (see text above)"
-                    : "WAVE: validate, then one clear question at the end"
+                line.role === "agent" ? "WAVE line…" : "Patient line…"
               }
             />
           </li>
         ))}
       </ul>
-
-      <p className="text-[11px] text-foreground/50">
-        Tip: after the readiness question, the patient&apos;s yes is the final line—do
-        not add a closing WAVE bubble. Affirm medication engagement (on time / late) and
-        use surf validation on the trigger, as in the seed examples.
-      </p>
     </div>
   );
 }

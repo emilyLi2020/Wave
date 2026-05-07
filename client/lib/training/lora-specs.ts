@@ -11,7 +11,8 @@
 import { z } from "zod";
 
 import {
-  CHECK_IN_BODY_URGE_LOCATION_PROMPT,
+  CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT,
+  CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT,
   CHECK_IN_CHUNK2_SCORE_PROMPT,
   CHECK_IN_COPING_BRIDGE_OPENER,
   CHECK_IN_COPING_CONSENT_PROMPT,
@@ -501,17 +502,46 @@ function refineCheckInDialogueOutput(
   }
 
   if (pack === "two") {
-    const bodyNeedle = CHECK_IN_BODY_URGE_LOCATION_PROMPT.replace(/\s+/g, " ").trim();
+    const landingNeedle = CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT.replace(
+      /\s+/g,
+      " ",
+    ).trim();
+    const observeNeedle = CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT.replace(
+      /\s+/g,
+      " ",
+    ).trim();
     const afterScore = turns[2];
-    const normalizedAgent = afterScore?.content.replace(/\s+/g, " ") ?? "";
+    const normalizedFirstFollowUp = afterScore?.content.replace(/\s+/g, " ") ?? "";
     if (
       afterScore?.role !== "agent" ||
-      !normalizedAgent.includes(bodyNeedle)
+      !normalizedFirstFollowUp.includes(landingNeedle) ||
+      normalizedFirstFollowUp.includes(observeNeedle)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["dialogueTurns", 2, "content"],
-        message: `The first WAVE turn after the patient gives their score must include this question verbatim: ${CHECK_IN_BODY_URGE_LOCATION_PROMPT}`,
+        message: `The first WAVE turn after the patient gives their score must include this landing prompt verbatim and must not include the body-location observe block yet: ${CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT}`,
+      });
+    }
+    const afterLandingPatient = turns[4];
+    const normalizedSecondFollowUp =
+      afterLandingPatient?.content.replace(/\s+/g, " ") ?? "";
+    if (
+      afterLandingPatient?.role !== "agent" ||
+      !normalizedSecondFollowUp.includes(observeNeedle)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dialogueTurns", 4, "content"],
+        message: `The second WAVE turn after the score (after the patient answers about the landing) must include this block verbatim: ${CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT}`,
+      });
+    }
+    if (turns[3]?.role !== "patient") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dialogueTurns", 3, "role"],
+        message:
+          "Line 4 should be the patient’s reply about how the landing section felt.",
       });
     }
   }
@@ -867,21 +897,21 @@ export const LORA_SPECS: Record<LoRAId, LoraFormSpec> = {
     2,
     "Check-in 2",
     "Focus: craving score, score reflection vs prior check-in, body-location question after the body-scan chunk, and somatic validation (PRD § Check-in 2).",
-    "Training transcripts (match `data/training-seeds/lora-check-in-2.json` and `client/scripts/generate-lora-check-in-2-grid.ts`). Mirror check-in 1 unless PRD differs: (1) Turn 1 is WAVE with exactly CHECK_IN_CHUNK2_SCORE_PROMPT from `check-in-dialogue.ts`. (2) Turn 2 is the patient’s current score only (session intake/baseline stays in structured input; prior check-in score is implied for reflection, not spoken by the patient). (3) The first WAVE turn after the score opens with the score-reflection clause filled from the prior check-in score vs this score (use `fillScoreReflection` / `score-tracking.ts` patterns), then medication affirmation (same on-time/late/missed rules as check-in 1), then surf-framed trigger validation, then CHECK_IN_BODY_URGE_LOCATION_PROMPT verbatim. PRD Turn 3 then deepens on sensation or branches if they could not locate—training examples use validate → CHECK_IN_COPING_CONSENT_PROMPT → CHECK_IN_COPING_BRIDGE_OPENER → technique → check → CHECK_IN_CHUNK2_READINESS_PROMPT → patient affirms ready. (4) Every WAVE line ends with ?. (5) End on the patient’s readiness line; `reply` matches the last WAVE line. (6) Readiness names the next chunk (sound anchor), not the body scan.",
+    "Training transcripts (match `data/training-seeds/lora-check-in-2.json` and `client/scripts/generate-lora-check-in-2-grid.ts`). (1) Turn 1 is WAVE with exactly CHECK_IN_CHUNK2_SCORE_PROMPT from `check-in-dialogue.ts`. (2) Turn 2 is the patient’s current score only. (3) The first WAVE turn after the score: score-reflection clause (`fillScoreReflection` / `score-tracking.ts`), then CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT verbatim only (no body observe block on this turn). (4) Patient answers about the landing; the next WAVE turn briefly says Great if they were fine, or validates if they named friction, then CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT verbatim. (5) Patient answers body-location; then validate → CHECK_IN_COPING_CONSENT_PROMPT → CHECK_IN_COPING_BRIDGE_OPENER → technique → CHECK_IN_CHUNK2_READINESS_PROMPT → patient affirms ready. (6) Every WAVE line ends with ?. (7) End on the patient’s readiness line; `reply` matches the last WAVE line.",
   ),
   "lora-check-in-3": checkInSpec(
     "lora-check-in-3",
     3,
     "Check-in 3",
-    "Focus: sound or visualization anchor obstacles and mind-wandering.",
-    "If visualization failed, offer a non-visual anchor instead of asking the patient to try harder.",
+    "Focus: sound / visualization anchor — landing split, PRD anchor-hold question, obstacle-aware one technique.",
+    "Align with AGENTS.md § lora-check-in-3 and `check-in-dialogue.ts`: Turn 1 = CHECK_IN_CHUNK3_SCORE_PROMPT; first post-score WAVE = score reflection + CHECK_IN_CHUNK3_LANDING_SECTION_PROMPT verbatim only; after patient landing reply, Great. or brief validate + CHECK_IN_CHUNK3_ANCHOR_HOLD_PROMPT verbatim; then validate → CHECK_IN_COPING_CONSENT_PROMPT (when needed) → CHECK_IN_COPING_BRIDGE_OPENER → one technique → CHECK_IN_CHUNK3_READINESS_PROMPT. No check-in-1 med + surf block on the first post-score turn. If the anchor fails, prefer real-sound or thought-labeling paths over pressing visualization (PRD Obstacle Library).",
   ),
   "lora-check-in-4": checkInSpec(
     "lora-check-in-4",
     4,
     "Check-in 4",
-    "Focus: breathing obstacles, chest tightness, and breath-induced anxiety.",
-    "Never push deeper breathing when the patient reports breath anxiety or chest tightness.",
+    "Focus: 4-4-6 breathing — landing split, PRD breathing follow-up, obstacle-aware one technique (no deeper breaths for breath anxiety / chest tightness).",
+    "Align with AGENTS.md § lora-check-in-4 and `check-in-dialogue.ts`: Turn 1 = CHECK_IN_CHUNK4_SCORE_PROMPT; first post-score WAVE = score reflection + CHECK_IN_CHUNK4_LANDING_SECTION_PROMPT verbatim only; after patient landing reply, Great. or brief validate + CHECK_IN_CHUNK4_BREATHING_FOLLOW_UP_PROMPT verbatim (not CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT); then validate → CHECK_IN_COPING_CONSENT_PROMPT (when needed) → CHECK_IN_COPING_BRIDGE_OPENER → one technique → CHECK_IN_CHUNK4_READINESS_PROMPT. No check-in-1 med + surf block on the first post-score turn. Never push deeper or longer breaths when the patient reports breath anxiety or chest tightness (PRD obstacle library).",
   ),
   "lora-check-in-5": checkInSpec(
     "lora-check-in-5",

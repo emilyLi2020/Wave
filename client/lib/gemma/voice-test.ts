@@ -31,7 +31,8 @@ export const MOCK_VOICE_CHECK_IN_SESSION: MockVoiceCheckInSession = {
   priorChunk:
     "The patient just completed a short body scan and was invited to notice where the urge shows up without fighting it.",
   nextPhase: "the sound anchor",
-  opener: "Craving score right now, 1 to 10?",
+  opener:
+    "How intense is the craving now, rate from 1 to 10?",
 };
 
 export interface VoiceTestTurn {

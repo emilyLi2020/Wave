@@ -34,6 +34,10 @@ import type {
   SessionHistoryEntry,
 } from "./schemas";
 import { fillScoreReflection } from "@/lib/session/score-tracking";
+import {
+  checkInLandingSectionPrompt,
+  checkInPostLandingFollowUpPrompt,
+} from "@/lib/training/check-in-dialogue";
 
 export interface BuiltCheckInPrompt {
   systemPrompt: string;
@@ -102,6 +106,41 @@ export function buildCheckInPrompt(
   // messages in history — makes turn-template adherence dramatically
   // more reliable at low reasoning effort.
   const agentTurnNumber = meta.agentTurnsInHistory + 1;
+  const demoTurnALineCheckIn1 =
+    `TURN A — \`history\` ends with exactly 1 patient message (the score) and 0 agent messages: produce ONE short text reply (2-3 sentences max) that reflects the score with specific validation AND ends with ONE concrete question about how the chunk landed (e.g. 'what came up for you during the body scan?', 'where did your mind go?'). The reply MUST end with a question mark.`;
+
+  const demoBlockCheckIns2Thru4 = (() => {
+    const landing = checkInLandingSectionPrompt(
+      context.chunkNumber as 2 | 3 | 4,
+    );
+    const followUp = checkInPostLandingFollowUpPrompt(
+      context.chunkNumber as 2 | 3 | 4,
+    );
+    const turnC =
+      context.chunkNumber === 3 ?
+        `- TURN C — \`history\` ends with exactly 3 patient messages and 2 agent messages: validate what they said about the sound or visualization anchor; if the anchor did not land, do not ask them to try harder visually. Offer ONE brief practice from the PRD obstacle path (e.g. real-sound anchoring or thought labeling). End by asking what they notice.`
+      : context.chunkNumber === 4 ?
+        `- TURN C — \`history\` ends with exactly 3 patient messages and 2 agent messages: validate what they said about 4-4-6 breathing (count, hold, exhale, intruding thoughts). If they report breath anxiety or chest tightness, do not push deeper or longer breaths; offer ONE gentler skill from the PRD obstacle path (smaller breaths, outer focus, orientation). End by asking what they notice.`
+      : `- TURN C — \`history\` ends with exactly 3 patient messages and 2 agent messages: validate their body answer specifically, offer ONE brief practice, end by asking what they notice.`;
+    return [
+      "DEMO MODE (hard override): The check-in is running in fast-demo mode. The endConversation tool is NOT available to you in this mode — the system advances the session itself after the patient answers your readiness question. You only ever produce text. Look at the `history` array you were given.",
+      `- TURN A — \`history\` ends with exactly 1 patient message (the score) and 0 agent messages: weave the score reflection from the score lines in this prompt, then end with this landing prompt verbatim (nothing after it in this turn): "${landing}"`,
+      `- TURN B — \`history\` ends with exactly 2 patient messages and 1 agent message: if their landing answer sounds fine, open with Great.; if they name friction, validate briefly first. Then in the SAME turn include this block verbatim: "${followUp}"`,
+      turnC,
+      `- TURN D — \`history\` ends with exactly 4 patient messages and 3 agent messages: reflect how the practice landed, then ask readiness using this exact pattern: 'Ready to continue with the next part, [next part name], and see if it helps?' MUST end with '?'.`,
+      `- TURN E — \`history\` ends with exactly 5 patient messages and 4 agent messages: if the patient is affirmative, produce a warm hand-off with NO question. If not affirmative, validate and ask what they need before continuing.`,
+      "Still validate first; still never prescribe; still never push positivity; still never mention that demo mode exists.",
+    ].join("\n");
+  })();
+
+  const demoBlockCheckIn1Or5 = [
+    "DEMO MODE (hard override): The check-in is running in fast-demo mode. The endConversation tool is NOT available to you in this mode — the system advances the session itself after the patient answers your readiness question. You only ever produce text. Look at the `history` array you were given.",
+    `- ${demoTurnALineCheckIn1}`,
+    "- TURN B — `history` ends with exactly 2 patient messages (score + 1 free-text reply) and 1 agent message: validate specifically, offer ONE brief practice to try right now, and end by asking what they notice. Example: 'Stomach is useful information — urges often show up as a pull or knot there. Try placing attention around the edges of that sensation, like you are tracing its outline rather than fighting it. Can you try that for one breath and tell me what shifts, even a little?'",
+    "- TURN C — `history` ends with exactly 3 patient messages and 2 agent messages: reflect how the practice landed, then ask readiness using this exact pattern: 'Ready to continue with the next part, [next part name], and see if it helps?' MUST end with '?'. Do NOT ask a generic 'ready to continue?' question.",
+    "- TURN D — `history` ends with exactly 4 patient messages and 3 agent messages: if the patient is affirmative, produce a warm hand-off with NO question (e.g. 'Alright, let's try the next part together and see if it helps.'). If not affirmative, validate and ask what they need before continuing.",
+    "Still validate first; still never prescribe; still never push positivity; still never mention that demo mode exists.",
+  ].join("\n");
   const scoreHistoryIncludingCurrent =
     context.scoreHistory[context.scoreHistory.length - 1] ===
     context.cravingScore
@@ -124,9 +163,9 @@ export function buildCheckInPrompt(
     "- Validate FIRST. Never offer a technique before reflecting what the patient said.",
     "- Validation must be specific enough to feel heard. Do NOT use 'that makes sense' as the whole reply. Name what sounds hard, affirm that they are still trying, and then ask the next concrete question.",
     "- Use gentle encouragement without toxic positivity: 'this is hard and you're still staying with it', 'we can try the next part and see if it helps', 'you don't have to force it'.",
-    "- One technique per check-in maximum. If the patient names where the urge lives in the body (for example: stomach, chest, throat, jaw), treat that as enough information to offer one brief body-based practice. Validate first, then guide the practice, then ask what they notice.",
+    "- One technique per check-in maximum. If the patient names body sensations (for example: stomach, chest, throat, jaw), treat that as enough information to offer one brief body-based practice when that fits this check-in. On check-in 3, ground techniques in the anchor obstacle path (sound, visualization, mind-wandering) per PRD. On check-in 4, ground techniques in the breathing obstacle path (tight chest, intruding thoughts, breath-induced anxiety) per PRD; never push deeper breathing when they report breath anxiety or chest tightness.",
     "- If the patient reports physical arousal after a practice (heart beating fast, pounding, hot, flushed, shaky), do NOT jump to readiness. Validate it as nervous-system activation and choose exactly ONE easing skill: place one hand on the chest and say 'it's okay'; loosen/remove an extra layer if they feel hot; or use cool water on the face/hands if available. Ask what changes after they try it.",
-    "- Do not jump from the patient's body-location answer straight to readiness. The sequence after a Turn 2 answer is: validate → one concrete practice → ask how it landed → then readiness.",
+    "- Do not jump from the patient's answer to your second post-landing question straight to readiness. For check-ins 2–4, follow the landing split in <turn_template> (second question is body-location observe on check-in 2, the sound-anchor hold question on check-in 3, and the PRD breathing follow-up question on check-in 4).",
     "- Do not push for positivity. 'It's hard' is a complete answer.",
     "- Never prescribe medication, recommend a dose change, or shame a missed dose.",
     "- Never offer crisis routing — that lives outside this conversation.",
@@ -139,6 +178,14 @@ export function buildCheckInPrompt(
         "<check_in_1_priority>",
         "For Check-in 1, the CHECK-IN 1 block inside <turn_template> overrides generic sequencing hints elsewhere in this prompt if they conflict.",
         "</check_in_1_priority>",
+      ]
+    : []),
+    ...(context.chunkNumber >= 2 && context.chunkNumber <= 4 ?
+      [
+        "",
+        "<check_in_2_4_landing_split>",
+        "For check-ins 2–4, use the two-turn post-score split in <turn_template>: first agent turn after the score ends with the landing prompt only; after the patient answers, the next agent turn says Great. if they were fine or validates briefly if not, then asks the verbatim follow-up from <turn_template> (body-location observe on check-in 2; PRD sound-anchor hold question on check-in 3; PRD breathing follow-up on check-in 4).",
+        "</check_in_2_4_landing_split>",
       ]
     : []),
     "",
@@ -155,8 +202,12 @@ export function buildCheckInPrompt(
     "Allowed obstacleCategory values: none, cannot_visualize, mind_wandering, urge_overwhelming, breath_tight, breath_anxiety, gave_in, guilt_failure, physical_discomfort, sleepiness.",
     "Pair the tool with text: when you call endConversation, ALSO produce a brief 1-2 sentence closing text turn in the same response. Don't end the check-in with no words — the patient should hear a soft hand-off before the next chunk starts.",
     context.demoMode
-      ? "DEMO MODE (hard override): The check-in is running in fast-demo mode. The endConversation tool is NOT available to you in this mode — the system advances the session itself after the patient answers your readiness question. You only ever produce text. Look at the `history` array you were given.\n- TURN A — `history` ends with exactly 1 patient message (the score) and 0 agent messages: produce ONE short text reply (2-3 sentences max) that reflects the score with specific validation AND ends with ONE concrete question about how the chunk landed (e.g. 'what came up for you during the body scan?', 'where did your mind go?'). The reply MUST end with a question mark.\n- TURN B — `history` ends with exactly 2 patient messages (score + 1 free-text reply) and 1 agent message: validate specifically, offer ONE brief practice to try right now, and end by asking what they notice. Example: 'Stomach is useful information — urges often show up as a pull or knot there. Try placing attention around the edges of that sensation, like you are tracing its outline rather than fighting it. Can you try that for one breath and tell me what shifts, even a little?'\n- TURN C — `history` ends with exactly 3 patient messages and 2 agent messages: reflect how the practice landed, then ask readiness using this exact pattern: 'Ready to continue with the next part, [next part name], and see if it helps?' MUST end with '?'. Do NOT ask a generic 'ready to continue?' question.\n- TURN D — `history` ends with exactly 4 patient messages and 3 agent messages: if the patient is affirmative, produce a warm hand-off with NO question (e.g. 'Alright, let's try the next part together and see if it helps.'). If not affirmative, validate and ask what they need before continuing.\nStill validate first; still never prescribe; still never push positivity; still never mention that demo mode exists."
-      : "Floor: never call endConversation on your FIRST agent turn after the score — your first agent turn is always a text-only validating reply, no tool call. Never call it before the patient has sent 4 patient messages total: score + body/experience answer + practice-landing answer + readiness answer.\nCeiling: once the patient has answered your readiness question with yes / I'm ready / let's go (or any clear affirmative) AND the minimum turn count above is met, you MUST call endConversation in your next response. Do NOT ask 'ready?' a second time. The accompanying text is a warm 1-2 sentence hand-off with NO question — e.g. 'alright, let's try the sound anchor together and see if it helps.' The patient already answered; re-asking the same question makes the app feel stuck.",
+      ? context.chunkNumber >= 2 && context.chunkNumber <= 4
+        ? demoBlockCheckIns2Thru4
+        : demoBlockCheckIn1Or5
+      : context.chunkNumber >= 2 && context.chunkNumber <= 4
+        ? "Floor: never call endConversation on your first two agent turns after the score (landing prompt, then the second scripted follow-up in <turn_template>), no tool on those turns. Never call it before the patient has sent their readiness reply after your readiness question in <turn_template>.\nCeiling: once the patient has answered your readiness question with yes / I'm ready / let's go (or any clear affirmative) AND the minimum turn count above is met, you MUST call endConversation in your next response. Do NOT ask 'ready?' a second time. The accompanying text is a warm 1-2 sentence hand-off with NO question — e.g. 'alright, let's try the next part together and see if it helps.' The patient already answered; re-asking the same question makes the app feel stuck."
+        : "Floor: never call endConversation on your FIRST agent turn after the score — your first agent turn is always a text-only validating reply, no tool call. Never call it before the patient has sent 4 patient messages total: score + body/experience answer + practice-landing answer + readiness answer.\nCeiling: once the patient has answered your readiness question with yes / I'm ready / let's go (or any clear affirmative) AND the minimum turn count above is met, you MUST call endConversation in your next response. Do NOT ask 'ready?' a second time. The accompanying text is a warm 1-2 sentence hand-off with NO question — e.g. 'alright, let's try the sound anchor together and see if it helps.' The patient already answered; re-asking the same question makes the app feel stuck.",
     "</end_conversation_tool>",
     "",
     `<patient_score>`,
@@ -171,7 +222,9 @@ export function buildCheckInPrompt(
     `Patient: ${MAT_LABEL[context.profile.matType]}, ${STATUS_LABEL[context.profile.medicationStatus]}.`,
     context.profile.matType === "none"
       ? "Standard MBRP framing. No pharmacology claims."
-      : "You may weave a brief medication-aware validation clause into your reply if it fits naturally. Never prescribe. Never recommend a dose change. Never shame a missed dose.",
+      : context.chunkNumber >= 2 && context.chunkNumber <= 4
+        ? "Keep medication mentions brief and optional. Do not repeat check-in 1's long medication-status affirmation plus surf-framed trigger validation on your first turn after the score. Never prescribe. Never recommend a dose change. Never shame a missed dose."
+        : "You may weave a brief medication-aware validation clause into your reply if it fits naturally. Never prescribe. Never recommend a dose change. Never shame a missed dose.",
     context.profile.usedSubstanceToday
       ? "The patient said yes to 'used a substance today' at the safety screen but is not in physical distress. Do not bring this up directly during the check-in — the closing reflection handles it."
       : "",
@@ -216,11 +269,11 @@ function sanitizePromptPunctuation(text: string): string {
  * Renders an explicit turn-by-turn template plus a line that tells the
  * model exactly which agent turn it is about to write. Two shapes:
  *
- *   - Non-closing check-ins (chunks 1-4): score → body/experience
- *     question → free-text reply → validation + one practice →
- *     practice reply → readiness → affirmative → hand-off +
- *     endConversation. Four agent turns in the normal arc, possibly
- *     more if the patient raises a concern.
+ *   - Non-closing check-ins (chunks 1-4): score → follow-up questions →
+ *     free-text replies → validation + one practice → practice reply →
+ *     readiness → affirmative → hand-off + endConversation. Check-ins 2–4 use
+ *     a landing question, then a chunk-specific follow-up (body observe, anchor hold,
+ *     or breathing follow-up per PRD), before the obstacle path.
  *
  *   - Check-in 5 (closing): score → reflection question → free-text →
  *     carry-forward question → one-word reply → hand-off + endConversation.
@@ -284,22 +337,40 @@ function buildTurnTemplate(
     ].join("\n");
   }
 
+  const chunkNum = context.chunkNumber as 2 | 3 | 4;
+  const landingSection = checkInLandingSectionPrompt(chunkNum);
+  const postLandingFollowUp = checkInPostLandingFollowUpPrompt(chunkNum);
+  const patientAfterFollowUp =
+    chunkNum === 3 ?
+      "  (patient) answers about the sound anchor — whether they could stay with the water sound, visualization, or what made it hard"
+    : chunkNum === 4 ?
+      "  (patient) answers about 4-4-6 breathing — following their own count, chest tightness, intruding thoughts, breath-induced anxiety, or what got in the way"
+    : "  (patient) answers where the urge lives or how it feels to observe, including if they cannot locate it";
+  const agent3ValidatePractice =
+    chunkNum === 3 ?
+      "  [agent 3] validate what they named about the anchor (sound, imagery, mind-wandering, urge intensity). PRD Chunk 3: if the anchor did not land, do not ask them to try harder visually; offer exactly ONE technique from the obstacle path (e.g. real-sound anchoring, thought labeling, or normalizing urge intensification). MUST end with '?'. DO NOT ask readiness here."
+    : chunkNum === 4 ?
+      "  [agent 3] validate what they named about the breathing practice (inhale/hold/exhale pacing, intruding thoughts). PRD Check-in 4: if they report breath anxiety or chest tightness, do not push deeper, longer, or more disciplined breaths; offer exactly ONE gentler skill (e.g. smaller breaths, outer focus, orienting touch or sound). For other obstacles, at most one technique from the obstacle library. MUST end with '?'. DO NOT ask readiness here."
+    : "  [agent 3] validate what they named with more than 'that makes sense', offer exactly ONE concrete practice, and ask them to try it right now and report what they notice. For body-location answers, use the MBRP body-scan practice: bring attention to the strongest spot, notice the edges, temperature, pressure, pulsing, or change with breath. MUST end with '?'. DO NOT ask readiness here.";
+
   return [
     "<turn_template>",
     `Expected shape for this check-in (next chunk after this is ${nextChunkLabel}), agent turns numbered in [brackets]:`,
     "",
     "  (patient) sends craving score",
-    "  [agent 1] validate the score with more than 'that makes sense': name the effort, normalize difficulty, and ask ONE specific question about their experience during the chunk (body sensation, what came up, how something landed). MUST end with '?'.",
-    "  (patient) free-text reply describing what came up",
-    "  [agent 2] validate what they named with more than 'that makes sense', offer exactly ONE concrete practice, and ask them to try it right now and report what they notice. For body-location answers, use the MBRP body-scan practice: bring attention to the strongest spot, notice the edges, temperature, pressure, pulsing, or change with breath. MUST end with '?'. DO NOT ask readiness here.",
+    `  [agent 1] Weave the score reflection from <patient_score> (Score trend to reflect now) in your own words. Do NOT repeat check-in 1's long medication-status affirmation plus surf-framed trigger validation on this turn. End this turn with this landing prompt verbatim (do not add the second follow-up block in the same turn): "${landingSection}"`,
+    "  (patient) answers how the landing section felt; any questions or concerns",
+    `  [agent 2] If they sound fine with no concerns, open with Great. If they name difficulty, validate in one or two short sentences first (no technique yet). In the SAME turn, include this block verbatim after that opener: "${postLandingFollowUp}"`,
+    patientAfterFollowUp,
+    agent3ValidatePractice,
     "  (patient) replies with how that brief practice landed, even one word",
-    `  [agent 3] reflect how the practice landed, affirm that trying while it feels hard still counts, then ask this exact readiness question: 'Ready to continue with the next part, ${nextChunkLabel}, and see if it helps?' MUST end with '?'. Do NOT ask a generic 'ready to continue?' question.`,
+    `  [agent 4] reflect how the practice landed, affirm that trying while it feels hard still counts, then ask this exact readiness question: 'Ready to continue with the next part, ${nextChunkLabel}, and see if it helps?' MUST end with '?'. Do NOT ask a generic 'ready to continue?' question.`,
     "  (patient) affirmative (yes / ready / ok / let's go) OR a new concern",
-    "  [agent 4]",
+    "  [agent 5]",
     `    • if affirmative: warm 1-2 sentence hand-off (no question) that says you will try ${nextChunkLabel} together and see if it helps, AND call endConversation in the same response.`,
     "    • if new concern: briefly address it + ask ONE more question ending with '?', then expect another patient turn before the hand-off.",
     "",
-    `YOU ARE WRITING AGENT TURN #${agentTurnNumber} NOW. Produce exactly that turn's content — do not skip ahead to a warm close before the patient has confirmed, and do not regress to re-asking about body sensation if they already answered.`,
+    `YOU ARE WRITING AGENT TURN #${agentTurnNumber} NOW. Produce exactly that turn's content — do not skip ahead to a warm close before the patient has confirmed, and do not regress to re-asking earlier questions if they already answered.`,
     "</turn_template>",
   ].join("\n");
 }

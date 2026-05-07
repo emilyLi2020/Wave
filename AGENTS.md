@@ -132,16 +132,40 @@ Strict guidance for training seeds (`data/training-seeds/lora-check-in-1.json`),
 
 ## Check-in training dialogue rules (`lora-check-in-2`)
 
-Same clinical stack as check-in 1 (medication affirmation, surf-framed trigger validation, always end WAVE lines with `?`, consent + `CHECK_IN_COPING_BRIDGE_OPENER` before techniques, transcript ends on patient readiness with no extra WAVE line). **Differences (PRD § Chunk 2 / Check-in 2):**
+Same sequencing discipline as check-in 1 (always end WAVE lines with `?`, consent + `CHECK_IN_COPING_BRIDGE_OPENER` before techniques, transcript ends on patient readiness with no extra WAVE line). **Differences (PRD § Chunk 2 / Check-in 2):**
 
-1. **Turn 1 prompt**: Exactly **`CHECK_IN_CHUNK2_SCORE_PROMPT`** in `client/lib/training/check-in-dialogue.ts` (shorter craving ask after the body-scan chunk—not the same string as check-in 1).
-2. **Turn 2 (first WAVE after the number)**: Begin with a **score reflection** comparing this score to the **prior check-in score** (patterns in `client/lib/session/score-tracking.ts` / `fillScoreReflection`), then medication + surf lines as in check-in 1, then the body-awareness question **`CHECK_IN_BODY_URGE_LOCATION_PROMPT`** verbatim. Do **not** use the check-in 1 “obstacle enum” question here.
-3. **Turn 3+**: Patient describes locating the urge, difficulty locating, or mixed mind–body experience; WAVE **validates** somatically, then may deepen (tight/warm/shift—PRD) or, in these training seeds, move to **consent → bridge → one technique** like check-in 1 when extra grounding helps.
+1. **Turn 1 prompt**: Exactly **`CHECK_IN_CHUNK2_SCORE_PROMPT`** (same string as **`CHECK_IN_CHUNK234_SCORE_PROMPT`**) in `client/lib/training/check-in-dialogue.ts` — matches PRD / `CHECK_IN_OPENERS[2].turn1` (*How intense is the craving now, rate from 1 to 10?*). Not the same string as check-in 1.
+2. **After the score (two WAVE turns before body work)**: (a) **First** WAVE turn: score reflection vs the **prior check-in score** (`fillScoreReflection` / `client/lib/session/score-tracking.ts`), then **`CHECK_IN_CHUNK2_LANDING_SECTION_PROMPT`** verbatim only. (b) **Second** WAVE turn (after the patient answers about the landing): if they were fine, open with **Great.**; if they named a struggle, validate briefly first. Then include **`CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT`** verbatim in the same turn. Do **not** repeat check-in 1’s long medication + surf block on the first post-score turn. See `check-in-dialogue.ts`.
+3. **Next patient turn**: Locating the urge, difficulty locating, or mixed experience; WAVE **validates** somatically, then may deepen or move to **consent → bridge → one technique** as in training seeds.
 4. **Readiness**: Last WAVE line uses **`CHECK_IN_CHUNK2_READINESS_PROMPT`** (next phase is the **sound anchor**).
 
 Canonical grid: `data/training-seeds/lora-check-in-2.json` via `client/scripts/generate-lora-check-in-2-grid.ts`.
 
 **Clinician / LLM expansion**: long-form instructions live in `data/training-seeds/clinician-llm-instructions.json` under **`lora-check-in-2`**, editable from `/training` → Check-in 2.
+
+## Check-in training dialogue rules (`lora-check-in-3`)
+
+Same global discipline as check-in 2 (no check-in-1 med + surf paragraph on the first post-score turn; landing split into two WAVE turns; **Great.** or brief validation before the verbatim follow-up; consent + `CHECK_IN_COPING_BRIDGE_OPENER` before techniques; every WAVE line ends with `?`; transcript ends on patient readiness). **Chunk / PRD focus (after sound or visualization anchor, before 4-4-6 breathing):**
+
+1. **Turn 1 prompt**: Exactly **`CHECK_IN_CHUNK3_SCORE_PROMPT`** (same string as **`CHECK_IN_CHUNK234_SCORE_PROMPT`**) in `client/lib/training/check-in-dialogue.ts` — matches PRD / `CHECK_IN_OPENERS[3].turn1` (*How intense is the craving now, rate from 1 to 10?*).
+2. **First WAVE turn after the number**: Score reflection vs the **prior check-in score** (`fillScoreReflection` / `client/lib/session/score-tracking.ts`), then **`CHECK_IN_CHUNK3_LANDING_SECTION_PROMPT`** verbatim only (how the landing of the sound-anchor chunk felt; questions or concerns). Do **not** put the anchor-hold or body-observe question on this turn.
+3. **Second WAVE turn (after the patient answers about the landing)**: **Great.** if they were fine; otherwise validate briefly. Then **`CHECK_IN_CHUNK3_ANCHOR_HOLD_PROMPT`** verbatim — PRD / `CHECK_IN_OPENERS[3].turn2` core question (*Could you hold onto the sound of water, or was it hard to stay with?*). Do **not** use the check-in-2 body-location observe block here.
+4. **Branching (PRD § Adaptive path / Chunk 3 user flow)**: After the patient answers about the anchor, **validate before technique**. If the anchor did not land, do **not** push harder on visualization; use the obstacle-library stance (e.g. real-sound anchoring, thought labeling, normalizing urge intensification). At most **one** technique before readiness.
+5. **Readiness**: Last WAVE line uses **`CHECK_IN_CHUNK3_READINESS_PROMPT`** (next part is **breathing**).
+
+**Clinician / LLM expansion**: long-form instructions live in `data/training-seeds/clinician-llm-instructions.json` under **`lora-check-in-3`**, editable from `/training` when that surface is wired.
+
+## Check-in training dialogue rules (`lora-check-in-4`)
+
+Same global discipline as check-ins 2–3 (no check-in-1 med + surf paragraph on the first post-score turn; landing split into two WAVE turns; **Great.** or brief validation before the verbatim follow-up; consent + `CHECK_IN_COPING_BRIDGE_OPENER` before techniques; every WAVE line ends with `?`; transcript ends on patient readiness). **Chunk / PRD focus (after 4-4-6 breathing, before closing reflection):**
+
+1. **Turn 1 prompt**: Exactly **`CHECK_IN_CHUNK4_SCORE_PROMPT`** (same string as **`CHECK_IN_CHUNK234_SCORE_PROMPT`**) in `client/lib/training/check-in-dialogue.ts` — matches PRD / `CHECK_IN_OPENERS[4].turn1` (*How intense is the craving now, rate from 1 to 10?*).
+2. **First WAVE turn after the number**: Score reflection vs the **prior check-in score** (`fillScoreReflection` / `client/lib/session/score-tracking.ts`), then **`CHECK_IN_CHUNK4_LANDING_SECTION_PROMPT`** verbatim only (how the landing of the breathing exercise felt; questions or concerns). Do **not** put the PRD breathing follow-up or body-location observe on this turn.
+3. **Second WAVE turn (after the patient answers about the landing)**: **Great.** if they were fine; otherwise validate briefly. Then **`CHECK_IN_CHUNK4_BREATHING_FOLLOW_UP_PROMPT`** verbatim — PRD / `CHECK_IN_OPENERS[4].turn2` core question (*How did the breathing feel — were you able to follow your own count, or did something get in the way?*). Do **not** use **`CHECK_IN_BODY_URGE_LOCATION_OBSERVE_PROMPT`** here (that block is check-in 2 only).
+4. **Branching (PRD § Check-in 4 / obstacle library)**: After the patient answers about breathing, **validate before technique**. Branch on tight chest, intruding thoughts, and breath-induced anxiety. **Never** push deeper, longer, or more “disciplined” breaths when the patient reports **breath anxiety** or **chest tightness**; prefer smaller breaths, orientation, or outer focus. At most **one** technique before readiness (`lora-specs` invariant).
+5. **Readiness**: Last WAVE line uses **`CHECK_IN_CHUNK4_READINESS_PROMPT`** (next part is the **closing reflection**).
+
+**Clinician / LLM expansion**: long-form instructions live in `data/training-seeds/clinician-llm-instructions.json` under **`lora-check-in-4`**, editable from `/training` when that surface is wired.
 
 ## Learned User Preferences
 

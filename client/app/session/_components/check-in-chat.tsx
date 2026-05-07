@@ -54,11 +54,10 @@ interface Props {
    */
   sessionHistory: readonly SessionHistoryEntry[];
   /**
-   * When true the check-in runs in fast-demo mode: the LLM is
-   * instructed to end after the patient's first free-text reply (so
-   * score + 1 free-text turn → endConversation). A client-side
-   * backstop also force-finalizes at that point in case the model
-   * produces a text turn instead of the tool call.
+   * When true the check-in runs in fast-demo mode: the LLM follows the
+   * compressed demo script in the prompt (see `buildCheckInPrompt`).
+   * A client-side backstop force-finalizes after an affirmative readiness
+   * reply if the model omits the `endConversation` tool call.
    */
   demoMode: boolean;
   onComplete: (checkIn: CheckIn) => void;
@@ -225,10 +224,13 @@ export function CheckInChat({
           (t) => t.role === "patient",
         );
         const lastPatient = patientMessages[patientMessages.length - 1];
+        const minPatientTurnsForDemoAdvance =
+          chunkNumber >= 2 && chunkNumber <= 4 ? 5 : 4;
         if (
-          patientMessages.length >= 4 &&
+          patientMessages.length >= minPatientTurnsForDemoAdvance &&
           lastPatient &&
           isAffirmative(lastPatient.content) &&
+          lastAgentAskedReadiness(turnsRef.current) &&
           !completedRef.current
         ) {
           const fallbackSignal: EndConversationSignal = {
@@ -245,10 +247,13 @@ export function CheckInChat({
           (t) => t.role === "patient",
         );
         const lastPatient = patientMessages[patientMessages.length - 1];
+        const minPatientTurnsForDemoAdvance =
+          chunkNumber >= 2 && chunkNumber <= 4 ? 5 : 4;
         if (
-          patientMessages.length >= 4 &&
+          patientMessages.length >= minPatientTurnsForDemoAdvance &&
           lastPatient &&
           isAffirmative(lastPatient.content) &&
+          lastAgentAskedReadiness(turnsRef.current) &&
           !completedRef.current
         ) {
           const fallbackSignal: EndConversationSignal = {
@@ -380,7 +385,7 @@ export function CheckInChat({
       >
         {turns.length === 0 ? (
           <p className="text-sm text-foreground/50">
-            Tap a number below — your craving right now, 1 to 10.
+            Tap a number below for how strong the craving feels right now, from 1 to 10.
           </p>
         ) : null}
         {turns.map((turn) => (

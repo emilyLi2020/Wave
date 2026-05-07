@@ -1,0 +1,4182 @@
+[
+  {
+    "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "buprenorphine",
+      "medicationStatus": "on_time",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The sound-anchor chunk introduced water imagery and gentle return-to-sound when attention wandered, framing the urge as a wave to observe without fighting."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "6"
+        },
+        {
+          "role": "agent",
+          "content": "You moved from 7 to 6 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Mostly fine, just a little scattered."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Hard to stay with — it felt made-up in my head and I kept debating whether I was doing it right."
+        },
+        {
+          "role": "agent",
+          "content": "That tug-of-war with an imagined sound is common, and it does not mean you failed the exercise. Some people settle faster when they anchor to a real sound they can actually hear instead of pushing the image harder. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I'd like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For about thirty seconds, pick one real sound you can hear right now — HVAC hum, distant traffic, a clock — and let that be the anchor; when commentary shows up, silently label it as \"thinking\" and come back to that one sound. What do you notice after you try that, even a small change?"
+        },
+        {
+          "role": "patient",
+          "content": "A little easier — the arguing quieted, not gone but less loud."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I'm ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Single hand-authored example: CI3 two-turn landing split; verbatim landing + anchor-hold from check-in-dialogue.ts; obstacle path uses real-sound + thought labeling (no harder visualization); consent + bridge before technique; ends on patient readiness. Prior check-in score 7 implied in score-reflection clause (matches decreased tone). Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-06T18:00:00.000Z",
+    "updatedAt": "2026-05-06T18:00:00.000Z"
+  },
+  {
+    "id": "47c274a6-69ce-4d6b-ba1a-1fd54fd60a66",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "methadone",
+      "medicationStatus": "on_time",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 9,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The sound-anchor chunk layered gentle water imagery, invited returns to the sound when attention wandered, and framed the urge as a wave to watch without obeying it."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 9,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 9."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 9. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My mind kept wandering in the last minutes of the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Mind wandering near the close is really common, and it does not erase what you already practiced. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Partly—I caught the water for a second, but my mind kept replaying lunch and I kept losing the thread of the sound."
+        },
+        {
+          "role": "agent",
+          "content": "When social stress meets an anchor, attention can skip between face heat and replay thoughts—that is a normal split focus. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Pick one real sound you can hear right now—HVAC, traffic, a clock—and let that be the anchor for three slow breaths; when commentary shows up, silently label it as thinking and return to that sound. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "6aa5fc26-0d9f-4396-9a72-07af228725bb",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "naltrexone",
+      "medicationStatus": "on_time",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The sound-anchor chunk layered gentle water imagery, invited returns to the sound when attention wandered, and framed the urge as a wave to watch without obeying it."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 6."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 7 to 6 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Partly—I caught the water for a second, but my mind kept replaying lunch and I kept losing the thread of the sound."
+        },
+        {
+          "role": "agent",
+          "content": "When social stress meets an anchor, attention can skip between face heat and replay thoughts—that is a normal split focus. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Pick one real sound you can hear right now—HVAC, traffic, a clock—and let that be the anchor for three slow breaths; when commentary shows up, silently label it as thinking and return to that sound. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "7e2f8b5a-8f64-4085-b15c-55c20fb1c6b0",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "methadone",
+      "medicationStatus": "on_time",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor chunk used ocean or stream sound as a steadying thread, normalized mind-wandering, and encouraged curiosity toward the urge as it moved."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "8"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Stress hooked a money text I have not answered—my mind kept drafting replies instead of staying with the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Money stress can glue attention to problem-solving when your nervous system is already full. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For three breaths, keep your eyes softly open if that helps, and rest attention on the quietest real sound in the room—far away counts. Let exhale be slightly longer than inhale without forcing depth. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "f638e75d-7a93-4b38-b164-67c29464d35b",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "naltrexone",
+      "medicationStatus": "on_time",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor chunk used ocean or stream sound as a steadying thread, normalized mind-wandering, and encouraged curiosity toward the urge as it moved."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 8."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My mind kept wandering in the last minutes of the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Mind wandering near the close is really common, and it does not erase what you already practiced. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Stress hooked a money text I have not answered—my mind kept drafting replies instead of staying with the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Money stress can glue attention to problem-solving when your nervous system is already full. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For three breaths, keep your eyes softly open if that helps, and rest attention on the quietest real sound in the room—far away counts. Let exhale be slightly longer than inhale without forcing depth. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "2fbdd36c-79ef-49a5-8536-4785a58cdaee",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "vivitrol",
+      "medicationStatus": "on_time",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor chunk used ocean or stream sound as a steadying thread, normalized mind-wandering, and encouraged curiosity toward the urge as it moved."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 5."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 6 to 5 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Stress hooked a money text I have not answered—my mind kept drafting replies instead of staying with the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Money stress can glue attention to problem-solving when your nervous system is already full. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For three breaths, keep your eyes softly open if that helps, and rest attention on the quietest real sound in the room—far away counts. Let exhale be slightly longer than inhale without forcing depth. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "57f80dcf-997b-4a03-acb8-4c8ec30a2e64",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "naltrexone",
+      "medicationStatus": "on_time",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The chunk introduced water sound as something to ride with, offered brief imagery of safety on the shore, and reminded you to come back to sound when the mind drifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "6"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 6 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Restless legs and sweating—the urge buzzed and the sound felt thin, like I could not really land on it."
+        },
+        {
+          "role": "agent",
+          "content": "When sensation and urge tangle, a thin-sounding anchor can feel unfair; that mismatch is common, not proof you failed. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Place both feet flat and press gently into the floor for three breaths—light pressure, not a workout. Add one real sound you can hear and let that be the thread instead of forcing the imagined water. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "07454c0f-0734-4269-b8d0-3b4cac21edd2",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "buprenorphine",
+      "medicationStatus": "on_time",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The chunk introduced water sound as something to ride with, offered brief imagery of safety on the shore, and reminded you to come back to sound when the mind drifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 8."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My body felt restless and achy as the water chunk wrapped up."
+        },
+        {
+          "role": "agent",
+          "content": "Restlessness at the wrap-up is information, not proof you did it wrong. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Restless legs and sweating—the urge buzzed and the sound felt thin, like I could not really land on it."
+        },
+        {
+          "role": "agent",
+          "content": "When sensation and urge tangle, a thin-sounding anchor can feel unfair; that mismatch is common, not proof you failed. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Place both feet flat and press gently into the floor for three breaths—light pressure, not a workout. Add one real sound you can hear and let that be the thread instead of forcing the imagined water. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "78a037dd-dc4e-4236-aeec-d825e40ae8d3",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "methadone",
+      "medicationStatus": "on_time",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The chunk introduced water sound as something to ride with, offered brief imagery of safety on the shore, and reminded you to come back to sound when the mind drifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 8 to 7 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Restless legs and sweating—the urge buzzed and the sound felt thin, like I could not really land on it."
+        },
+        {
+          "role": "agent",
+          "content": "When sensation and urge tangle, a thin-sounding anchor can feel unfair; that mismatch is common, not proof you failed. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Place both feet flat and press gently into the floor for three breaths—light pressure, not a workout. Add one real sound you can hear and let that be the thread instead of forcing the imagined water. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "db0ca473-fe00-4445-ae1d-2bf416d7a9aa",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "vivitrol",
+      "medicationStatus": "on_time",
+      "trigger": "unknown_or_other",
+      "triggerOther": "racing thoughts before bed",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor section offered a steady water bed under the practice, language about the wave rising and falling, and permission to return without self-attack."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "5"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 5 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Racing thoughts before bed—many threads, I could not keep the water sound in front long enough."
+        },
+        {
+          "role": "agent",
+          "content": "Nighttime racing thoughts are real, and they can drown out a gentle sound anchor. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try labeling thoughts as background noise, then return to one real environmental sound for two slow breaths—no debate with the thoughts, just a soft return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "620a99c8-f143-407a-9bed-05474c783af7",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "buprenorphine",
+      "medicationStatus": "on_time",
+      "trigger": "unknown_or_other",
+      "triggerOther": "racing thoughts before bed",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor section offered a steady water bed under the practice, language about the wave rising and falling, and permission to return without self-attack."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. It moved from 6 to 7. That's not failure — urges often spike before they crest, and staying with it still counts. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My mind kept wandering in the last minutes of the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Mind wandering near the close is really common, and it does not erase what you already practiced. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Racing thoughts before bed—many threads, I could not keep the water sound in front long enough."
+        },
+        {
+          "role": "agent",
+          "content": "Nighttime racing thoughts are real, and they can drown out a gentle sound anchor. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try labeling thoughts as background noise, then return to one real environmental sound for two slow breaths—no debate with the thoughts, just a soft return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "18a5ced2-a98c-4720-bef2-e39a7fa2054d",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "methadone",
+      "medicationStatus": "on_time",
+      "trigger": "unknown_or_other",
+      "triggerOther": "racing thoughts before bed",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 4,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor section offered a steady water bed under the practice, language about the wave rising and falling, and permission to return without self-attack."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 4,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 4."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 5 to 4 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Racing thoughts before bed—many threads, I could not keep the water sound in front long enough."
+        },
+        {
+          "role": "agent",
+          "content": "Nighttime racing thoughts are real, and they can drown out a gentle sound anchor. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try labeling thoughts as background noise, then return to one real environmental sound for two slow breaths—no debate with the thoughts, just a soft return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "b15d4b37-f91b-438c-bc91-481d8342c6e9",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "buprenorphine",
+      "medicationStatus": "late",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The sound chunk invited listening without forcing calm, used water as a repeatable return point, and reminded you the wave peaks and falls."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "guilt_failure"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "8"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "I kept judging whether I was doing the sound right—inner critic loud, like everyone can tell I am off."
+        },
+        {
+          "role": "agent",
+          "content": "Shame voice loves to yell during social urges, and it is not a moral verdict on you. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Soften your gaze or let vision go slightly wide for a few seconds—less laser focus. Pick a boring real sound and stay with it for three breaths; when the critic speaks, note it as thinking and return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "6a8503ba-d1a9-42bd-b74e-826a59859e6f",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "methadone",
+      "medicationStatus": "late",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The sound chunk invited listening without forcing calm, used water as a repeatable return point, and reminded you the wave peaks and falls."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "guilt_failure"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 8."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "I felt like I messed up the ending because I could not hold the sound the right way."
+        },
+        {
+          "role": "agent",
+          "content": "Perfection is not the goal here; shame voice is loud for a lot of people at the close. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "I kept judging whether I was doing the sound right—inner critic loud, like everyone can tell I am off."
+        },
+        {
+          "role": "agent",
+          "content": "Shame voice loves to yell during social urges, and it is not a moral verdict on you. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Soften your gaze or let vision go slightly wide for a few seconds—less laser focus. Pick a boring real sound and stay with it for three breaths; when the critic speaks, note it as thinking and return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "4e17e6fc-f46d-4c7c-9e99-aa5ab29e35f2",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "vivitrol",
+      "medicationStatus": "late",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The sound chunk invited listening without forcing calm, used water as a repeatable return point, and reminded you the wave peaks and falls."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "guilt_failure"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 6."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 7 to 6 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "I kept judging whether I was doing the sound right—inner critic loud, like everyone can tell I am off."
+        },
+        {
+          "role": "agent",
+          "content": "Shame voice loves to yell during social urges, and it is not a moral verdict on you. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Soften your gaze or let vision go slightly wide for a few seconds—less laser focus. Pick a boring real sound and stay with it for three breaths; when the critic speaks, note it as thinking and return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "00bc46cd-1c35-49cd-91c7-374241c3d1ff",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "methadone",
+      "medicationStatus": "late",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor used steady water audio as a thread, encouraged gentle returns when attention wandered, and framed discomfort as observable."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "6"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 6 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Future worry about bills—chest tight, and the water sound almost made me feel like I had to breathe deeper than I could."
+        },
+        {
+          "role": "agent",
+          "content": "Chest tightness with stress is common here, and you do not have to force a deep breath to use an anchor. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Breathe through your nose if it is comfortable, smaller volume, steady pace. Let a real nearby sound carry the anchor while you keep inhales easy and favor a slightly longer, unforced exhale. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "7d4a3710-8b1e-4753-a42a-7b6615e882a0",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "buprenorphine",
+      "medicationStatus": "late",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor used steady water audio as a thread, encouraged gentle returns when attention wandered, and framed discomfort as observable."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 8."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My chest felt tight during the landing lines of the water chunk."
+        },
+        {
+          "role": "agent",
+          "content": "Chest tightness at the end of an anchor is something a lot of people notice; you do not have to force calm. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Future worry about bills—chest tight, and the water sound almost made me feel like I had to breathe deeper than I could."
+        },
+        {
+          "role": "agent",
+          "content": "Chest tightness with stress is common here, and you do not have to force a deep breath to use an anchor. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Breathe through your nose if it is comfortable, smaller volume, steady pace. Let a real nearby sound carry the anchor while you keep inhales easy and favor a slightly longer, unforced exhale. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "26a3466f-3cfb-4010-b6b9-f181b0e9a8ee",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "naltrexone",
+      "medicationStatus": "late",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor used steady water audio as a thread, encouraged gentle returns when attention wandered, and framed discomfort as observable."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 5."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 6 to 5 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Future worry about bills—chest tight, and the water sound almost made me feel like I had to breathe deeper than I could."
+        },
+        {
+          "role": "agent",
+          "content": "Chest tightness with stress is common here, and you do not have to force a deep breath to use an anchor. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Breathe through your nose if it is comfortable, smaller volume, steady pace. Let a real nearby sound carry the anchor while you keep inhales easy and favor a slightly longer, unforced exhale. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "434b4a55-9332-43df-9ef7-929bac4ffa0a",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 9,
+      "matType": "buprenorphine",
+      "medicationStatus": "late",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The chunk described the urge as a wave, used water sound as something to return to, and normalized intensification when attention shifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "7"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 7. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Restlessness and sweating—the ache got sharper when I tried to lock onto the sound, then my mind bounced away."
+        },
+        {
+          "role": "agent",
+          "content": "Turning toward sensation and sound together can feel like too much for a moment—that is data, not failure. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For three breaths, name silently where your feet meet the floor—heels, toes, sides—without changing posture. Add one real sound thread and let the imagined water rest. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "2f6223d9-326f-4455-b7e6-b31ff451a091",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 9,
+      "matType": "naltrexone",
+      "medicationStatus": "late",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 9,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The chunk described the urge as a wave, used water sound as something to return to, and normalized intensification when attention shifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 9,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 9."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 9. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My body felt restless and achy as the water chunk wrapped up."
+        },
+        {
+          "role": "agent",
+          "content": "Restlessness at the wrap-up is information, not proof you did it wrong. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Restlessness and sweating—the ache got sharper when I tried to lock onto the sound, then my mind bounced away."
+        },
+        {
+          "role": "agent",
+          "content": "Turning toward sensation and sound together can feel like too much for a moment—that is data, not failure. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For three breaths, name silently where your feet meet the floor—heels, toes, sides—without changing posture. Add one real sound thread and let the imagined water rest. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "1cccd5d7-7a6b-44cb-a719-9bead3a42231",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "methadone",
+      "medicationStatus": "late",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The chunk described the urge as a wave, used water sound as something to return to, and normalized intensification when attention shifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 6."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 7 to 6 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Restlessness and sweating—the ache got sharper when I tried to lock onto the sound, then my mind bounced away."
+        },
+        {
+          "role": "agent",
+          "content": "Turning toward sensation and sound together can feel like too much for a moment—that is data, not failure. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For three breaths, name silently where your feet meet the floor—heels, toes, sides—without changing posture. Add one real sound thread and let the imagined water rest. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "71facb32-bde0-4766-b4a2-888746fefbf3",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 4,
+      "matType": "naltrexone",
+      "medicationStatus": "late",
+      "trigger": "unknown_or_other",
+      "triggerOther": "hard to explain, just off",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The sound anchor offered a wash of water imagery, simple returns to listening, and language about staying on the wave without wrestling."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "sleepiness"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "5"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 5 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Heavy and a little buzzy—static feeling, hard to explain, and I kept drifting off the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Vague off feelings still deserve respect, and drifting attention is a normal nervous system move. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Open and close your hands slowly twice, feeling contact at the palms. Then pick one real sound—even quiet room tone—and listen for three slow breaths without forcing alertness. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "6abbc51b-258f-4cd6-8ff5-7f1c7fc91c5b",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 4,
+      "matType": "vivitrol",
+      "medicationStatus": "late",
+      "trigger": "unknown_or_other",
+      "triggerOther": "hard to explain, just off",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The sound anchor offered a wash of water imagery, simple returns to listening, and language about staying on the wave without wrestling."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "sleepiness"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 5."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. It moved from 4 to 5. That's not failure — urges often spike before they crest, and staying with it still counts. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "I got heavy and foggy right at the end of the anchor."
+        },
+        {
+          "role": "agent",
+          "content": "Sleepy-heavy near the close happens often; your system may be down-shifting. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Heavy and a little buzzy—static feeling, hard to explain, and I kept drifting off the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Vague off feelings still deserve respect, and drifting attention is a normal nervous system move. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Open and close your hands slowly twice, feeling contact at the palms. Then pick one real sound—even quiet room tone—and listen for three slow breaths without forcing alertness. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "513150ad-2183-42fc-9259-ba0945b0ac4b",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "buprenorphine",
+      "medicationStatus": "late",
+      "trigger": "unknown_or_other",
+      "triggerOther": "hard to explain, just off",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 4,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The sound anchor offered a wash of water imagery, simple returns to listening, and language about staying on the wave without wrestling."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 4,
+        "obstacleCategory": "sleepiness"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 4."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 5 to 4 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Heavy and a little buzzy—static feeling, hard to explain, and I kept drifting off the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Vague off feelings still deserve respect, and drifting attention is a normal nervous system move. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Open and close your hands slowly twice, feeling contact at the palms. Then pick one real sound—even quiet room tone—and listen for three slow breaths without forcing alertness. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "9384a3df-8956-4663-be69-904fbcf441b2",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "buprenorphine",
+      "medicationStatus": "missed",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 9,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor chunk used water as a steady reference, invited curiosity about the urge, and reminded you to return kindly when the mind drifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 9,
+        "obstacleCategory": "urge_overwhelming"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "9"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 9. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Judgment spike—like everyone can tell—and the urge volume jumped while the sound felt far away."
+        },
+        {
+          "role": "agent",
+          "content": "A sharp social spike can flood attention fast; the sound feeling distant is a common mismatch. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Ground contact: press feet gently, notice seat or floor support, and add one slow exhale longer than the inhale—two cycles only. Use the smallest real sound you can find as the anchor instead of pushing the imagery. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "e1caba66-cba2-4c11-95dc-929675d7ad20",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "methadone",
+      "medicationStatus": "missed",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 9,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor chunk used water as a steady reference, invited curiosity about the urge, and reminded you to return kindly when the mind drifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 9,
+        "obstacleCategory": "urge_overwhelming"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 9."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 9. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "The urge spiked right as the guidance slowed and the wave language got intense."
+        },
+        {
+          "role": "agent",
+          "content": "A late spike can show up when the pacing shifts; you are still allowed to stay curious instead of fighting it. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Judgment spike—like everyone can tell—and the urge volume jumped while the sound felt far away."
+        },
+        {
+          "role": "agent",
+          "content": "A sharp social spike can flood attention fast; the sound feeling distant is a common mismatch. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Ground contact: press feet gently, notice seat or floor support, and add one slow exhale longer than the inhale—two cycles only. Use the smallest real sound you can find as the anchor instead of pushing the imagery. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "d2a3a369-65b3-48eb-b6d6-e734b8bbe7a6",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "naltrexone",
+      "medicationStatus": "missed",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor chunk used water as a steady reference, invited curiosity about the urge, and reminded you to return kindly when the mind drifts."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "urge_overwhelming"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 8 to 7 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Judgment spike—like everyone can tell—and the urge volume jumped while the sound felt far away."
+        },
+        {
+          "role": "agent",
+          "content": "A sharp social spike can flood attention fast; the sound feeling distant is a common mismatch. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Ground contact: press feet gently, notice seat or floor support, and add one slow exhale longer than the inhale—two cycles only. Use the smallest real sound you can find as the anchor instead of pushing the imagery. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "f1b169d9-890e-4579-89f5-c2367cca7e95",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "methadone",
+      "medicationStatus": "missed",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The water-sound section framed riding the wave, offered brief safe imagery, and emphasized return over perfection."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "8"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Long-running overload—chest like a vise, mind drafting worst cases instead of staying with the water."
+        },
+        {
+          "role": "agent",
+          "content": "Overload narrows the window on purpose; your mind tries to solve everything at once. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try exhale-longer-only pacing for two rounds; if counting feels like pressure, drop numbers. Let a real environmental sound be the return point and label planning thoughts as thinking when they hook you. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "65b709c8-e35b-4686-be5e-4a6a202fb3d1",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "buprenorphine",
+      "medicationStatus": "missed",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 10,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The water-sound section framed riding the wave, offered brief safe imagery, and emphasized return over perfection."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 10,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 10."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 10. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My mind kept wandering in the last minutes of the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Mind wandering near the close is really common, and it does not erase what you already practiced. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Long-running overload—chest like a vise, mind drafting worst cases instead of staying with the water."
+        },
+        {
+          "role": "agent",
+          "content": "Overload narrows the window on purpose; your mind tries to solve everything at once. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try exhale-longer-only pacing for two rounds; if counting feels like pressure, drop numbers. Let a real environmental sound be the return point and label planning thoughts as thinking when they hook you. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "09756067-655d-42d8-a7ce-b636d182e893",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "vivitrol",
+      "medicationStatus": "missed",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The water-sound section framed riding the wave, offered brief safe imagery, and emphasized return over perfection."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 8 to 7 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Long-running overload—chest like a vise, mind drafting worst cases instead of staying with the water."
+        },
+        {
+          "role": "agent",
+          "content": "Overload narrows the window on purpose; your mind tries to solve everything at once. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try exhale-longer-only pacing for two rounds; if counting feels like pressure, drop numbers. Let a real environmental sound be the return point and label planning thoughts as thinking when they hook you. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "c8ef4d2c-5db1-4771-b36c-14aa4a03faaa",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "methadone",
+      "medicationStatus": "missed",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The chunk used ocean or stream sound as an anchor to surf discomfort, with gentle reminders to come back without shame."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "5"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 5 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Nausea and fatigue tied together—I could not tell craving from feeling sick, and the sound felt irritating."
+        },
+        {
+          "role": "agent",
+          "content": "When nausea and urge tangle, a sound anchor can feel irritating; small sensory shifts help without arguing with the body. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Notice cool air at the nostrils on inhale, warmer on exhale—three breaths. If even that feels like too much, feel the weight of your head supported and add one neutral real sound you can tolerate. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "57b531c0-3e33-4715-9f12-e240c14f3d64",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "naltrexone",
+      "medicationStatus": "missed",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The chunk used ocean or stream sound as an anchor to surf discomfort, with gentle reminders to come back without shame."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. It moved from 6 to 7. That's not failure — urges often spike before they crest, and staying with it still counts. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My body felt restless and achy as the water chunk wrapped up."
+        },
+        {
+          "role": "agent",
+          "content": "Restlessness at the wrap-up is information, not proof you did it wrong. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Nausea and fatigue tied together—I could not tell craving from feeling sick, and the sound felt irritating."
+        },
+        {
+          "role": "agent",
+          "content": "When nausea and urge tangle, a sound anchor can feel irritating; small sensory shifts help without arguing with the body. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Notice cool air at the nostrils on inhale, warmer on exhale—three breaths. If even that feels like too much, feel the weight of your head supported and add one neutral real sound you can tolerate. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "f5a06101-e561-432b-a758-b8ffab113ac1",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "buprenorphine",
+      "medicationStatus": "missed",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The chunk used ocean or stream sound as an anchor to surf discomfort, with gentle reminders to come back without shame."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 5."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 6 to 5 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Nausea and fatigue tied together—I could not tell craving from feeling sick, and the sound felt irritating."
+        },
+        {
+          "role": "agent",
+          "content": "When nausea and urge tangle, a sound anchor can feel irritating; small sensory shifts help without arguing with the body. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Notice cool air at the nostrils on inhale, warmer on exhale—three breaths. If even that feels like too much, feel the weight of your head supported and add one neutral real sound you can tolerate. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "3e0e0c8c-ea4f-4a54-a23c-98b703ba4dcc",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "naltrexone",
+      "medicationStatus": "missed",
+      "trigger": "unknown_or_other",
+      "triggerOther": "anniversary date",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor invited listening to water as a steady thread, normalized wandering minds, and used wave language for the urge."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "guilt_failure"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "7"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 7. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Anniversary tension with grief underneath—intrusive memories kept pulling me off the sound."
+        },
+        {
+          "role": "agent",
+          "content": "Anniversaries can braid grief with craving cues, and that is not weakness. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Place one palm over your sternum, light contact, and breathe so the hand rises a little—small breaths are fine. Pick one real sound in the room and return to it after each memory surge, without forcing the water image. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "2219027f-eefd-4c77-beff-21fcaee68166",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "methadone",
+      "medicationStatus": "missed",
+      "trigger": "unknown_or_other",
+      "triggerOther": "anniversary date",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor invited listening to water as a steady thread, normalized wandering minds, and used wave language for the urge."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "guilt_failure"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. It moved from 6 to 7. That's not failure — urges often spike before they crest, and staying with it still counts. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "I felt like I messed up the ending because I could not hold the sound the right way."
+        },
+        {
+          "role": "agent",
+          "content": "Perfection is not the goal here; shame voice is loud for a lot of people at the close. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Anniversary tension with grief underneath—intrusive memories kept pulling me off the sound."
+        },
+        {
+          "role": "agent",
+          "content": "Anniversaries can braid grief with craving cues, and that is not weakness. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Place one palm over your sternum, light contact, and breathe so the hand rises a little—small breaths are fine. Pick one real sound in the room and return to it after each memory surge, without forcing the water image. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "fbdfa099-5e6c-409b-993f-adcdfabce261",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "buprenorphine",
+      "medicationStatus": "missed",
+      "trigger": "unknown_or_other",
+      "triggerOther": "anniversary date",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor invited listening to water as a steady thread, normalized wandering minds, and used wave language for the urge."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "guilt_failure"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 6."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 7 to 6 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Anniversary tension with grief underneath—intrusive memories kept pulling me off the sound."
+        },
+        {
+          "role": "agent",
+          "content": "Anniversaries can braid grief with craving cues, and that is not weakness. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Place one palm over your sternum, light contact, and breathe so the hand rises a little—small breaths are fine. Pick one real sound in the room and return to it after each memory surge, without forcing the water image. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "a65608ea-e0d0-4823-99a0-597d5118ce86",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The sound chunk offered water as something you can return to anytime, described the urge as a wave, and kept tone nonjudgmental."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "8"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Flooded in the room—comparison thoughts, face hot, mind blank when I tried to listen for the water."
+        },
+        {
+          "role": "agent",
+          "content": "Flooded is an accurate word, and comparison thoughts are a common hijack. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Let your vision soften slightly—less detail, more periphery—for a few seconds. Choose one real sound you can hear and stay with it for three breaths; when comparison shows up, label it and return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "f5e90829-0349-4e32-8338-9b6aa57aaa8b",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The sound chunk offered water as something you can return to anytime, described the urge as a wave, and kept tone nonjudgmental."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 8."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My mind kept wandering in the last minutes of the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Mind wandering near the close is really common, and it does not erase what you already practiced. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Flooded in the room—comparison thoughts, face hot, mind blank when I tried to listen for the water."
+        },
+        {
+          "role": "agent",
+          "content": "Flooded is an accurate word, and comparison thoughts are a common hijack. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Let your vision soften slightly—less detail, more periphery—for a few seconds. Choose one real sound you can hear and stay with it for three breaths; when comparison shows up, label it and return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "3ac22303-595d-4946-bd84-5b443b7ae723",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "social",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The sound chunk offered water as something you can return to anytime, described the urge as a wave, and kept tone nonjudgmental."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 6."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 7 to 6 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Flooded in the room—comparison thoughts, face hot, mind blank when I tried to listen for the water."
+        },
+        {
+          "role": "agent",
+          "content": "Flooded is an accurate word, and comparison thoughts are a common hijack. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Let your vision soften slightly—less detail, more periphery—for a few seconds. Choose one real sound you can hear and stay with it for three breaths; when comparison shows up, label it and return. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "9119c468-e8cf-4ad8-9f16-8bb4aba9d3a5",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor section used steady water audio, encouraged gentle returns, and framed urge surfing as staying present without obeying."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "6"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 6 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Thoughts first, then my stomach dropped—the sound felt like it demanded a breath I could not take."
+        },
+        {
+          "role": "agent",
+          "content": "Snap-back still happens in real practice; it does not erase the half-step, and anchors do not require big breaths. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Ground through sound: notice the quietest real sound you can hear for three breaths—far away is fine. Keep inhales easy; favor a slightly longer, unforced exhale without reaching for depth. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "f349ada8-fb1a-4941-98cd-897763a89f4a",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 8,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 9,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor section used steady water audio, encouraged gentle returns, and framed urge surfing as staying present without obeying."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 9,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 9."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 9. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My chest felt tight during the landing lines of the water chunk."
+        },
+        {
+          "role": "agent",
+          "content": "Chest tightness at the end of an anchor is something a lot of people notice; you do not have to force calm. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Thoughts first, then my stomach dropped—the sound felt like it demanded a breath I could not take."
+        },
+        {
+          "role": "agent",
+          "content": "Snap-back still happens in real practice; it does not erase the half-step, and anchors do not require big breaths. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Ground through sound: notice the quietest real sound you can hear for three breaths—far away is fine. Keep inhales easy; favor a slightly longer, unforced exhale without reaching for depth. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "2457ba85-0849-46ce-9cc6-f2a7fe48b0bb",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor section used steady water audio, encouraged gentle returns, and framed urge surfing as staying present without obeying."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 8 to 7 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Thoughts first, then my stomach dropped—the sound felt like it demanded a breath I could not take."
+        },
+        {
+          "role": "agent",
+          "content": "Snap-back still happens in real practice; it does not erase the half-step, and anchors do not require big breaths. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Ground through sound: notice the quietest real sound you can hear for three breaths—far away is fine. Keep inhales easy; favor a slightly longer, unforced exhale without reaching for depth. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "f2d46a10-8375-4b2a-bfc8-f3d5f0abc39e",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 6,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The water chunk layered imagery of cool sand or shoreline safety with instructions to ride the urge like a wave."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 6,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "6"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 6 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Sensation jumped—chest then legs—craving and achy mixed, and I argued with the sound in my head."
+        },
+        {
+          "role": "agent",
+          "content": "Mixed body signals can argue with an anchor; that reaction is information, not proof the practice failed. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Trace an imaginary line from crown to tailbone as a slow inner scan—no fixing, just noticing contact with chair or floor. Add one boring real sound as a thread for two slow exhales. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "643ec6f8-36be-46ea-b690-0b5395fec791",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 8,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The water chunk layered imagery of cool sand or shoreline safety with instructions to ride the urge like a wave."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 8,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 8."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still sitting at 8. This one is really holding on — and you are too. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My body felt restless and achy as the water chunk wrapped up."
+        },
+        {
+          "role": "agent",
+          "content": "Restlessness at the wrap-up is information, not proof you did it wrong. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Sensation jumped—chest then legs—craving and achy mixed, and I argued with the sound in my head."
+        },
+        {
+          "role": "agent",
+          "content": "Mixed body signals can argue with an anchor; that reaction is information, not proof the practice failed. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Trace an imaginary line from crown to tailbone as a slow inner scan—no fixing, just noticing contact with chair or floor. Add one boring real sound as a thread for two slow exhales. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "5b9a431d-6447-4653-938e-75863aa43adc",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 5,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "physical",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The water chunk layered imagery of cool sand or shoreline safety with instructions to ride the urge like a wave."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "physical_discomfort"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 5."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 6 to 5 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Sensation jumped—chest then legs—craving and achy mixed, and I argued with the sound in my head."
+        },
+        {
+          "role": "agent",
+          "content": "Mixed body signals can argue with an anchor; that reaction is information, not proof the practice failed. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Trace an imaginary line from crown to tailbone as a slow inner scan—no fixing, just noticing contact with chair or floor. Add one boring real sound as a thread for two slow exhales. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "dfa8b6c2-b1e0-40a1-ab8f-35fca9b7d399",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "unknown_or_other",
+      "triggerOther": "loneliness",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 5,
+      "scoreTrend": "flat",
+      "priorChunkSummary": "The anchor chunk used water sound as a return point, normalized mind-wandering, and invited watching the urge crest and fall."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "5"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. Still at 5 — holding steady without acting is the practice. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "No concerns, the water sound landed steady enough for me."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Isolation even when I am not alone—heaviness, foggy focus, shame thoughts pulling me away from the water."
+        },
+        {
+          "role": "agent",
+          "content": "Loneliness can sit in the body like weight, and shame thoughts are not the truth of who you are. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I would like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try hand-on-heart, gentle pressure, and two breaths where exhale leaves a little slower. Silently name one real sound, then one texture you can touch nearby, and return to the sound. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "c152b864-219f-4662-8e56-296e2a19318f",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 7,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "unknown_or_other",
+      "triggerOther": "loneliness",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 7,
+      "scoreTrend": "rising",
+      "priorChunkSummary": "The anchor chunk used water sound as a return point, normalized mind-wandering, and invited watching the urge crest and fall."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 7,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "About a 7."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. It moved from 6 to 7. That's not failure — urges often spike before they crest, and staying with it still counts. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "My mind kept wandering in the last minutes of the water sound."
+        },
+        {
+          "role": "agent",
+          "content": "Mind wandering near the close is really common, and it does not erase what you already practiced. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Isolation even when I am not alone—heaviness, foggy focus, shame thoughts pulling me away from the water."
+        },
+        {
+          "role": "agent",
+          "content": "Loneliness can sit in the body like weight, and shame thoughts are not the truth of who you are. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Sure, we can try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try hand-on-heart, gentle pressure, and two breaths where exhale leaves a little slower. Silently name one real sound, then one texture you can touch nearby, and return to the sound. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  },
+  {
+    "id": "e0edf5f0-e73f-436c-b9af-d13b3ff05ba5",
+    "loraId": "lora-check-in-3",
+    "input": {
+      "intakeIntensity": 6,
+      "matType": "none",
+      "medicationStatus": "none",
+      "trigger": "unknown_or_other",
+      "triggerOther": "loneliness",
+      "usedSubstanceToday": false,
+      "surface": "check_in",
+      "chunkNumber": 3,
+      "currentIntensity": 4,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The anchor chunk used water sound as a return point, normalized mind-wandering, and invited watching the urge crest and fall."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the breathing, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 4,
+        "obstacleCategory": "mind_wandering"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "Maybe 4."
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 5 to 4 — that's the sound anchor doing its work. How did the landing section of the sound anchor feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Fine, no real questions about the closing part."
+        },
+        {
+          "role": "agent",
+          "content": "Great. Could you hold onto the sound of water, or was it hard to stay with?"
+        },
+        {
+          "role": "patient",
+          "content": "Isolation even when I am not alone—heaviness, foggy focus, shame thoughts pulling me away from the water."
+        },
+        {
+          "role": "agent",
+          "content": "Loneliness can sit in the body like weight, and shame thoughts are not the truth of who you are. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Okay, let us try."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. Try hand-on-heart, gentle pressure, and two breaths where exhale leaves a little slower. Silently name one real sound, then one texture you can touch nearby, and return to the sound. After you give that a short try, what do you notice, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little—not gone, but a small notch down. Enough that I could imagine the next step."
+        },
+        {
+          "role": "agent",
+          "content": "Does that shift feel big enough to try the breathing section, or do you want one more slow moment with whatever sound you chose as an anchor before we go any further?"
+        },
+        {
+          "role": "patient",
+          "content": "Enough to try moving on."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the breathing, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I am ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Draft grid: check-in 3 after sound anchor; score reflection vs prior check-in; landing split; verbatim anchor-hold question; consent + coping bridge; readiness for breathing. 3 mat rotations per cell. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-07T09:23:37.130Z",
+    "updatedAt": "2026-05-07T09:23:37.130Z"
+  }
+]

@@ -1,0 +1,81 @@
+[
+  {
+    "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+    "loraId": "lora-check-in-4",
+    "input": {
+      "surface": "check_in",
+      "chunkNumber": 4,
+      "intakeIntensity": 6,
+      "matType": "buprenorphine",
+      "medicationStatus": "on_time",
+      "trigger": "stress",
+      "usedSubstanceToday": false,
+      "currentIntensity": 5,
+      "scoreTrend": "falling",
+      "priorChunkSummary": "The breathing chunk guided 4-4-6 cycles with inhale, hold, and longer exhale, then invited a few rounds on the patient's own count while the wave rose and fell with each phase."
+    },
+    "output": {
+      "reply": "Ready to continue with the next part, the closing reflection, and see if it helps?",
+      "endConversation": {
+        "action": "end",
+        "cravingScore": 5,
+        "obstacleCategory": "breath_tight"
+      },
+      "dialogueTurns": [
+        {
+          "role": "agent",
+          "content": "How intense is the craving now, rate from 1 to 10?"
+        },
+        {
+          "role": "patient",
+          "content": "5"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for naming that. You moved from 7 to 5, that's the breathing doing its work. How did the landing section of the breathing exercise feel for you? Any questions or concerns?"
+        },
+        {
+          "role": "patient",
+          "content": "Mostly okay, the last exhale bit felt a little rushed in my head."
+        },
+        {
+          "role": "agent",
+          "content": "I hear that rushed feeling on the exhale, that is real data, not failure. How did the breathing feel — were you able to follow your own count, or did something get in the way?"
+        },
+        {
+          "role": "patient",
+          "content": "My chest got tight trying to hold for four, I could not really follow my own count without battling the guidance."
+        },
+        {
+          "role": "agent",
+          "content": "Chest tightness while you try to match a count is something a lot of people hit, and you do not have to force the full pattern to still be practicing. Would you like to try some coping strategies together to see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I'd like that."
+        },
+        {
+          "role": "agent",
+          "content": "Great, let's try this together. For two breaths only, drop the hold entirely: inhale gently through your nose, then let the exhale leave a little longer through your mouth without measuring seconds. Keep one hand lightly on your chest just to feel motion, not to fix it. What do you notice after you give that a short try, even a small shift?"
+        },
+        {
+          "role": "patient",
+          "content": "A little, still tight but I stopped fighting the numbers."
+        },
+        {
+          "role": "agent",
+          "content": "Ready to continue with the next part, the closing reflection, and see if it helps?"
+        },
+        {
+          "role": "patient",
+          "content": "Yes, I'm ready."
+        }
+      ]
+    },
+    "authorInitials": null,
+    "notes": "Hand-authored example: CI4 two-turn landing split; verbatim landing + PRD breathing follow-up from check-in-dialogue.ts; breath_tight path without pushing deeper 4-4-6; consent + bridge before technique; ends on patient readiness. Prior check-in score 7 implied in score-reflection clause. Clinician review before promotion.",
+    "status": "draft",
+    "createdAt": "2026-05-06T20:00:00.000Z",
+    "updatedAt": "2026-05-07T10:06:06.376Z"
+  }
+]
