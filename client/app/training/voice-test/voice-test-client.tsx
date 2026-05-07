@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import {
   getGemmaModelLoadState,
@@ -18,6 +18,17 @@ import {
   AsyncTextChunkStream,
 } from "@/lib/voice/sentence-buffer";
 import {
+  INITIAL_VOICE_TURN_STATE,
+  formatVoiceDebugDetail,
+  voicePhaseToLoopStatus,
+  voiceTurnReducer,
+  type AssistantDraft,
+  type VoiceDebugEvent,
+  type VoiceDebugEventName,
+  type VoiceLoopStatus,
+  type VoiceTurnPhase,
+} from "@/app/training/voice-test/voice-turn-machine";
+import {
   createBrowserTextToSpeechEngine,
   createKokoroTextToSpeechEngine,
   createVadListener,
@@ -30,12 +41,11 @@ import {
   KOKORO_MODEL_ID,
   KOKORO_RUNTIME_OPTIONS,
   preloadKokoroTextToSpeech,
-  startAudioCapture,
   subscribeKokoroLoad,
   subscribeWhisperLoad,
   WHISPER_MODEL_IDS,
-  type AudioCaptureController,
   type AudioCaptureLevel,
+  type AudioCaptureResult,
   type BrowserVoiceInfo,
   type KokoroRuntimeId,
   type KokoroRuntimeOption,
@@ -56,15 +66,6 @@ import {
   type VoiceRuntimeCapabilities,
   type WhisperModelId,
 } from "@/lib/voice";
-
-type VoiceLoopStatus =
-  | "idle"
-  | "warming"
-  | "recording"
-  | "transcribing"
-  | "thinking"
-  | "speaking"
-  | "error";
 
 type RecordingSource = "manual" | "hands-free" | "interruption";
 type InterruptionStatus = "idle" | "armed" | "suppressed" | "detected" | "ignored";
@@ -103,6 +104,12 @@ interface LastRunMetrics {
   playbackMode: TtsPlaybackMode;
   streamMode: KokoroStreamMode | null;
   fallbackUsed: boolean;
+}
+
+interface PendingVadAudioTurn {
+  audioResult: AudioCaptureResult;
+  source: RecordingSource;
+  level: VadListenerLevel;
 }
 
 const INITIAL_METRICS: LastRunMetrics = {
@@ -200,9 +207,7 @@ export function VoiceTestClient() {
   const [vadLevel, setVadLevel] = useState<VadListenerLevel>(INITIAL_VAD_LEVEL);
   const [interruptionDebug, setInterruptionDebug] =
     useState<InterruptionDebugState>(INITIAL_INTERRUPTION_DEBUG);
-  const [autoStopOnSilence, setAutoStopOnSilence] = useState(true);
   const [bargeInEnabled, setBargeInEnabled] = useState(true);
-  const [streamingReply, setStreamingReply] = useState("");
   const [streamingTtsStatus, setStreamingTtsStatus] = useState("idle");
   const [streamingTtsMode, setStreamingTtsMode] = useState<
     KokoroStreamMode | "idle"
@@ -214,30 +219,37 @@ export function VoiceTestClient() {
     createInitialTranscript(),
   );
   const [metrics, setMetrics] = useState<LastRunMetrics>(INITIAL_METRICS);
+  const [voiceTurn, dispatchVoiceTurn] = useReducer(
+    voiceTurnReducer,
+    INITIAL_VOICE_TURN_STATE,
+  );
 
-  const captureRef = useRef<AudioCaptureController | null>(null);
   const vadListenerRef = useRef<VadListenerController | null>(null);
   const browserTtsRef = useRef<TextToSpeechEngine | null>(null);
   const kokoroTtsRef = useRef<KokoroTextToSpeechEngine | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textChunkStreamRef = useRef<AsyncTextChunkStream | null>(null);
   const generationRunIdRef = useRef(0);
-  const streamingReplyRef = useRef("");
+  const assistantDraftRef = useRef<AssistantDraft | null>(null);
   const historyRef = useRef<VoiceTestTurn[]>(createInitialHistory());
   const stoppingRef = useRef(false);
   const handsFreeEnabledRef = useRef(false);
   const statusRef = useRef<VoiceLoopStatus>("idle");
+  const voicePhaseRef = useRef<VoiceTurnPhase>("idle");
   const bargeInEnabledRef = useRef(true);
   const ttsPlaybackActiveRef = useRef(false);
   const activeTtsPlaybackCountRef = useRef(0);
   const activeRecordingSourceRef = useRef<RecordingSource | null>(null);
+  const pendingVadAudioRef = useRef<PendingVadAudioTurn | null>(null);
+  const submitVadAudioTurnRef = useRef<
+    (audio: Float32Array, source: RecordingSource, level: VadListenerLevel) => void
+  >(() => undefined);
   const interruptionInProgressRef = useRef(false);
   const interruptionModeArmedRef = useRef(false);
   const interruptionArmPendingRef = useRef(false);
   const startRecordingRef = useRef<
-    (source?: RecordingSource) => Promise<void>
-  >(async () => undefined);
-  const stopRecordingRef = useRef<() => Promise<void>>(async () => undefined);
+    (source?: RecordingSource) => void
+  >(() => undefined);
   const vadResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interruptionSuppressionTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,7 +267,6 @@ export function VoiceTestClient() {
   );
   const canRecord = Boolean(
     capabilities?.hasMicrophoneApi &&
-      capabilities.hasMediaRecorder &&
       capabilities.isSecureContext,
   );
   const isBusy =
@@ -264,6 +275,10 @@ export function VoiceTestClient() {
     status === "thinking" ||
     status === "speaking";
   const isRecording = status === "recording";
+  const visibleAssistantDraft =
+    voiceTurn.assistantDraft?.status === "streaming"
+      ? voiceTurn.assistantDraft.content
+      : "";
 
   useEffect(() => {
     handsFreeEnabledRef.current = handsFreeEnabled;
@@ -325,7 +340,6 @@ export function VoiceTestClient() {
       }
       clearTtsPlaybackActive();
       kokoroTtsRef.current?.stop();
-      captureRef.current?.cancel();
       abortRef.current?.abort();
     };
   }, []);
@@ -387,30 +401,13 @@ export function VoiceTestClient() {
 
     if (ttsCanBeInterrupted && bargeInEnabled) {
       if (!interruptionModeArmedRef.current && !interruptionArmPendingRef.current) {
-        interruptionArmPendingRef.current = true;
         setInterruptionDebug((current) => ({
           status: current.status === "detected" ? "detected" : "suppressed",
           confidence: current.confidence,
           lastIgnoredReason: current.lastIgnoredReason,
           lastEvent: "waiting for TTS grace period",
         }));
-        vadResumeTimerRef.current = setTimeout(() => {
-          interruptionArmPendingRef.current = false;
-          if (
-            handsFreeEnabledRef.current &&
-            (statusRef.current === "speaking" || ttsPlaybackActiveRef.current) &&
-            bargeInEnabledRef.current
-          ) {
-            interruptionModeArmedRef.current = true;
-            vadListenerRef.current?.resume("interruption");
-            setInterruptionDebug((current) => ({
-              status: current.status === "detected" ? "detected" : "armed",
-              confidence: current.confidence,
-              lastIgnoredReason: current.lastIgnoredReason,
-              lastEvent: "listening for sustained barge-in",
-            }));
-          }
-        }, 600);
+        scheduleInterruptionRearm(600, "TTS grace period elapsed");
       } else {
         setInterruptionDebug((current) => ({
           status:
@@ -439,8 +436,7 @@ export function VoiceTestClient() {
   async function handleHandsFreeChange(enabled: boolean): Promise<void> {
     if (!enabled) {
       handsFreeEnabledRef.current = false;
-      vadListenerRef.current?.stop();
-      vadListenerRef.current = null;
+      vadListenerRef.current?.pause();
       if (vadResumeTimerRef.current) {
         clearTimeout(vadResumeTimerRef.current);
         vadResumeTimerRef.current = null;
@@ -456,14 +452,19 @@ export function VoiceTestClient() {
       interruptionInProgressRef.current = false;
       interruptionModeArmedRef.current = false;
       interruptionArmPendingRef.current = false;
+      logVoiceEvent("hands_free_stop", "hands-free disabled");
+      if (activeRecordingSourceRef.current === "hands-free") {
+        activeRecordingSourceRef.current = null;
+        setVoicePhase("idle", "turn_idle", "hands-free stopped");
+      }
       return;
     }
 
     if (!canRecord) {
       setErrorMessage(
-        "Hands-free mode needs HTTPS or localhost plus microphone support.",
+        "Voice capture needs HTTPS or localhost plus microphone support.",
       );
-      setStatus("error");
+      setVoicePhase("error", "turn_failed", "microphone unavailable");
       return;
     }
 
@@ -471,68 +472,105 @@ export function VoiceTestClient() {
     setWarningMessage("Hands-free mode is listening for your next voice turn.");
     handsFreeEnabledRef.current = true;
     try {
-      const listener = await createVadListener({
-        onLevel: handleVadLevel,
-        onStateChange: setVadState,
-        onSpeechStart: () => {
-          if (!handsFreeEnabledRef.current) return;
-          const currentStatus = statusRef.current;
-          if (currentStatus === "idle") {
-            void startRecordingRef.current("hands-free");
-          }
-        },
-        onSpeechEnd: () => {
-          if (!handsFreeEnabledRef.current) return;
-          if (statusRef.current === "recording") {
-            void stopRecordingRef.current();
-          }
-        },
-        onInterruptionStart: (nextVadLevel) => {
-          if (
-            !handsFreeEnabledRef.current ||
-            !bargeInEnabledRef.current ||
-            (statusRef.current !== "speaking" && !ttsPlaybackActiveRef.current)
-          ) {
-            return;
-          }
-
-          setInterruptionDebug({
-            status: "detected",
-            confidence: nextVadLevel.confidence,
-            lastIgnoredReason: null,
-            lastEvent: "interruption detected",
-          });
-          interruptionInProgressRef.current = true;
-          interruptionModeArmedRef.current = false;
-          interruptionArmPendingRef.current = false;
-          beginVadInterruptionRecording(nextVadLevel);
-        },
-        onInterruptionEnd: (audio, nextVadLevel) => {
-          finishVadInterruptionRecording(audio, nextVadLevel);
-        },
-        onInterruptionIgnored: (reason, nextVadLevel) => {
-          setInterruptionDebug((current) => ({
-            status: "ignored",
-            confidence: nextVadLevel.confidence,
-            lastIgnoredReason: reason,
-            lastEvent: `ignored: ${formatIgnoredReason(reason)}`,
-          }));
-        },
-      });
-      vadListenerRef.current?.stop();
-      vadListenerRef.current = listener;
+      const listener = await ensureVadListener();
       setHandsFreeEnabled(true);
+      setVoicePhase("listening", "hands_free_start", "hands-free listening");
+      listener.resume("normal");
     } catch (err) {
       handsFreeEnabledRef.current = false;
       setHandsFreeEnabled(false);
       setVadState("error");
       setErrorMessage(toErrorMessage(err));
+      setVoicePhase("error", "turn_failed", toErrorMessage(err));
     }
+  }
+
+  async function ensureVadListener(): Promise<VadListenerController> {
+    if (vadListenerRef.current) return vadListenerRef.current;
+
+    const listener = await createVadListener({
+      onLevel: handleVadLevel,
+      onStateChange: setVadState,
+      onSpeechStart: () => {
+        const source = activeRecordingSourceRef.current;
+        if (source) {
+          setVoicePhase(
+            source === "interruption" ? "interrupting" : "capturing",
+            "vad_speech_start",
+            formatVoiceDebugDetail({ source }),
+          );
+          return;
+        }
+
+        if (handsFreeEnabledRef.current && statusRef.current === "idle") {
+          beginVadCapture("hands-free");
+          setVoicePhase(
+            "capturing",
+            "vad_speech_start",
+            formatVoiceDebugDetail({ source: "hands-free" }),
+          );
+        }
+      },
+      onSpeechEnd: (audio, nextVadLevel) => {
+        const source =
+          activeRecordingSourceRef.current ??
+          (handsFreeEnabledRef.current ? "hands-free" : "manual");
+        submitVadAudioTurnRef.current(audio, source, nextVadLevel);
+      },
+      onSpeechMisfire: (nextVadLevel, mode) => {
+        logVoiceEvent(
+          "vad_misfire",
+          formatVoiceDebugDetail({
+            source: activeRecordingSourceRef.current ?? mode,
+            text: `peak ${nextVadLevel.peak.toFixed(3)}`,
+          }),
+        );
+        if (activeRecordingSourceRef.current && statusRef.current === "recording") {
+          activeRecordingSourceRef.current = null;
+          setWarningMessage("Speech was too short for Silero to submit.");
+          setVoicePhase("idle", "turn_idle", "VAD misfire");
+        }
+      },
+      onInterruptionStart: (nextVadLevel) => {
+        if (
+          !handsFreeEnabledRef.current ||
+          !bargeInEnabledRef.current ||
+          (statusRef.current !== "speaking" && !ttsPlaybackActiveRef.current)
+        ) {
+          return;
+        }
+
+        setInterruptionDebug({
+          status: "detected",
+          confidence: nextVadLevel.confidence,
+          lastIgnoredReason: null,
+          lastEvent: "interruption detected",
+        });
+        interruptionInProgressRef.current = true;
+        interruptionModeArmedRef.current = false;
+        interruptionArmPendingRef.current = false;
+        beginVadInterruptionRecording(nextVadLevel);
+      },
+      onInterruptionEnd: (audio, nextVadLevel) => {
+        submitVadAudioTurnRef.current(audio, "interruption", nextVadLevel);
+      },
+      onInterruptionIgnored: (reason, nextVadLevel) => {
+        setInterruptionDebug((current) => ({
+          status: "ignored",
+          confidence: nextVadLevel.confidence,
+          lastIgnoredReason: reason,
+          lastEvent: `ignored: ${formatIgnoredReason(reason)}`,
+        }));
+      },
+    });
+
+    vadListenerRef.current = listener;
+    return listener;
   }
 
   function handleVadLevel(nextVadLevel: VadListenerLevel): void {
     setVadLevel(nextVadLevel);
-    if (activeRecordingSourceRef.current === "interruption") {
+    if (activeRecordingSourceRef.current) {
       setLevel({
         rms: nextVadLevel.rms,
         peak: nextVadLevel.peak,
@@ -548,18 +586,70 @@ export function VoiceTestClient() {
     });
   }
 
+  function setVoicePhase(
+    phase: VoiceTurnPhase,
+    eventName?: VoiceDebugEventName,
+    detail = "phase changed",
+  ): void {
+    voicePhaseRef.current = phase;
+    dispatchVoiceTurn({ type: "PHASE_CHANGED", phase });
+    const nextStatus = voicePhaseToLoopStatus(phase);
+    statusRef.current = nextStatus;
+    setStatus(nextStatus);
+    if (eventName) logVoiceEvent(eventName, detail, phase);
+  }
+
+  function logVoiceEvent(
+    name: VoiceDebugEventName,
+    detail = "event",
+    phase = voicePhaseRef.current,
+  ): void {
+    dispatchVoiceTurn({
+      type: "EVENT_LOGGED",
+      event: {
+        id: createTurnId(),
+        name,
+        detail,
+        phase,
+        timestamp: performance.now(),
+      },
+    });
+  }
+
+  function setAssistantDraft(nextDraft: AssistantDraft | null): void {
+    assistantDraftRef.current = nextDraft;
+    dispatchVoiceTurn({
+      type: "ASSISTANT_DRAFT_CHANGED",
+      draft: nextDraft,
+    });
+  }
+
   function beginVadInterruptionRecording(nextVadLevel: VadListenerLevel): void {
     if (activeRecordingSourceRef.current === "interruption") return;
     cancelActiveAssistantTurn("interruption");
+    beginVadCapture("interruption", nextVadLevel);
+    setVoicePhase(
+      "interrupting",
+      "interrupt_detected",
+      formatVoiceDebugDetail({
+        source: "interruption",
+        text: formatProbability(nextVadLevel.confidence),
+      }),
+    );
+    setWarningMessage("Interruption detected; recording your barge-in.");
+  }
+
+  function beginVadCapture(
+    source: RecordingSource,
+    nextVadLevel: VadListenerLevel = vadLevel,
+  ): void {
     setLevel({
       rms: nextVadLevel.rms,
       peak: nextVadLevel.peak,
       speaking: true,
     });
-    activeRecordingSourceRef.current = "interruption";
-    statusRef.current = "recording";
-    setStatus("recording");
-    setWarningMessage("Interruption detected; recording your barge-in.");
+    pendingVadAudioRef.current = null;
+    activeRecordingSourceRef.current = source;
   }
 
   function cancelActiveAssistantTurn(reason: "interruption" | "cancel"): void {
@@ -571,12 +661,21 @@ export function VoiceTestClient() {
     controller?.abort();
     stopTtsPlayback();
 
-    const interruptedDraft = streamingReplyRef.current.trim();
-    streamingReplyRef.current = "";
-    setStreamingReply("");
+    const interruptedDraft = assistantDraftRef.current?.content.trim() ?? "";
+    if (assistantDraftRef.current) {
+      setAssistantDraft({
+        ...assistantDraftRef.current,
+        status: reason === "interruption" ? "interrupted" : "discarded",
+      });
+    }
+    setAssistantDraft(null);
     setStreamingTtsStatus("idle");
     setStreamingTtsMode("idle");
     stoppingRef.current = false;
+    logVoiceEvent(
+      reason === "interruption" ? "gemma_abort" : "turn_cancelled",
+      reason,
+    );
 
     if (reason !== "interruption" || interruptedDraft.length === 0) return;
 
@@ -591,40 +690,38 @@ export function VoiceTestClient() {
     });
   }
 
-  function finishVadInterruptionRecording(
-    audio: Float32Array,
-    nextVadLevel: VadListenerLevel,
-  ): void {
-    if (activeRecordingSourceRef.current !== "interruption") return;
-    const durationMs = Math.round((audio.length / 16_000) * 1000);
-    const peakLevel = computePeakLevel(audio);
-    setLevel({
-      rms: nextVadLevel.rms,
-      peak: Math.max(nextVadLevel.peak, peakLevel),
-      speaking: false,
-    });
-    captureRef.current = {
-      stop: async () => ({
-        audio,
-        sampleRate: 16_000,
-        durationMs,
-        peakLevel,
-      }),
-      cancel: () => undefined,
-    };
-    setWarningMessage("Interruption speech ended; transcribing your barge-in.");
-    void stopRecordingRef.current();
-  }
-
   function clearVadResumeTimer(): void {
     if (!vadResumeTimerRef.current) return;
     clearTimeout(vadResumeTimerRef.current);
     vadResumeTimerRef.current = null;
   }
 
+  function scheduleInterruptionRearm(delayMs: number, detail: string): void {
+    clearVadResumeTimer();
+    interruptionArmPendingRef.current = true;
+    logVoiceEvent("interrupt_rearm", `scheduled: ${detail}`);
+    vadResumeTimerRef.current = setTimeout(() => {
+      interruptionArmPendingRef.current = false;
+      if (
+        handsFreeEnabledRef.current &&
+        (statusRef.current === "speaking" || ttsPlaybackActiveRef.current) &&
+        bargeInEnabledRef.current
+      ) {
+        interruptionModeArmedRef.current = true;
+        vadListenerRef.current?.resume("interruption");
+        logVoiceEvent("interrupt_rearm", detail);
+        setInterruptionDebug((current) => ({
+          status: current.status === "detected" ? "detected" : "armed",
+          confidence: current.confidence,
+          lastIgnoredReason: current.lastIgnoredReason,
+          lastEvent: "listening for sustained barge-in",
+        }));
+      }
+    }, delayMs);
+  }
+
   async function handleWarmModels() {
-    statusRef.current = "warming";
-    setStatus("warming");
+    setVoicePhase("warming", "turn_idle", "warming models");
     setErrorMessage(null);
     setWarningMessage("Warming local Whisper, Gemma, and Kokoro models.");
 
@@ -635,12 +732,10 @@ export function VoiceTestClient() {
         await preloadKokoroTextToSpeech(selectedKokoroRuntimeId);
         await ensureKokoroVoices();
       }
-      statusRef.current = "idle";
-      setStatus("idle");
+      setVoicePhase("idle", "turn_idle", "models ready");
       setWarningMessage("Local voice models are ready.");
     } catch (err) {
-      statusRef.current = "error";
-      setStatus("error");
+      setVoicePhase("error", "turn_failed", toErrorMessage(err));
       setErrorMessage(toErrorMessage(err));
     }
   }
@@ -650,9 +745,9 @@ export function VoiceTestClient() {
   ): Promise<void> {
     if (!canRecord) {
       setErrorMessage(
-        "Microphone capture needs HTTPS or localhost plus MediaRecorder support.",
+        "Voice capture needs HTTPS or localhost plus microphone support.",
       );
-      setStatus("error");
+      setVoicePhase("error", "turn_failed", "microphone unavailable");
       return;
     }
 
@@ -673,58 +768,109 @@ export function VoiceTestClient() {
     if (isBusy && !canInterruptPlayback) return;
 
     setErrorMessage(null);
-    setStreamingReply("");
     setLevel({ rms: 0, peak: 0, speaking: false });
 
     try {
-      const shouldAutoStopOnSilence =
-        source === "manual" ? autoStopOnSilence : true;
-      const controller = await startAudioCapture({
-        autoStopOnSilence: shouldAutoStopOnSilence,
-        onLevel: setLevel,
-        onSpeechStart: () => setWarningMessage(null),
-        onSilence: shouldAutoStopOnSilence ? () => {
-          setWarningMessage(
-            source === "interruption"
-              ? "Interruption speech ended; transcribing your barge-in."
-              : "VAD detected silence and stopped recording.",
-          );
-          void handleStopRecording();
-        } : undefined,
-      });
-      captureRef.current = controller;
-      activeRecordingSourceRef.current = source;
-      statusRef.current = "recording";
-      setStatus("recording");
+      const listener = await ensureVadListener();
+      beginVadCapture(source, vadLevel);
+      setVoicePhase(
+        "listening",
+        source === "manual" ? "manual_start" : "hands_free_start",
+        formatVoiceDebugDetail({ source }),
+      );
+      setWarningMessage(
+        source === "manual"
+          ? "Listening with Silero. Speak naturally; stop can flush the active segment."
+          : "Hands-free mode is listening for your next voice turn.",
+      );
+      listener.resume("normal");
     } catch (err) {
-      setStatus("error");
+      setVoicePhase("error", "turn_failed", toErrorMessage(err));
       setErrorMessage(toErrorMessage(err));
     }
   }
 
   async function handleStopRecording() {
-    if (!captureRef.current || stoppingRef.current) return;
+    if (!activeRecordingSourceRef.current || stoppingRef.current) return;
+    const source = activeRecordingSourceRef.current;
+    logVoiceEvent(
+      source === "manual" ? "manual_stop" : "hands_free_stop",
+      formatVoiceDebugDetail({ source }),
+    );
+    setWarningMessage("Asking Silero to finish the active speech segment.");
+    vadListenerRef.current?.pause({ submitSpeech: true });
+  }
+
+  function submitVadAudioTurn(
+    audio: Float32Array,
+    recordingSource: RecordingSource,
+    nextVadLevel: VadListenerLevel,
+  ): void {
+    if (stoppingRef.current) return;
+    const audioResult = createVadAudioResult(audio);
+    pendingVadAudioRef.current = {
+      audioResult,
+      source: recordingSource,
+      level: nextVadLevel,
+    };
+    void processVadAudioTurn(audioResult, recordingSource, nextVadLevel);
+  }
+
+  async function processVadAudioTurn(
+    audioResult: AudioCaptureResult,
+    recordingSource: RecordingSource,
+    nextVadLevel: VadListenerLevel,
+  ) {
+    if (stoppingRef.current) return;
     stoppingRef.current = true;
     const loopStartedAt = performance.now();
-    const capture = captureRef.current;
-    const recordingSource = activeRecordingSourceRef.current ?? "manual";
-    captureRef.current = null;
     activeRecordingSourceRef.current = null;
-    statusRef.current = "transcribing";
-    setStatus("transcribing");
+    pendingVadAudioRef.current = null;
+    setVoicePhase(
+      "transcribing",
+      "vad_speech_end",
+      formatVoiceDebugDetail({
+        source: recordingSource,
+        ms: audioResult.durationMs,
+      }),
+    );
+    setLevel({
+      rms: nextVadLevel.rms,
+      peak: Math.max(nextVadLevel.peak, audioResult.peakLevel),
+      speaking: false,
+    });
+    setWarningMessage(
+      recordingSource === "interruption"
+        ? "Interruption speech ended; transcribing your barge-in."
+        : "Silero detected speech end; transcribing your turn.",
+    );
     setErrorMessage(null);
     let streamingPromise: Promise<TextToSpeechResult> | null = null;
     let generationController: AbortController | null = null;
     let generationRunId: number | null = null;
 
     try {
-      const audioResult = await capture.stop();
+      logVoiceEvent(
+        "stt_start",
+        formatVoiceDebugDetail({
+          source: recordingSource,
+          ms: audioResult.durationMs,
+        }),
+      );
       const sttEngine = await createWhisperSpeechToTextEngine(selectedModelId);
       const sttResult = await sttEngine.transcribe(
         audioResult.audio,
         audioResult.sampleRate,
       );
       const userText = sttResult.text.trim();
+      logVoiceEvent(
+        "stt_done",
+        formatVoiceDebugDetail({
+          source: recordingSource,
+          text: userText || "empty",
+          ms: sttResult.elapsedMs,
+        }),
+      );
 
       setMetrics({
         ...INITIAL_METRICS,
@@ -734,8 +880,7 @@ export function VoiceTestClient() {
       });
 
       if (userText.length === 0) {
-        statusRef.current = "idle";
-        setStatus("idle");
+        setVoicePhase("idle", "turn_idle", "empty transcript");
         if (recordingSource === "interruption") {
           interruptionInProgressRef.current = false;
           setInterruptionDebug((current) => ({
@@ -764,8 +909,11 @@ export function VoiceTestClient() {
       ];
       historyRef.current = nextHistory;
 
-      statusRef.current = "thinking";
-      setStatus("thinking");
+      setVoicePhase(
+        "generating",
+        "gemma_delta",
+        formatVoiceDebugDetail({ source: recordingSource, text: "start" }),
+      );
       generationRunId = generationRunIdRef.current + 1;
       generationRunIdRef.current = generationRunId;
       generationController = new AbortController();
@@ -806,11 +954,28 @@ export function VoiceTestClient() {
         history: nextHistory,
         signal: generationController.signal,
         onDelta: (accumulated) => {
-          if (!isActiveGeneration(generationRunId, generationController)) return;
-          streamingReplyRef.current = accumulated;
-          setStreamingReply(accumulated);
+          if (!isActiveGeneration(generationRunId, generationController)) {
+            logVoiceEvent("gemma_delta_ignored", "stale generation delta");
+            return;
+          }
+          const currentGenerationRunId = generationRunId;
+          if (currentGenerationRunId === null) return;
+          setAssistantDraft({
+            status: "streaming",
+            content: accumulated,
+            turnId: `assistant-${currentGenerationRunId}`,
+            generationRunId: currentGenerationRunId,
+            startedAt: gemmaStartedAt,
+          });
           if (firstTokenMs === null && accumulated.trim().length > 0) {
             firstTokenMs = Math.round(performance.now() - gemmaStartedAt);
+            logVoiceEvent(
+              "gemma_delta",
+              formatVoiceDebugDetail({
+                source: recordingSource,
+                ms: firstTokenMs,
+              }),
+            );
           }
 
           if (!textChunkStream) return;
@@ -824,8 +989,7 @@ export function VoiceTestClient() {
       if (!isActiveGeneration(generationRunId, generationController)) {
         throw new DOMException("Generation superseded.", "AbortError");
       }
-      streamingReplyRef.current = "";
-      setStreamingReply("");
+      setAssistantDraft(null);
 
       if (textChunkStream) {
         const remainder = gemmaResult.text.startsWith(lastStreamText)
@@ -844,14 +1008,20 @@ export function VoiceTestClient() {
         throw new DOMException("Generation superseded.", "AbortError");
       }
       if (!ttsPlaybackActiveRef.current) {
-        statusRef.current = "speaking";
-        setStatus("speaking");
+        setVoicePhase("speaking", "tts_chunk_start", "assistant ready");
       }
       const assistantTurn = {
         role: "assistant" as const,
         content: gemmaResult.text,
       };
       historyRef.current = [...nextHistory, assistantTurn];
+      setAssistantDraft({
+        status: "complete",
+        content: gemmaResult.text,
+        turnId: `assistant-${generationRunId}`,
+        generationRunId,
+        startedAt: gemmaStartedAt,
+      });
       appendTranscript({
         role: "assistant",
         content: gemmaResult.text,
@@ -884,8 +1054,8 @@ export function VoiceTestClient() {
       clearTtsPlaybackActive();
       setStreamingTtsStatus("idle");
       setStreamingTtsMode("idle");
-      statusRef.current = "idle";
-      setStatus("idle");
+      setAssistantDraft(null);
+      setVoicePhase("idle", "turn_idle", "assistant playback complete");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         void streamingPromise?.catch(() => undefined);
@@ -894,14 +1064,12 @@ export function VoiceTestClient() {
         if (!isActiveGeneration(generationRunId, generationController)) {
           return;
         }
-        streamingReplyRef.current = "";
-        setStreamingReply("");
+        setAssistantDraft(null);
         if (interruptionInProgressRef.current) {
           setWarningMessage("Interruption detected; recording your barge-in.");
         } else {
           setWarningMessage("Voice turn cancelled.");
-          statusRef.current = "idle";
-          setStatus("idle");
+          setVoicePhase("idle", "turn_cancelled", "AbortError");
         }
         setStreamingTtsMode("idle");
       } else {
@@ -914,7 +1082,7 @@ export function VoiceTestClient() {
         clearTtsPlaybackActive();
         setStreamingTtsStatus("idle");
         setStreamingTtsMode("idle");
-        setStatus("error");
+        setVoicePhase("error", "turn_failed", toErrorMessage(err));
         setErrorMessage(toErrorMessage(err));
       }
     } finally {
@@ -926,11 +1094,11 @@ export function VoiceTestClient() {
   }
 
   function handleCancel() {
-    captureRef.current?.cancel();
-    captureRef.current = null;
+    vadListenerRef.current?.pause();
     cancelActiveAssistantTurn("cancel");
     stoppingRef.current = false;
     activeRecordingSourceRef.current = null;
+    pendingVadAudioRef.current = null;
     interruptionInProgressRef.current = false;
     if (interruptionSuppressionTimerRef.current) {
       clearTimeout(interruptionSuppressionTimerRef.current);
@@ -940,8 +1108,7 @@ export function VoiceTestClient() {
     setStreamingTtsStatus("idle");
     setStreamingTtsMode("idle");
     setInterruptionDebug(INITIAL_INTERRUPTION_DEBUG);
-    statusRef.current = "idle";
-    setStatus("idle");
+    setVoicePhase("cancelled", "turn_cancelled", "cancel button");
     setWarningMessage("Current voice turn cancelled.");
   }
 
@@ -949,12 +1116,19 @@ export function VoiceTestClient() {
     cancelActiveAssistantTurn("cancel");
     historyRef.current = createInitialHistory();
     setTranscript(createInitialTranscript());
+    setAssistantDraft(null);
     setStreamingTtsStatus("idle");
     setStreamingTtsMode("idle");
     setMetrics(INITIAL_METRICS);
     setInterruptionDebug(INITIAL_INTERRUPTION_DEBUG);
     clearTtsPlaybackActive();
     interruptionInProgressRef.current = false;
+    activeRecordingSourceRef.current = null;
+    pendingVadAudioRef.current = null;
+    dispatchVoiceTurn({ type: "RESET" });
+    voicePhaseRef.current = "idle";
+    statusRef.current = "idle";
+    setStatus("idle");
     setErrorMessage(null);
     setWarningMessage(null);
   }
@@ -1024,6 +1198,10 @@ export function VoiceTestClient() {
 
   function handleTtsPlaybackEvent(event: TtsPlaybackLifecycleEvent): void {
     if (event.status === "end") {
+      logVoiceEvent(
+        "tts_chunk_end",
+        formatVoiceDebugDetail({ chunkIndex: event.chunkIndex }),
+      );
       activeTtsPlaybackCountRef.current = Math.max(
         0,
         activeTtsPlaybackCountRef.current - 1,
@@ -1038,10 +1216,13 @@ export function VoiceTestClient() {
     activeTtsPlaybackCountRef.current += 1;
     ttsPlaybackActiveRef.current = true;
     setTtsPlaybackActive(true);
+    logVoiceEvent(
+      "tts_chunk_start",
+      formatVoiceDebugDetail({ chunkIndex: event.chunkIndex }),
+    );
 
     if (statusRef.current === "thinking") {
-      statusRef.current = "speaking";
-      setStatus("speaking");
+      setVoicePhase("speaking", "tts_chunk_start", "playback started");
     }
 
     if (
@@ -1053,6 +1234,7 @@ export function VoiceTestClient() {
     }
 
     vadListenerRef.current?.markAudioOutput();
+    logVoiceEvent("interrupt_rearm", "suppressed after TTS audio output");
     setInterruptionDebug((current) => ({
       status: current.status === "detected" ? "detected" : "suppressed",
       confidence: current.confidence,
@@ -1075,6 +1257,7 @@ export function VoiceTestClient() {
           lastIgnoredReason: current.lastIgnoredReason,
           lastEvent: "listening for sustained barge-in",
         }));
+        logVoiceEvent("interrupt_rearm", "TTS suppression elapsed");
       }
     }, 260);
   }
@@ -1114,6 +1297,7 @@ export function VoiceTestClient() {
     browserTtsRef.current?.stop();
     kokoroTtsRef.current?.stop();
     clearTtsPlaybackActive();
+    logVoiceEvent("tts_stop", "playback stopped");
   }
 
   function isActiveGeneration(
@@ -1140,7 +1324,7 @@ export function VoiceTestClient() {
   }
 
   startRecordingRef.current = handleStartRecording;
-  stopRecordingRef.current = handleStopRecording;
+  submitVadAudioTurnRef.current = submitVadAudioTurn;
 
   return (
     <div className="space-y-8">
@@ -1205,12 +1389,12 @@ export function VoiceTestClient() {
             {transcript.map((turn) => (
               <TranscriptBubble key={turn.id} turn={turn} />
             ))}
-            {streamingReply ? (
+            {visibleAssistantDraft ? (
               <TranscriptBubble
                 turn={{
                   id: "streaming",
                   role: "assistant",
-                  content: streamingReply,
+                  content: visibleAssistantDraft,
                   meta: "streaming from local Gemma",
                 }}
               />
@@ -1295,8 +1479,6 @@ export function VoiceTestClient() {
             selectedKokoroRuntimeId={selectedKokoroRuntimeId}
             onKokoroRuntimeChange={setSelectedKokoroRuntimeId}
             hasWebGpu={capabilities?.hasWebGpu}
-            autoStopOnSilence={autoStopOnSilence}
-            onAutoStopChange={setAutoStopOnSilence}
             bargeInEnabled={bargeInEnabled}
             onBargeInChange={setBargeInEnabled}
           />
@@ -1315,6 +1497,8 @@ export function VoiceTestClient() {
             vadState={vadState}
             vadLevel={vadLevel}
             interruptionDebug={interruptionDebug}
+            voicePhase={voiceTurn.phase}
+            events={voiceTurn.events}
             capabilities={capabilities}
             onlineStatus={onlineStatus}
             metrics={metrics}
@@ -1573,8 +1757,6 @@ function ConfigPanel({
   selectedKokoroRuntimeId,
   onKokoroRuntimeChange,
   hasWebGpu,
-  autoStopOnSilence,
-  onAutoStopChange,
   bargeInEnabled,
   onBargeInChange,
 }: {
@@ -1593,8 +1775,6 @@ function ConfigPanel({
   selectedKokoroRuntimeId: KokoroRuntimeId;
   onKokoroRuntimeChange: (runtimeId: KokoroRuntimeId) => void;
   hasWebGpu?: boolean;
-  autoStopOnSilence: boolean;
-  onAutoStopChange: (enabled: boolean) => void;
   bargeInEnabled: boolean;
   onBargeInChange: (enabled: boolean) => void;
 }) {
@@ -1725,17 +1905,11 @@ function ConfigPanel({
         </p>
       </label>
 
-      <label className="mt-5 flex items-start gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={autoStopOnSilence}
-          onChange={(event) => onAutoStopChange(event.target.checked)}
-          className="mt-1"
-        />
-        <span>
-          Auto-stop recording after local VAD detects silence.
-        </span>
-      </label>
+      <p className="mt-5 rounded-2xl border border-border bg-background p-3 text-xs leading-relaxed text-foreground/60">
+        Speech capture is handled by Silero VAD. Completed speech segments are
+        submitted to Whisper as 16 kHz PCM audio; no MediaRecorder capture path
+        is used on this page.
+      </p>
       <label className="mt-3 flex items-start gap-3 text-sm">
         <input
           type="checkbox"
@@ -1764,6 +1938,8 @@ function RuntimePanel({
   vadState,
   vadLevel,
   interruptionDebug,
+  voicePhase,
+  events,
   capabilities,
   onlineStatus,
   metrics,
@@ -1782,6 +1958,8 @@ function RuntimePanel({
   vadState: VadListenerState;
   vadLevel: VadListenerLevel;
   interruptionDebug: InterruptionDebugState;
+  voicePhase: VoiceTurnPhase;
+  events: readonly VoiceDebugEvent[];
   capabilities: VoiceRuntimeCapabilities | null;
   onlineStatus: boolean | null;
   metrics: LastRunMetrics;
@@ -1798,6 +1976,7 @@ function RuntimePanel({
         <DebugRow label="Playback mode" value={playbackMode} />
         <DebugRow label="TTS playback" value={ttsPlaybackActive ? "active" : "idle"} />
         <DebugRow label="Hands-free" value={handsFreeEnabled ? "on" : "off"} />
+        <DebugRow label="Voice phase" value={voicePhase} />
         <DebugRow label="VAD state" value={vadState} />
         <DebugRow
           label="VAD level"
@@ -1882,6 +2061,33 @@ function RuntimePanel({
           />
           <DebugRow label="Fallback" value={metrics.fallbackUsed ? "yes" : "no"} />
         </dl>
+      </div>
+      <div className="mt-5 rounded-2xl border border-border bg-background p-4">
+        <h3 className="text-sm font-semibold">Voice event log</h3>
+        <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+          {events.length === 0 ? (
+            <p className="text-xs text-foreground/45">No voice events yet.</p>
+          ) : (
+            events
+              .slice()
+              .reverse()
+              .map((event) => (
+                <div key={event.id} className="rounded-xl bg-surface-muted p-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-mono text-xs text-foreground/80">
+                      {event.name}
+                    </p>
+                    <p className="font-mono text-[10px] text-foreground/45">
+                      {Math.round(event.timestamp)}ms
+                    </p>
+                  </div>
+                  <p className="mt-1 text-xs text-foreground/55">
+                    {event.phase} · {event.detail}
+                  </p>
+                </div>
+              ))
+          )}
+        </div>
       </div>
     </section>
   );
@@ -1970,6 +2176,15 @@ function computePeakLevel(audio: Float32Array): number {
     peakLevel = Math.max(peakLevel, Math.abs(sample));
   }
   return peakLevel;
+}
+
+function createVadAudioResult(audio: Float32Array): AudioCaptureResult {
+  return {
+    audio,
+    sampleRate: 16_000,
+    durationMs: Math.round((audio.length / 16_000) * 1000),
+    peakLevel: computePeakLevel(audio),
+  };
 }
 
 function toErrorMessage(err: unknown): string {

@@ -84,19 +84,23 @@ with `model: "v5"`, `baseAssetPath: "/vendor/vad/"`, and
 
 - `onLevel` for debug RMS/peak, Silero speech probability, active probability
   threshold, and a best-effort noise-floor estimate.
-- `onSpeechStart` for normal idle hands-free turn starts.
-- `onSpeechEnd` for normal hands-free turn stops. Normal hands-free turns still
-  use the existing recorder handoff for transcription.
+- `onSpeechStart` for normal speech start and recording-meter state.
+- `onSpeechEnd` for normal speech audio. Manual, hands-free, and interruption
+  turns all transcribe Silero's returned mono 16 kHz `Float32Array`; the page no
+  longer starts a separate `MediaRecorder` capture.
+- `onSpeechMisfire` for speech that was detected but shorter than Silero's
+  `minSpeechMs` gate.
 - `onInterruptionStart` for explicit barge-in during TTS.
-- `onInterruptionEnd` for accepted barge-in audio. Interruption turns transcribe
-  Silero's buffered 16 kHz speech audio directly so Whisper gets the beginning of
-  the user's barge-in instead of a late `MediaRecorder` capture.
+- `onInterruptionEnd` for accepted barge-in audio, routed through the same
+  Silero-audio submission path as every other turn.
 - `onInterruptionIgnored` for rejected interruption candidates.
 
 Hands-free mode is controlled by the action button next to `Start talking`; it
 is not hidden in the stack settings panel. Normal hands-free detection should
-only start turns while the page is idle. During recording it can help auto-stop
-the turn. During thinking/transcribing/warming it is paused.
+only start turns while the page is idle. Manual capture also uses the same
+long-lived `MicVAD`; clicking stop asks Silero to flush the active speech segment
+with `submitUserSpeechOnPause` instead of stopping a browser recorder. During
+thinking/transcribing/warming it is paused.
 
 ## Interruption Detection
 
@@ -136,7 +140,7 @@ When an interruption is accepted, `voice-test-client.tsx`:
 2. Closes the active text chunk stream.
 3. Interrupts the active Transformers.js generation with
    `InterruptableStoppingCriteria`.
-4. Invalidates the active generation token so stale Gemma deltas cannot keep
+4. Invalidates the active generation token through the voice turn machine so stale Gemma deltas cannot keep
    updating the visible streaming bubble.
 5. Commits any visible partial assistant draft as an interrupted transcript turn,
    then clears the live draft before the user's barge-in is transcribed.
@@ -162,6 +166,9 @@ The runtime debug panel shows:
   `no recent rise`. Silero misfires are surfaced through this same ignored
   interruption path instead of being silent.
 - Stream mode and streaming TTS status.
+- Voice phase and the recent voice event log (`vad_speech_start`,
+  `vad_speech_end`, `interrupt_detected`, `gemma_abort`, `tts_chunk_start`,
+  `stt_done`, and related events).
 - Last turn timing for audio, STT, first Gemma token, first audio, Gemma, TTS,
   total time, chunk count, playback mode, and fallback use.
 

@@ -151,7 +151,6 @@ export interface VoiceRuntimeCapabilities {
   hasWindow: boolean;
   hasNavigator: boolean;
   hasMicrophoneApi: boolean;
-  hasMediaRecorder: boolean;
   hasSpeechSynthesis: boolean;
   hasWebGpu: boolean;
   isSecureContext: boolean;

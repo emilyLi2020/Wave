@@ -8,7 +8,7 @@ const NEGATIVE_THRESHOLD_OFFSET = 0.15;
 const NORMAL_MIN_SPEECH_MS = 240;
 const BARGE_IN_MIN_SPEECH_MS = 280;
 const INTERRUPTION_HOLD_MS = 380;
-const END_SILENCE_MS = 1000;
+const END_SILENCE_MS = 700;
 const PRE_SPEECH_PAD_MS = 400;
 const INTERRUPTION_MIN_PEAK = 0.035;
 const INTERRUPTION_RECENT_RISE_MULTIPLIER = 1.45;
@@ -26,6 +26,10 @@ export type VadListenerState =
 
 export type VadSensitivityMode = "normal" | "barge-in" | "interruption";
 
+export interface VadPauseOptions {
+  submitSpeech?: boolean;
+}
+
 export type VadInterruptionIgnoredReason =
   | "audio-output-suppression"
   | "low-peak"
@@ -40,7 +44,8 @@ export interface VadListenerLevel extends AudioCaptureLevel {
 export interface VadListenerOptions {
   onLevel?: (level: VadListenerLevel) => void;
   onSpeechStart?: () => void;
-  onSpeechEnd?: () => void;
+  onSpeechEnd?: (audio: Float32Array, level: VadListenerLevel) => void;
+  onSpeechMisfire?: (level: VadListenerLevel, mode: VadSensitivityMode) => void;
   onInterruptionStart?: (level: VadListenerLevel) => void;
   onInterruptionEnd?: (audio: Float32Array, level: VadListenerLevel) => void;
   onInterruptionIgnored?: (
@@ -51,7 +56,7 @@ export interface VadListenerOptions {
 }
 
 export interface VadListenerController {
-  pause(): void;
+  pause(options?: VadPauseOptions): void;
   resume(mode?: VadSensitivityMode): void;
   markAudioOutput(suppressionMs?: number): void;
   stop(): void;
@@ -71,6 +76,7 @@ export async function createVadListener(
   let mode: VadSensitivityMode = "normal";
   let stopped = false;
   let paused = true;
+  let allowPauseSubmit = false;
   let hasStarted = false;
   let pendingInterruption: InterruptionCandidate | null = null;
   let interruptionFired = false;
@@ -125,7 +131,7 @@ export async function createVadListener(
       options.onLevel?.(latestLevel);
     },
     onSpeechStart: () => {
-      if (stopped || paused) return;
+      if (stopped || (paused && !allowPauseSubmit)) return;
       if (mode === "interruption") {
         handleInterruptionCandidateStart();
         return;
@@ -135,28 +141,30 @@ export async function createVadListener(
       options.onSpeechStart?.();
     },
     onSpeechRealStart: () => {
-      if (stopped || paused || mode !== "interruption") return;
+      if (stopped || (paused && !allowPauseSubmit) || mode !== "interruption") return;
       tryAcceptInterruptionCandidate();
     },
     onSpeechEnd: (audio) => {
-      if (stopped || paused) return;
+      if (stopped || (paused && !allowPauseSubmit)) return;
       const wasAcceptedInterruption = interruptionFired;
-      const interruptionLevel = pendingInterruption?.level ?? latestLevel;
+      const speechLevel = pendingInterruption?.level ?? latestLevel;
       resetSpeechState();
       publishState("listening");
 
       if (mode === "interruption") {
         if (wasAcceptedInterruption) {
-          options.onInterruptionEnd?.(audio, interruptionLevel);
+          options.onInterruptionEnd?.(audio, speechLevel);
         }
         return;
       }
 
       if (!wasAcceptedInterruption) {
-        options.onSpeechEnd?.();
+        options.onSpeechEnd?.(audio, speechLevel);
       }
     },
     onVADMisfire: () => {
+      if (stopped || (paused && !allowPauseSubmit)) return;
+      options.onSpeechMisfire?.(latestLevel, mode);
       if (mode !== "interruption") return;
       ignoreInterruption(
         latestLevel.peak < INTERRUPTION_MIN_PEAK
@@ -172,12 +180,13 @@ export async function createVadListener(
   await micVad.pause();
   publishState("paused");
 
-  function pause(): void {
+  function pause(options: VadPauseOptions = {}): void {
     if (stopped) return;
     paused = true;
+    allowPauseSubmit = options.submitSpeech ?? false;
     resetSpeechState();
     publishState("paused");
-    void micVad.pause().catch(handleVadError);
+    void pauseMicVad(options.submitSpeech ?? false);
   }
 
   function resume(nextMode: VadSensitivityMode = "normal"): void {
@@ -185,13 +194,7 @@ export async function createVadListener(
     mode = nextMode;
     paused = false;
     resetSpeechState();
-    micVad.setOptions({
-      positiveSpeechThreshold: getPositiveSpeechThreshold(),
-      negativeSpeechThreshold: getNegativeSpeechThreshold(),
-      minSpeechMs: getMinSpeechMs(),
-      redemptionMs: END_SILENCE_MS,
-      preSpeechPadMs: PRE_SPEECH_PAD_MS,
-    });
+    micVad.setOptions(getVadOptions(false));
     publishState("listening");
     void micVad.start().catch(handleVadError);
   }
@@ -236,6 +239,33 @@ export async function createVadListener(
     if (mode === "interruption") return INTERRUPTION_HOLD_MS;
     if (mode === "barge-in") return BARGE_IN_MIN_SPEECH_MS;
     return NORMAL_MIN_SPEECH_MS;
+  }
+
+  function getVadOptions(submitUserSpeechOnPause: boolean) {
+    return {
+      positiveSpeechThreshold: getPositiveSpeechThreshold(),
+      negativeSpeechThreshold: getNegativeSpeechThreshold(),
+      minSpeechMs: getMinSpeechMs(),
+      redemptionMs: END_SILENCE_MS,
+      preSpeechPadMs: PRE_SPEECH_PAD_MS,
+      submitUserSpeechOnPause,
+    };
+  }
+
+  async function pauseMicVad(submitUserSpeechOnPause: boolean): Promise<void> {
+    try {
+      if (submitUserSpeechOnPause) {
+        micVad.setOptions(getVadOptions(true));
+      }
+      await micVad.pause();
+    } catch (error) {
+      handleVadError(error);
+    } finally {
+      allowPauseSubmit = false;
+      if (!stopped && submitUserSpeechOnPause) {
+        micVad.setOptions(getVadOptions(false));
+      }
+    }
   }
 
   function buildVadLevel(

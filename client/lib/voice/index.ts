@@ -1,9 +1,6 @@
 export {
   getVoiceRuntimeCapabilities,
-  startAudioCapture,
-  type AudioCaptureController,
   type AudioCaptureLevel,
-  type AudioCaptureOptions,
 } from "@/lib/voice/audio-capture";
 export {
   createWhisperSpeechToTextEngine,
