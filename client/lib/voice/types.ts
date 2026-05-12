@@ -19,24 +19,48 @@ export const KOKORO_MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
 export const KOKORO_DEFAULT_VOICE_ID = "af_heart";
 export const KOKORO_RUNTIME_OPTIONS = [
   {
-    id: "q8-wasm",
-    label: "q8 + WASM (safe)",
-    dtype: "q8",
-    device: "wasm",
+    id: "fp16-webgpu",
+    label: "fp16 + WebGPU (default)",
+    dtype: "fp16",
+    device: "webgpu",
   },
   {
     id: "fp32-webgpu",
-    label: "fp32 + WebGPU (fast)",
+    label: "fp32 + WebGPU (fidelity)",
     dtype: "fp32",
     device: "webgpu",
+  },
+  {
+    id: "q8-webgpu",
+    label: "q8 + WebGPU (experimental)",
+    dtype: "q8",
+    device: "webgpu",
+  },
+  {
+    id: "q4f16-webgpu",
+    label: "q4f16 + WebGPU (experimental)",
+    dtype: "q4f16",
+    device: "webgpu",
+  },
+  {
+    id: "q4-webgpu",
+    label: "q4 + WebGPU (experimental, audible artifacts)",
+    dtype: "q4",
+    device: "webgpu",
+  },
+  {
+    id: "q8-wasm",
+    label: "q8 + WASM (fallback)",
+    dtype: "q8",
+    device: "wasm",
   },
 ] as const;
 export type KokoroRuntimeOption = (typeof KOKORO_RUNTIME_OPTIONS)[number];
 export type KokoroRuntimeId = KokoroRuntimeOption["id"];
 export type KokoroDtype = KokoroRuntimeOption["dtype"];
 export type KokoroDevice = KokoroRuntimeOption["device"];
-export const KOKORO_DEFAULT_RUNTIME_ID: KokoroRuntimeId = "fp32-webgpu";
-export const KOKORO_DTYPE: KokoroDtype = "fp32";
+export const KOKORO_DEFAULT_RUNTIME_ID: KokoroRuntimeId = "fp16-webgpu";
+export const KOKORO_DTYPE: KokoroDtype = "fp16";
 export const KOKORO_DEVICE: KokoroDevice = "webgpu";
 
 export interface VoiceModelLoadState {
