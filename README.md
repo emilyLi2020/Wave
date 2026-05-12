@@ -16,7 +16,7 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000). Navigate between **Home**, **Onboarding**, **Session**, **Dashboard**, **History**, **Insights**, and the developer-only **Training** screens from the top nav.
 
-The active demo is in `client/`. The session flow currently uses scripted meditation chunks, a multi-turn check-in chat, and a reflection card. Check-ins, reflection, and insight regeneration run through the local Gemma runtime behind the `client/lib/gemma/*` boundaries; chunks are served from the local fallback bank.
+The active demo is in `client/`. The session flow uses local Gemma-backed meditation chunks, a streamed multi-turn check-in chat, and a reflection card behind the `client/lib/gemma/*` boundaries, with scripted local fallbacks when validation fails. The mounted reflection and phase-narration contracts mirror the combined `lora-wave-session` dataset; check-ins intentionally keep streaming prose in the frontend while preserving the dataset's clinical wording and readiness semantics.
 
 ## Docs
 

@@ -1,0 +1,7 @@
+{
+  "baseModel": "unsloth/gemma-4-E2B-it",
+  "adapterDir": "/home/ubuntu/wave-work/Wave/models/runs/lora-wave-session/overnight-primary-r32-a32-lr2e-4-1epoch/adapter",
+  "outDir": "/home/ubuntu/wave-work/Wave/models/runs/lora-wave-session/overnight-primary-r32-a32-lr2e-4-1epoch/merged-16bit",
+  "saveMethod": "merged_16bit",
+  "maxSeqLength": 4096
+}

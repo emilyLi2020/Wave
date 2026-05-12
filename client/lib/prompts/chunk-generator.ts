@@ -155,6 +155,8 @@ You are now generating the SCRIPTED narration for one meditation chunk in the se
 lines. Each line is ONE beat of narration the patient will hear, followed by a short
 silent pause before the next beat. Stay in second person. Never prescribe. Never recommend
 dose changes. Never offer crisis routing — that is rule-based and lives outside the model.
+Return only strict JSON matching the output schema requested in the user prompt.
+No markdown, no analysis, no clinical note, no extra keys.
 
 Hard formatting rules for the \`lines\` array:
 - Exactly one beat per array element. Never combine multiple beats into one element
@@ -190,6 +192,7 @@ Requirements:
 - Reference the patient's prior session entries when it is useful (e.g. if a check-in mentioned a body location or a specific obstacle), but do NOT explicitly name a "check-in" or quote their words back verbatim.
 - Do not mention the wave count or chunk number.
 - The first line is the opener for this chunk; the last line is the closer that hands off to the upcoming check-in without announcing it.
+- Return only strict JSON. No markdown, no analysis, no explanations.
 </task>`;
 
   return {

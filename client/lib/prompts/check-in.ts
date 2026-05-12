@@ -154,7 +154,16 @@ export function buildCheckInPrompt(
   );
 
   const sections: string[] = [
+    "<surface>",
+    "check_in",
+    "</surface>",
+    "",
     `You are running Check-in ${context.chunkNumber} of 5, immediately after ${CHUNK_LABEL[context.chunkNumber]}.`,
+    "",
+    "<runtime_contract>",
+    "This mounted frontend surface streams patient-facing prose. Do not wrap the visible reply in JSON, markdown, analysis, or a clinical note.",
+    "When the check-in is complete, use the endConversation tool supplied by the runtime after a brief closing hand-off.",
+    "</runtime_contract>",
     "",
     "<conversation_rules>",
     "- The patient has just sent their craving score (1-10) via a slider as their first message in the chat history below. Treat that as turn 1 of the patient's contribution.",

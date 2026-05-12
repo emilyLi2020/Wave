@@ -1,0 +1,7 @@
+{
+  "baseModel": "unsloth/gemma-4-E2B-it",
+  "adapterDir": "E:\\Github\\Wave\\models\\successful_runs\\local_final\\adapter",
+  "outDir": "E:\\Github\\Wave\\models\\successful_runs\\local_final\\merged-16bit",
+  "saveMethod": "merged_16bit",
+  "maxSeqLength": 3072
+}

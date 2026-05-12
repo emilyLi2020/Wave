@@ -1,0 +1,10 @@
+
+FROM .
+TEMPLATE """{{- range $i, $_ := .Messages }}
+{{- $last := eq (len (slice $.Messages $i)) 1 }}
+<|turn>{{ .Role }}
+{{ .Content }}{{ if not $last }}<turn|>
+{{ end }}
+{{- end }}<turn|>
+<|turn>model
+"""

@@ -261,12 +261,14 @@ await test("reflection boundary validates, sanitizes, and emits progress titles"
       return {
         text: JSON.stringify({
           insight: "You stayed [with it] — and the wave moved.",
-          nextSteps: [
-            "Drink water",
-            "Text safe person",
-            "Walk one block",
-            "Rest 10 min",
-          ],
+          journalPromptQuestion:
+            "What is one sign from today you could notice again?",
+          nextSteps: {
+            one: "Drink water",
+            two: "Text safe person",
+            three: "Walk one block",
+            four: "Rest 10 min",
+          },
         }),
       };
     },
@@ -276,12 +278,16 @@ await test("reflection boundary validates, sanitizes, and emits progress titles"
   assert.equal(result.attempts, 1);
   assert.deepEqual(titles, ["Reading the session arc", "Choosing next steps"]);
   assert.equal(result.payload.insight, "You stayed with it, and the wave moved.");
-  assert.deepEqual(result.payload.nextSteps, [
-    "Drink water",
-    "Text safe person",
-    "Walk one block",
-    "Rest 10 min",
-  ]);
+  assert.equal(
+    result.payload.journalPromptQuestion,
+    "What is one sign from today you could notice again?",
+  );
+  assert.deepEqual(result.payload.nextSteps, {
+    one: "Drink water",
+    two: "Text safe person",
+    three: "Walk one block",
+    four: "Rest 10 min",
+  });
 });
 
 await test("reflection boundary retries invalid output then falls back", async () => {
@@ -296,7 +302,11 @@ await test("reflection boundary retries invalid output then falls back", async (
           text:
             calls === 1
               ? "{not valid json"
-              : JSON.stringify({ insight: "too short", nextSteps: ["one"] }),
+              : JSON.stringify({
+                  insight: "too short",
+                  journalPromptQuestion: "Too short?",
+                  nextSteps: { one: "one" },
+                }),
         };
       },
     }),
@@ -306,7 +316,8 @@ await test("reflection boundary retries invalid output then falls back", async (
   assert.equal(result.source, "fallback");
   assert.equal(result.attempts, 2);
   assert.equal(titles.includes("Pulling a saved reflection"), true);
-  assert.equal(result.payload.nextSteps.length, 4);
+  assert.equal(Object.values(result.payload.nextSteps).length, 4);
+  assert.equal(result.payload.journalPromptQuestion.endsWith("?"), true);
 });
 
 await test("insights boundary parses validated local Gemma cards", async () => {

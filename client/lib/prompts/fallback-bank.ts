@@ -25,12 +25,12 @@ import { isAffirmative } from "@/lib/session/is-affirmative";
  * those mounted surfaces.
  */
 
-const NEXT_STEPS_DEFAULT = [
-  "Drink a glass of water",
-  "Walk one block outside",
-  "Text a safe person",
-  "Lie down for 10 min",
-];
+const NEXT_STEPS_DEFAULT = {
+  one: "Drink a glass of water",
+  two: "Walk one block outside",
+  three: "Text a safe person",
+  four: "Lie down for 10 min",
+};
 
 function bankReflection(input: ReflectionContext): ReflectionPayload {
   const drop = input.intakeIntensity - input.endingIntensity;
@@ -48,7 +48,12 @@ function bankReflection(input: ReflectionContext): ReflectionPayload {
       " You chose to come into a session today even after using. That is a meaningful step, not a contradiction.";
   }
 
-  return { insight, nextSteps: NEXT_STEPS_DEFAULT };
+  return {
+    insight,
+    journalPromptQuestion:
+      "What is one small sign from this session you could notice again later?",
+    nextSteps: NEXT_STEPS_DEFAULT,
+  };
 }
 
 export function fallbackReflection(input: ReflectionContext): ReflectionPayload {

@@ -17,8 +17,14 @@ export type JsonSchema = Record<string, unknown>;
 
 export const reflectionPayloadSchema = z.object({
   insight: z.string().min(20).max(500),
+  journalPromptQuestion: z.string().min(10).max(200),
   /** Shown only after "No ideas" — four tap options; patient still picks one. */
-  nextSteps: z.array(z.string().min(2).max(60)).length(4),
+  nextSteps: z.object({
+    one: z.string().min(3).max(80),
+    two: z.string().min(3).max(80),
+    three: z.string().min(3).max(80),
+    four: z.string().min(3).max(80),
+  }),
 });
 
 export type ReflectionPayload = z.infer<typeof reflectionPayloadSchema>;
@@ -26,14 +32,24 @@ export type ReflectionPayload = z.infer<typeof reflectionPayloadSchema>;
 export const reflectionJsonSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["insight", "nextSteps"],
+  required: ["insight", "journalPromptQuestion", "nextSteps"],
   properties: {
     insight: { type: "string", minLength: 20, maxLength: 500 },
+    journalPromptQuestion: {
+      type: "string",
+      minLength: 10,
+      maxLength: 200,
+    },
     nextSteps: {
-      type: "array",
-      minItems: 4,
-      maxItems: 4,
-      items: { type: "string", minLength: 2, maxLength: 60 },
+      type: "object",
+      additionalProperties: false,
+      required: ["one", "two", "three", "four"],
+      properties: {
+        one: { type: "string", minLength: 3, maxLength: 80 },
+        two: { type: "string", minLength: 3, maxLength: 80 },
+        three: { type: "string", minLength: 3, maxLength: 80 },
+        four: { type: "string", minLength: 3, maxLength: 80 },
+      },
     },
   },
 };

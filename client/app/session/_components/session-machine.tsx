@@ -335,10 +335,11 @@ export function SessionMachine() {
 
   const reflectionContext: ReflectionContext | null = useMemo(() => {
     if (!profile || !state.intake || state.checkIns.length < 5) return null;
-    const finalScore = state.checkIns[state.checkIns.length - 1].cravingScore;
+    const finalCheckIn = state.checkIns[state.checkIns.length - 1];
+    const finalScore = finalCheckIn.cravingScore;
     const durationSeconds = Math.max(
       0,
-      Math.round((Date.now() - new Date(state.startedAt).getTime()) / 1000),
+      Math.round((finalCheckIn.endedAt - new Date(state.startedAt).getTime()) / 1000),
     );
     return {
       intakeIntensity: state.intake.intakeIntensity,
@@ -542,6 +543,12 @@ function ReflectionPlanAndSuggestions({
 }) {
   const [stage, setStage] = useState<"askPlan" | "suggestions">("askPlan");
   const [ownPlanDraft, setOwnPlanDraft] = useState("");
+  const nextStepOptions = [
+    payload.nextSteps.one,
+    payload.nextSteps.two,
+    payload.nextSteps.three,
+    payload.nextSteps.four,
+  ];
 
   const trimmedPlan = ownPlanDraft.trim();
   const canUseOwnPlan = trimmedPlan.length >= 2;
@@ -595,7 +602,7 @@ function ReflectionPlanAndSuggestions({
               Four gentle options. Pick one, or go back to write your own.
             </p>
             <NextStepChips
-              options={payload.nextSteps}
+              options={nextStepOptions}
               onPick={onPickNextStep}
             />
             <button
@@ -609,7 +616,12 @@ function ReflectionPlanAndSuggestions({
         )
       }
     >
-      <p>{payload.insight}</p>
+      <div className="space-y-3">
+        <p>{payload.insight}</p>
+        <p className="text-sm text-foreground/70">
+          {payload.journalPromptQuestion}
+        </p>
+      </div>
     </NarrationCard>
   );
 }

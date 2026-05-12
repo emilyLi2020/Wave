@@ -240,6 +240,14 @@ The runtime wrapper can map `action: "continue"` to the existing
 `endConversation: null` contract and `action: "end"` to the existing parsed
 end-conversation signal.
 
+**Browser runtime note.** The merged training dataset stores check-in assistant
+turns as strict JSON with `reply` and `endConversation`. The mounted frontend
+keeps the patient-facing check-in chat streamed as plain prose through
+`client/lib/gemma/checkin.ts` and maps readiness through the AI SDK
+`endConversation` tool. Compatible dataset wording is mirrored in the frontend
+prompts, but the JSON wrapper is intentionally not used for visible check-in
+streaming.
+
 ### Reflection Input
 
 ```ts
@@ -335,6 +343,10 @@ Specialized LoRAs must still satisfy the ship gates in
 - `client/app/api/training/export/route.ts` exports each specialized JSONL file
   and the combined `lora-wave-session.jsonl` file.
 - `client/lib/gemma/local-runtime.ts` remains the browser runtime boundary.
+- `client/lib/prompts/schemas.ts` mirrors the mounted runtime contracts:
+  phase narration returns six `lines`, check-ins stream prose plus a tool-based
+  end signal, and reflection returns `insight`, `journalPromptQuestion`, and
+  object-shaped `nextSteps` matching the training dataset.
 - `PRD.md > Medication-Aware Prompt Logic` remains the clinical matrix for all
   seed examples.
 - `AGENTS.md > Domain Constraints` remains the source of truth for tone,
