@@ -216,6 +216,11 @@ schema, safety, and medical-quality gates before accepting any row.
 Read the full process, commands, and disclosure rules in
 [`SYNTHETIC_DATA.md`](SYNTHETIC_DATA.md).
 
+For a single narrative on **both** synthetic paths (phase templates vs unified
+session gap-fill), how they connect to `prepare_wave_session_dataset.py`, and
+how clinical safeguards are layered, see
+[`SYNTHETIC_DATASET_GENERATION.md`](SYNTHETIC_DATASET_GENERATION.md).
+
 ## Notebooks
 
 - `01_gemma4_smoke_test.ipynb` — downloads the smallest Gemma 4 (`google/gemma-4-E2B-it`) and runs one generic and one WAVE-style prompt to confirm the base model works on this machine before any LoRA work begins.

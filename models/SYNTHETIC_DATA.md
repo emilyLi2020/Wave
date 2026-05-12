@@ -4,6 +4,10 @@ This document explains how WAVE generates synthetic draft rows for the unified
 `lora-wave-session` LoRA experiment. The script is
 `generate_wave_session_synthetic.py`.
 
+For the broader picture (including deterministic phase-narration expansion,
+shared validators, and how we scope “clinical accuracy”), see
+[`SYNTHETIC_DATASET_GENERATION.md`](SYNTHETIC_DATASET_GENERATION.md).
+
 Synthetic rows are clinical-adjacent training drafts. They are not
 clinician-authored examples, and they must remain labeled as synthetic in every
 training and evaluation report.
