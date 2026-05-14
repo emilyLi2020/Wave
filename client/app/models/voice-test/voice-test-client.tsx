@@ -27,7 +27,7 @@ import {
   type VoiceDebugEventName,
   type VoiceLoopStatus,
   type VoiceTurnPhase,
-} from "@/app/training/voice-test/voice-turn-machine";
+} from "@/app/models/voice-test/voice-turn-machine";
 import {
   createBrowserTextToSpeechEngine,
   createKokoroTextToSpeechEngine,

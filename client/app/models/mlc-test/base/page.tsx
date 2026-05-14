@@ -1,10 +1,10 @@
-import { assertTrainingEnabled } from "@/lib/training/guard";
+import { assertModelsEnabled } from "@/lib/models/guard";
 
 import { BaseTestClient } from "../base-test-client";
 
 export const dynamic = "force-dynamic";
 
 export default function BaseTestPage() {
-  assertTrainingEnabled();
+  assertModelsEnabled();
   return <BaseTestClient />;
 }

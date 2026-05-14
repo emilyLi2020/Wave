@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Patient-facing header + footer. Hides itself on /training/* so the
- * dev-only training UI can render its own chrome (sidebar nav etc.)
- * without the patient nav showing through. The training surface is
- * gated by NEXT_PUBLIC_TRAINING_ENABLED and not shown to patients in
- * production.
+ * Patient-facing header + footer. Hides itself on the dev-only
+ * /training/* (training data) and /models/* (runtime/model test pages)
+ * surfaces so each can render its own chrome. Both are gated by env
+ * flags (NEXT_PUBLIC_TRAINING_ENABLED / NEXT_PUBLIC_MODELS_ENABLED)
+ * and not shown to patients in production.
  */
 
 import Link from "next/link";
@@ -23,7 +23,12 @@ const navLinks = [
 
 function shouldHide(pathname: string | null): boolean {
   if (!pathname) return false;
-  return pathname === "/training" || pathname.startsWith("/training/");
+  return (
+    pathname === "/training" ||
+    pathname.startsWith("/training/") ||
+    pathname === "/models" ||
+    pathname.startsWith("/models/")
+  );
 }
 
 export function SiteHeader() {

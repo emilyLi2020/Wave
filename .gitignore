@@ -15,9 +15,11 @@ __pycache__/
 models/runs/
 models/unsloth_compiled_cache/
 
-# Local symlinks into models/runs/ — re-create per-machine after running
-# the export pipeline. See docs/onnx-windows-handoff.md.
+# Local artifacts copied/symlinked into client/public/ for browser testing.
+# Re-create per-machine after running the export pipeline. See
+# docs/onnx-windows-handoff.md and docs/postmortems/mlc-finetune.md.
 client/public/mlc-export
 client/public/mlc-base-export
+client/public/mlc-google-it-export
 client/public/onnx-finetune-export
 
