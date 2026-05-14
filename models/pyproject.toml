@@ -24,6 +24,7 @@ dependencies = [
     "onnxconverter-common>=1.14.0",
     "onnxsim>=0.4.36",
     "onnxoptimizer>=0.3.13",
+    "optimum>=2.1.0",
 ]
 
 [tool.uv]

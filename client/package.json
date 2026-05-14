@@ -16,8 +16,10 @@
   "dependencies": {
     "@browser-ai/transformers-js": "^2.2.2",
     "@huggingface/transformers": "^4.2.0",
+    "@mediapipe/tasks-genai": "^0.10.27",
     "@mlc-ai/web-llm": "^0.2.83",
     "@ricky0123/vad-web": "^0.0.30",
+    "@wllama/wllama": "^3.1.1",
     "ai": "^6.0.174",
     "kokoro-js": "^1.2.1",
     "next": "16.2.4",

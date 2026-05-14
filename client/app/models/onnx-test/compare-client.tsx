@@ -18,7 +18,13 @@ import type {
 } from "@/lib/prompts/schemas";
 
 const UPSTREAM_ID = "onnx-community/gemma-4-E2B-it-ONNX";
-const FINETUNE_LOCAL_ID = "Maelstrome/lora-wave-session-r32-onnx";
+// v4-fused: decoder has 70 FastGelu contrib ops instead of decomposed Tanh-based
+// gelu (the suspected NaN source on WebGPU for long-context prompts). CPU bench
+// 2x faster than v3 and still coherent. Upload to HF first:
+//   hf upload Maelstrome/lora-wave-session-r32-onnx-fused models/runs/onnx-export-v4-fused .
+// If the upload hasn't run yet, swap back to "Maelstrome/lora-wave-session-r32-onnx"
+// (v3, decomposed decoder; empty output on WebGPU for WAVE prompts).
+const FINETUNE_LOCAL_ID = "Maelstrome/lora-wave-session-r32-onnx-fused";
 
 type Slot = "upstream" | "finetune";
 type TaskKey = "phase" | "checkin" | "reflection";
@@ -33,8 +39,8 @@ const SLOT_META: Record<
     accent: "#3b82f6",
   },
   finetune: {
-    title: "Our fine-tune",
-    subtitle: "Maelstrome/lora-wave-session-r32-onnx",
+    title: "Our fine-tune (v4 fused)",
+    subtitle: "Maelstrome/lora-wave-session-r32-onnx-fused",
     accent: "#a855f7",
   },
 };
@@ -133,6 +139,7 @@ type TaskResults = {
   phase?: SimpleResult;
   checkin?: CheckInResult;
   reflection?: SimpleResult;
+  smoke?: SimpleResult;
 };
 
 const MAX_TOKENS_BY_TASK: Record<TaskKey, number> = {
@@ -140,6 +147,8 @@ const MAX_TOKENS_BY_TASK: Record<TaskKey, number> = {
   checkin: 220,
   reflection: 320,
 };
+
+const SMOKE_PROMPT = "What is the capital of France? Answer in one sentence.";
 
 export function OnnxCompareClient() {
   const pipeRef = useRef<TextGenerationPipeline | null>(null);
@@ -158,10 +167,26 @@ export function OnnxCompareClient() {
         ? "finetune"
         : null;
 
+  // ?local=1 reroutes the FINETUNE_LOCAL_ID fetch from huggingface.co to a
+  // localhost static-file server that mirrors HF's URL layout. Use this to
+  // test a local v4 export under WebGPU without uploading to HF. Start the
+  // server with `pnpm exec tsx scripts/serve-local-hf.ts` from client/.
+  // ?local-host=http://localhost:PORT lets you override the port.
+  const useLocal = useRef<{ enabled: boolean; host: string }>({
+    enabled: false,
+    host: "http://localhost:8765",
+  });
+
   useEffect(() => {
     env.allowLocalModels = false;
     env.allowRemoteModels = true;
     env.useBrowserCache = true;
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      useLocal.current.enabled = params.get("local") === "1";
+      const customHost = params.get("local-host");
+      if (customHost) useLocal.current.host = customHost;
+    }
   }, []);
 
   const setSlotLoad = useCallback((slot: Slot, state: LoadState) => {
@@ -188,15 +213,18 @@ export function OnnxCompareClient() {
       }
 
       const modelId = slot === "upstream" ? UPSTREAM_ID : FINETUNE_LOCAL_ID;
-      // Both models load from HuggingFace Hub now (the finetune lives at
-      // Maelstrome/lora-wave-session-r32-onnx). Local serve of external-data
-      // files is blocked by transformers.js v4's MountedFiles bug on WebGPU.
-      // Re-assert env on every load: another route (e.g. /benchmark) might
-      // have set allowLocalModels=true + localModelPath in this SPA session,
-      // and transformers.js then short-circuits to the local path and 404s
-      // instead of falling through to HF.
+      // Both models load from HF Hub by default. When ?local=1 is set, swap
+      // env.remoteHost to the localhost mirror for the FINETUNE slot only —
+      // upstream stays on HF since it's already cached and not the model
+      // under test. This works under WebGPU because env.remoteHost goes
+      // through the same absolute-URL fetch path as HF Hub, sidestepping the
+      // MountedFiles bug that hits env.allowLocalModels=true + localModelPath.
       env.allowLocalModels = false;
       env.allowRemoteModels = true;
+      const isLocal = useLocal.current.enabled && slot === "finetune";
+      const HF_HOST = "https://huggingface.co/";
+      env.remoteHost = isLocal ? `${useLocal.current.host}/` : HF_HOST;
+      env.remotePathTemplate = "{model}/resolve/{revision}/";
       setSlotLoad(slot, {
         phase: "loading",
         message: "Initializing on WebGPU…",
@@ -411,6 +439,20 @@ export function OnnxCompareClient() {
     setRunning(null);
   }, [activeSlot, running, generateOne]);
 
+  const runSmoke = useCallback(async () => {
+    if (!activeSlot || running) return;
+    setRunning("phase");
+    const result = await generateOne(
+      [{ role: "user", content: SMOKE_PROMPT }],
+      64,
+    );
+    setResults((prev) => ({
+      ...prev,
+      [activeSlot]: { ...prev[activeSlot], smoke: result },
+    }));
+    setRunning(null);
+  }, [activeSlot, running, generateOne]);
+
   const runAll = useCallback(async () => {
     if (!activeSlot || running) return;
     await runPhase();
@@ -451,6 +493,15 @@ export function OnnxCompareClient() {
         itself, not a CPU fallback.
       </div>
 
+      {useLocal.current.enabled ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          <strong>?local=1 active.</strong> Fine-tune column will fetch from{" "}
+          <code>{useLocal.current.host}</code> instead of huggingface.co.
+          Start the server first: <code>cd client && pnpm exec tsx scripts/serve-local-hf.ts</code>.
+          Upstream slot still uses HF.
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <RuntimeCard
           slot="upstream"
@@ -479,6 +530,14 @@ export function OnnxCompareClient() {
             ? `Running ${running}…`
             : "Run all 3 tasks on this model"}
         </button>
+        <button
+          type="button"
+          disabled={!canRun}
+          onClick={runSmoke}
+          className="inline-flex items-center rounded-md border border-border bg-surface-muted px-3 py-2 text-xs font-medium text-foreground/80 disabled:cursor-not-allowed disabled:opacity-50 hover:border-accent/60 hover:text-foreground"
+        >
+          Smoke test (user-only)
+        </button>
         {!activeSlot ? (
           <span className="text-xs text-foreground/55">
             Load a model above to run tasks.
@@ -491,6 +550,14 @@ export function OnnxCompareClient() {
           </span>
         )}
       </div>
+
+      <TaskRow
+        title="Smoke test · user-only prompt (same shape as bench-onnx.ts)"
+        description={`Sends just [{role:"user", content:"${SMOKE_PROMPT}"}]. If this produces text but the WAVE tasks don't, the system-message prompt shape is the issue, not the WebGPU backend.`}
+        upstream={results.upstream.smoke}
+        finetune={results.finetune.smoke}
+        renderResult={(r) => <SimpleOutput result={r} />}
+      />
 
       <TaskRow
         title="Phase · chunk 2 narration"
@@ -695,6 +762,23 @@ function CheckInOutput({ result }: { result: CheckInResult }) {
       ))}
     </div>
   );
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    if (typeof o.message === "string") return o.message;
+    if (typeof o.error === "string") return o.error;
+    if (typeof o.stack === "string") return o.stack;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      /* fall through */
+    }
+  }
+  return String(err);
 }
 
 function stripThinking(text: string): string {

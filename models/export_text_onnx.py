@@ -49,6 +49,7 @@ FORBIDDEN_PREFIXES: tuple[str, ...] = (
 )
 RUNTIME_CONFIG_FILES: tuple[str, ...] = (
     "config.json",
+    "generation_config.json",
     "tokenizer.json",
     "tokenizer_config.json",
     "chat_template.jinja",
@@ -385,11 +386,12 @@ def run_track_b(source_path: Path, out_dir: Path) -> None:
         )
         print("Track B: torch.onnx.export complete.", flush=True)
 
-    # NOTE: A graph-optimization pass (`_optimize_graph`, using ORT's
-    # `optimize_model` in `bert` mode) was tested between export and fp16 cast.
-    # It either no-ops or makes things ~3% larger because Gemma 4's PLE /
-    # interleaved attention isn't a recognized fusion pattern. Keeping the
-    # function defined for future experiments but skipping it in the hot path.
+    # NOTE: graph-optimization in `bert` mode was a no-op in the original
+    # pipeline. `gpt2` mode (set in `_optimize_graph`) fuses 70 Tanh-based
+    # gelu_pytorch_tanh chains into 70 FastGelu contrib ops, which is what
+    # unblocks browser WebGPU generation (see docs/onnx-webgpu-divergence.md).
+    # The fusion runs AFTER fp16 cast + q4 quantization on the decoder so it
+    # operates on the smallest possible graph.
 
     # Export the small embed-tokens graph before we free the PyTorch model.
     embed_intermediate = out_dir / "onnx" / "embed_tokens.onnx"
@@ -417,6 +419,18 @@ def run_track_b(source_path: Path, out_dir: Path) -> None:
     quantized_path = out_dir / "onnx" / "decoder_model_merged_q4f16.onnx"
     _quantize_q4f16(decoder_fp16_path, quantized_path)
     _delete_onnx_with_sidecars(decoder_fp16_path)
+    gc.collect()
+
+    print("Track B: fusing decoder gelu_pytorch_tanh -> FastGelu (WebGPU fix)...",
+          flush=True)
+    fused_decoder_path = out_dir / "onnx" / "decoder_model_merged_q4f16_fused.onnx"
+    _optimize_graph(quantized_path, fused_decoder_path)
+    _delete_onnx_with_sidecars(quantized_path)
+    # Promote the fused decoder to the canonical name. `_copy_onnx_with_sidecars`
+    # loads with external data (which still points at the `_fused` sidecar),
+    # then re-saves to the canonical path emitting a fresh location pointer.
+    _copy_onnx_with_sidecars(fused_decoder_path, quantized_path)
+    _delete_onnx_with_sidecars(fused_decoder_path)
     gc.collect()
 
     print(f"Track B: casting + quantizing embed_tokens -> {embed_path}...", flush=True)
@@ -512,13 +526,21 @@ def _delete_onnx_with_sidecars(path: Path) -> None:
 
 
 def _optimize_graph(src: Path, dst: Path) -> None:
-    """Run graph-level optimizations.
+    """Run ORT's transformer-fusion pass on the decoder.
+
+    Without this, the decoder ships with the Tanh-based `gelu_pytorch_tanh`
+    decomposition (70 `Tanh` + many `Pow(x, 3)` ops). On `onnxruntime-web`
+    WebGPU this NaN-cascades for long prompts and the model emits a stop
+    token at step 0 — see docs/onnx-webgpu-divergence.md.
+
+    `model_type="gpt2"` with `opt_level=0` is the combination that fuses
+    the gelu-tanh chain into a single `FastGelu` contrib op which Dawn
+    handles correctly. Other model types we tried (bert, phi, qwen3) do
+    not match the fusion pattern and either no-op or add wrapper Cast nodes.
 
     onnxsim and onnxoptimizer both choke on >2 GB models because they
-    round-trip through a single protobuf message (2 GB limit). We use
-    `onnxruntime.transformers.optimizer.optimize_model` instead — it operates
-    on the file path so it can read/write external data without ever
-    serializing the whole model into one proto.
+    round-trip through a single protobuf message (2 GB limit); ORT's
+    optimize_model operates on the file path with external data.
     """
     print(f"optimize: running ORT transformer optimizer on {src} ...", flush=True)
     try:
@@ -530,10 +552,10 @@ def _optimize_graph(src: Path, dst: Path) -> None:
         _copy_onnx_with_sidecars(src, dst)
         return
 
-    fusion_options = FusionOptions("bert")
+    fusion_options = FusionOptions("gpt2")
     fusion_options.enable_gelu = True
     fusion_options.enable_layer_norm = True
-    fusion_options.enable_attention = False  # Gemma-4 attention shape isn't BERT-like
+    fusion_options.enable_attention = False  # Gemma-4 KV-sharing isn't a standard pattern
     fusion_options.enable_skip_layer_norm = True
     fusion_options.enable_bias_skip_layer_norm = True
     fusion_options.enable_bias_gelu = True
@@ -543,11 +565,11 @@ def _optimize_graph(src: Path, dst: Path) -> None:
     try:
         optimized = optimize_model(
             input=str(src),
-            model_type="bert",
-            num_heads=0,
-            hidden_size=0,
+            model_type="gpt2",
+            num_heads=8,
+            hidden_size=1536,
             optimization_options=fusion_options,
-            opt_level=1,
+            opt_level=0,  # let fusion patterns run on the raw graph; opt_level>0 adds Cast wrappers
             use_gpu=False,
             only_onnxruntime=False,
         )
@@ -562,7 +584,25 @@ def _optimize_graph(src: Path, dst: Path) -> None:
     optimized.save_model_to_file(
         str(dst), use_external_data_format=True, all_tensors_to_one_file=True
     )
-    print(f"optimize: wrote {dst}", flush=True)
+    # ORT writes external data with the `.onnx.data` filename convention;
+    # transformers.js expects `.onnx_data` (underscore). Rewrite by reloading
+    # and saving via stock onnx.save which respects our `location=` arg.
+    import onnx as _onnx
+    _model = _onnx.load(str(dst), load_external_data=True)
+    (dst.parent / location).unlink(missing_ok=True)
+    # Also drop the `.onnx.data` sidecar ORT created.
+    ort_sidecar = dst.parent / (dst.stem + ".onnx.data")
+    if ort_sidecar.exists():
+        ort_sidecar.unlink()
+    _onnx.save(
+        _model,
+        str(dst),
+        save_as_external_data=True,
+        all_tensors_to_one_file=True,
+        location=location,
+        size_threshold=1024,
+    )
+    print(f"optimize: wrote {dst} (external data: {location})", flush=True)
 
 
 def _copy_onnx_with_sidecars(src: Path, dst: Path) -> None:

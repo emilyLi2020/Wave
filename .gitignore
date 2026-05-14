@@ -12,8 +12,21 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .venv/
+.venv-*/
 models/runs/
 models/unsloth_compiled_cache/
+
+# Large local model artifacts. Host on HF; pull on demand.
+models/mediapipe/
+models/spaces/
+models/successful_runs/
+
+# Per-machine logs from benches / conversions / exports.
+logs/
+
+# Claude Code / Playwright MCP local state.
+.claude/
+.playwright-mcp/
 
 # Local artifacts copied/symlinked into client/public/ for browser testing.
 # Re-create per-machine after running the export pipeline. See
