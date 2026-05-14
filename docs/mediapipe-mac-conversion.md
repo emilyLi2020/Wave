@@ -1,5 +1,36 @@
 # Convert the PEFT-merged Gemma 4 fine-tune to a MediaPipe `.task` file (Mac handoff)
 
+> **⚠️ DEAD END as of 2026-05-14 — read this before running anything below.**
+>
+> The procedure documented here was executed on a Mac (2026-05-14). It produced
+> a structurally valid bundle (`Maelstrome/lora-wave-session-r32` →
+> `mediapipe/model.litertlm`, 4.7 GB) — but the bundle's outer container is
+> `LITERTLM`-magic, **not** `TFL3`-magic as this doc predicted. No version of
+> `@mediapipe/tasks-genai` (stable `0.10.27` or nightly `0.10.36-rc.20260514`)
+> registers a `LITERTLM` format matcher; both reject the file with
+> `Error: No model format matched.` Renaming `.litertlm` → `.task` doesn't help
+> (the matcher inspects bytes, not extension).
+>
+> **Root cause: no public Gemma 4 fine-tune → web-`.task` path exists.** Google
+> staff (tylermullen) confirmed on
+> [HF litert-community/TranslateGemma-4B-IT discussion #1](https://huggingface.co/litert-community/TranslateGemma-4B-IT/discussions/1):
+> *"The pre-converted models we have so far are '-web.task' format, which we
+> don't have any fine-tuning notebooks or colabs for, and probably won't be
+> able to make any time soon. Note that most of the documentation on our
+> website for model conversion will point you to a different converter which
+> will not work for this purpose."*
+>
+> Full writeup with reproduction + community-issue links:
+> [`postmortems/mediapipe-finetune.md`](postmortems/mediapipe-finetune.md).
+> Web-shipping route for the fine-tune is now wllama/GGUF — see
+> [`wllama.md`](wllama.md). Mobile via LiteRT-LM is still viable for the
+> `.litertlm` bundle this doc produces.
+>
+> The steps below are preserved for archival reference (and in case Google
+> ships a `LITERTLM` web consumer or a fine-tune→`-web.task` recipe later).
+
+---
+
 **Why this exists**: Google's `litert-converter` Python wheel ships only for
 `manylinux_2_27_x86_64` and `macosx_12_0_arm64`. There is no Windows wheel, so
 the conversion can't run on the dev machine where the fine-tune was trained.
@@ -10,7 +41,11 @@ back to Windows.
 browser via `@mediapipe/tasks-genai` and runs through LiteRT-LM's WebGPU
 kernels — bypassing the `onnxruntime-web` fp16 overflow bug that blocked the
 ONNX path. Validated working with base Gemma 4 on this exact code path:
-phase 2.5s, check-in 1.0s, reflection 1.5s — all coherent.
+phase 2.5s, check-in 1.0s, reflection 1.5s — all coherent. _**Update
+2026-05-14**: the prediction "what you get" turned out wrong for fine-tunes —
+see banner above. The base `gemma-4-E2B-it-web.task` works because Google
+built it internally with an unpublished recipe; running the steps below on a
+fine-tuned checkpoint produces a `LITERTLM` file with no browser consumer._
 
 **Time**: ~20 min if no surprises (mostly the conversion run itself).
 

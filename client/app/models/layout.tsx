@@ -92,6 +92,15 @@ export default function ModelsLayout({
           />
 
           <div className="pt-6 pb-2 text-xs uppercase tracking-wide text-foreground/50 px-2">
+            MediaPipe runtime (LiteRT-LM)
+          </div>
+          <SidebarLink href="/models/mediapipe-test" label="Chat · base Gemma 4" />
+          <SidebarLink
+            href="/models/mediapipe-finetune-test"
+            label="Chat · WAVE fine-tune"
+          />
+
+          <div className="pt-6 pb-2 text-xs uppercase tracking-wide text-foreground/50 px-2">
             Voice loop
           </div>
           <SidebarLink href="/models/voice-test" label="STT → LLM → TTS" />
