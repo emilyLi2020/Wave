@@ -101,6 +101,11 @@ def main() -> None:
 
 
 def download_source(repo_id: str, cache_dir: Path | None) -> Path:
+    local_candidate = Path(repo_id)
+    if local_candidate.exists() and local_candidate.is_dir():
+        print(f"Using local source directory: {local_candidate}", flush=True)
+        return local_candidate.resolve()
+
     print("Downloading source merged-16bit snapshot...", flush=True)
     from huggingface_hub import snapshot_download
 
@@ -333,17 +338,24 @@ def run_track_b(source_path: Path, out_dir: Path) -> None:
             input_names.append(f"past_key_values.{layer_idx}.{kv_name}")
             output_names.append(f"present.{layer_idx}.{kv_name}")
 
-    torch.onnx.export(
-        wrapper,
-        (example_input_ids, example_attention, example_positions, example_past_tuple),
-        str(decoder_path),
-        input_names=input_names,
-        output_names=output_names,
-        dynamic_shapes=dynamic_shapes,
-        opset_version=18,
-        dynamo=True,
-    )
-    print("Track B: torch.onnx.export complete.", flush=True)
+    if decoder_path.exists():
+        print(
+            f"Track B: skipping torch.onnx.export — {decoder_path} already exists. "
+            "Delete it to force a re-export.",
+            flush=True,
+        )
+    else:
+        torch.onnx.export(
+            wrapper,
+            (example_input_ids, example_attention, example_positions, example_past_tuple),
+            str(decoder_path),
+            input_names=input_names,
+            output_names=output_names,
+            dynamic_shapes=dynamic_shapes,
+            opset_version=18,
+            dynamo=True,
+        )
+        print("Track B: torch.onnx.export complete.", flush=True)
 
     # NOTE: A graph-optimization pass (`_optimize_graph`, using ORT's
     # `optimize_model` in `bert` mode) was tested between export and fp16 cast.
@@ -351,28 +363,41 @@ def run_track_b(source_path: Path, out_dir: Path) -> None:
     # interleaved attention isn't a recognized fusion pattern. Keeping the
     # function defined for future experiments but skipping it in the hot path.
 
+    # Export the small embed-tokens graph before we free the PyTorch model.
+    embed_intermediate = out_dir / "onnx" / "embed_tokens.onnx"
+    embed_fp16 = out_dir / "onnx" / "embed_tokens_fp16.onnx"
+    embed_path = out_dir / "onnx" / "embed_tokens_q4f16.onnx"
+    print(f"Track B: exporting embed_tokens -> {embed_intermediate}...", flush=True)
+    _export_embed_tokens(text_model, embed_intermediate)
+
+    # Free the PyTorch model BEFORE any large ONNX cast/quant pass.
+    # The fp16 caster loads the entire fp32 ONNX into memory + creates fp16
+    # copies; on a 17 GB decoder that peaks near 30 GB and OOM-kills if the
+    # PyTorch graph (another ~20 GB) is still resident.
+    print("Track B: freeing PyTorch model before heavy ONNX passes...", flush=True)
+    import gc
+    del wrapper, text_model, model, tokenizer
+    gc.collect()
+
     print("Track B: casting decoder fp32 -> fp16 ...", flush=True)
     decoder_fp16_path = out_dir / "onnx" / "decoder_model_merged_fp16.onnx"
     _cast_fp32_to_fp16(decoder_path, decoder_fp16_path)
     _delete_onnx_with_sidecars(decoder_path)
+    gc.collect()
 
     print("Track B: quantizing decoder fp16 -> q4f16...", flush=True)
     quantized_path = out_dir / "onnx" / "decoder_model_merged_q4f16.onnx"
     _quantize_q4f16(decoder_fp16_path, quantized_path)
     _delete_onnx_with_sidecars(decoder_fp16_path)
+    gc.collect()
 
-    embed_intermediate = out_dir / "onnx" / "embed_tokens.onnx"
-    embed_fp16 = out_dir / "onnx" / "embed_tokens_fp16.onnx"
-    embed_path = out_dir / "onnx" / "embed_tokens_q4f16.onnx"
-    print(f"Track B: exporting embed_tokens -> {embed_path}...", flush=True)
-    _export_embed_tokens(text_model, embed_intermediate)
+    print(f"Track B: casting + quantizing embed_tokens -> {embed_path}...", flush=True)
     _cast_fp32_to_fp16(embed_intermediate, embed_fp16)
     _delete_onnx_with_sidecars(embed_intermediate)
+    gc.collect()
     _quantize_q4f16(embed_fp16, embed_path)
     _delete_onnx_with_sidecars(embed_fp16)
-
-    # Free the model before downstream copies.
-    del wrapper, text_model, model, tokenizer
+    gc.collect()
 
 
 def _extract_text_causal_lm(model):
@@ -530,30 +555,17 @@ def _copy_onnx_with_sidecars(src: Path, dst: Path) -> None:
 def _cast_fp32_to_fp16(src: Path, dst: Path) -> None:
     """Cast all fp32 initializers in an ONNX model to fp16.
 
-    Halves the file size before the q4 matmul pass runs. The q4 quantizer
-    only touches MatMul weights; everything else (LayerNorm scales, biases,
-    RoPE tables, soft-cap constants) stays at the fp16 produced here.
+    Halves the file size before the q4 matmul pass runs. Delegates to the
+    streaming caster (cast_fp16_streaming.py) in a subprocess: it walks
+    initializers one at a time without loading the full graph into memory.
+    On a 17 GB decoder, the in-memory onnxconverter_common approach peaked
+    over 30 GB and OOM-killed the parent process.
     """
-    import onnx
-    from onnxconverter_common.float16 import convert_float_to_float16
-
-    print(f"fp16 cast: loading {src} ...", flush=True)
-    model_fp32 = onnx.load(str(src), load_external_data=True)
-    print("fp16 cast: converting ...", flush=True)
-    model_fp16 = convert_float_to_float16(
-        model_fp32,
-        keep_io_types=False,
-        disable_shape_infer=True,
-    )
-    location = dst.stem + ".onnx_data"
-    (dst.parent / location).unlink(missing_ok=True)
-    onnx.save(
-        model_fp16,
-        str(dst),
-        save_as_external_data=True,
-        all_tensors_to_one_file=True,
-        location=location,
-        size_threshold=1024,
+    script = Path(__file__).parent / "cast_fp16_streaming.py"
+    print(f"fp16 cast: delegating to streaming caster for {src} ...", flush=True)
+    subprocess.run(
+        [sys.executable, str(script), "--src", str(src), "--dst", str(dst)],
+        check=True,
     )
     print(f"fp16 cast: wrote {dst}", flush=True)
 

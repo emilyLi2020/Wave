@@ -333,7 +333,7 @@ async function generateChatText(
     callback_function: (chunk: string) => {
       if (options.signal?.aborted) return;
       accumulated += chunk;
-      options.onDelta?.(accumulated);
+      options.onDelta?.(stripThinking(accumulated));
     },
   });
 
@@ -347,8 +347,8 @@ async function generateChatText(
     });
 
     throwIfAborted(options.signal);
-    const finalText = extractGeneratedText(output).trim();
-    return finalText.length > 0 ? finalText : accumulated.trim();
+    const finalText = stripThinking(extractGeneratedText(output)).trim();
+    return finalText.length > 0 ? finalText : stripThinking(accumulated).trim();
   } finally {
     options.signal?.removeEventListener("abort", handleAbort);
     stoppingCriteria.reset();
@@ -427,8 +427,14 @@ function getTextDelta(part: unknown): string {
   return typeof delta === "string" ? delta : "";
 }
 
-function sanitizeCheckInModelText(text: string): string {
+function stripThinking(text: string): string {
   return text
+    .replace(/<\|think\|>[\s\S]*?<\/?\|think\|>/g, "")
+    .replace(/<\|think\|>[\s\S]*$/g, "");
+}
+
+function sanitizeCheckInModelText(text: string): string {
+  return stripThinking(text)
     .replace(/\]\s*\[/g, " ")
     .replace(/[\[\]]/g, "")
     .replace(/[–—]/g, ",")
@@ -438,7 +444,7 @@ function sanitizeCheckInModelText(text: string): string {
 }
 
 function sanitizeVoiceTestText(text: string): string {
-  return text
+  return stripThinking(text)
     .replace(/\]\s*\[/g, " ")
     .replace(/[\[\]{}]/g, "")
     .replace(/[–—]/g, ",")

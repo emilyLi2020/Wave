@@ -14,3 +14,10 @@ __pycache__/
 .venv/
 models/runs/
 models/unsloth_compiled_cache/
+
+# Local symlinks into models/runs/ — re-create per-machine after running
+# the export pipeline. See docs/onnx-windows-handoff.md.
+client/public/mlc-export
+client/public/mlc-base-export
+client/public/onnx-finetune-export
+

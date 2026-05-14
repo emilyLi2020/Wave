@@ -1,6 +1,6 @@
 # MLC Build Postmortem: Gemma 4 E2B Fine-tune → WebGPU WASM
 
-> Companion to [`ONNX_EXPORT_POSTMORTEM.md`](ONNX_EXPORT_POSTMORTEM.md). After the ONNX path landed us at ~7 GB total (4× upstream's 1.5 GB decoder due to PLE tables), we switched to MLC-LLM's compile pipeline against [PR #3485](https://github.com/mlc-ai/mlc-llm/pull/3485) (Gemma 4 E2B text-only support) + [relax PR #346](https://github.com/mlc-ai/relax/pull/346) (TVM-side companion).
+> Companion to [`onnx-export.md`](./onnx-export.md). After the ONNX path landed us at ~7 GB total (4× upstream's 1.5 GB decoder due to PLE tables), we switched to MLC-LLM's compile pipeline against [PR #3485](https://github.com/mlc-ai/mlc-llm/pull/3485) (Gemma 4 E2B text-only support) + [relax PR #346](https://github.com/mlc-ai/relax/pull/346) (TVM-side companion).
 >
 > End state: **2.5 GB total bundle, q4f16_1 quantized with PLE tables packed**. Comparable to upstream and architecturally tuned for WebGPU.
 
@@ -145,7 +145,7 @@ Compile time for mlc-llm bindings: ~5–10 min on Apple Silicon. The 176-target 
 
 ## 6. Build script wrapping all of the above
 
-Captured in [`models/runs/bench/build_mlc.sh`](runs/bench/build_mlc.sh) (gitignored — lives under `models/runs/`). Idempotent: re-running picks up incremental cmake state and skips already-fetched submodules.
+Captured in [`models/runs/bench/build_mlc.sh`](../../models/runs/bench/build_mlc.sh) (gitignored — lives under `models/runs/`). Idempotent: re-running picks up incremental cmake state and skips already-fetched submodules.
 
 ---
 
@@ -256,7 +256,7 @@ Compare to ONNX bundle: 7 GB. **Net win: 4.5 GB smaller while preserving the fin
 
 ## 10. Browser-side wiring
 
-Done in [`client/app/training/mlc-test/`](../client/app/training/mlc-test/) (page + client component) using `@mlc-ai/web-llm@^0.2.83`:
+Done in [`client/app/training/mlc-test/`](../../client/app/training/mlc-test/) (page + client component) using `@mlc-ai/web-llm@^0.2.83`:
 
 ```ts
 const MLC_APP_CONFIG: AppConfig = {
@@ -320,11 +320,11 @@ The `prefill_chunk_size: 8192` is the largest single matmul during inference. We
 
 ## File references
 
-- This document: [`models/MLC_BUILD_POSTMORTEM.md`](MLC_BUILD_POSTMORTEM.md)
-- Companion ONNX postmortem: [`models/ONNX_EXPORT_POSTMORTEM.md`](ONNX_EXPORT_POSTMORTEM.md)
-- Build helper script: [`models/runs/bench/build_mlc.sh`](runs/bench/build_mlc.sh) (gitignored)
-- Test page: [`client/app/training/mlc-test/page.tsx`](../client/app/training/mlc-test/page.tsx)
-- Test client: [`client/app/training/mlc-test/mlc-test-client.tsx`](../client/app/training/mlc-test/mlc-test-client.tsx)
+- This document: [`docs/postmortems/mlc-build.md`](./mlc-build.md)
+- Companion ONNX postmortem: [`docs/postmortems/onnx-export.md`](./onnx-export.md)
+- Build helper script: [`models/runs/bench/build_mlc.sh`](../../models/runs/bench/build_mlc.sh) (gitignored)
+- Test page: [`client/app/training/mlc-test/page.tsx`](../../client/app/training/mlc-test/page.tsx)
+- Test client: [`client/app/training/mlc-test/mlc-test-client.tsx`](../../client/app/training/mlc-test/mlc-test-client.tsx)
 - Workspace (not in repo): `/tmp/mlc-workspace/`
 - Compiled export (gitignored): `models/runs/mlc-export/`
 - mlc-llm PR: <https://github.com/mlc-ai/mlc-llm/pull/3485>

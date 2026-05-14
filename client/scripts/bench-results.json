@@ -1,0 +1,44 @@
+{
+  "upstream-base": {
+    "loadMs": 1414.158458,
+    "trials": [
+      {
+        "prompt": "anxiety_short",
+        "output": "Try the 5-4-3-2-1 technique:\n\n* **Acknowledge 5 things you see.**\n* **Acknowledge 4 things you can touch.**\n* **Acknowledge 3 things you hear.**\n* **Acknowledge 2 things you can smell.**\n* **Acknowledge 1 thing you can taste.**\n\nThis exercise",
+        "prefillMs": 0,
+        "decodeMs": 4304.991083999999,
+        "tokensGenerated": 61,
+        "tokensPerSecond": 14.169599613507588
+      },
+      {
+        "prompt": "breathing_guide",
+        "output": "Here's a 30-second breathing exercise you can try:\n\n1. **Find a comfortable spot:** Sit or lie down in a way that feels relaxed.\n2. **Close your eyes:** Gently close your eyes to minimize distractions.\n3. **Inhale slowly:** Breathe in deeply through your nose for a count of 4. Feel your belly expand.\n4.",
+        "prefillMs": 0,
+        "decodeMs": 4315.729375,
+        "tokensGenerated": 76,
+        "tokensPerSecond": 17.61000132219829
+      },
+      {
+        "prompt": "factual",
+        "output": "The capital of France is Paris.",
+        "prefillMs": 0,
+        "decodeMs": 658.4069170000002,
+        "tokensGenerated": 8,
+        "tokensPerSecond": 12.150540635951424
+      },
+      {
+        "prompt": "haiku",
+        "output": "Blue water crashes in,\nFoam spills on the sandy shore,\nRhythm of the tide.",
+        "prefillMs": 0,
+        "decodeMs": 1261.449458000001,
+        "tokensGenerated": 19,
+        "tokensPerSecond": 15.0620382604342
+      }
+    ]
+  },
+  "ours-finetuned": {
+    "loadMs": 39.278707999999824,
+    "trials": [],
+    "loadError": "Load model from /Users/bill.zhang/Github/Wave/models/runs/onnx-export-v2/onnx/decoder_model_merged_q4f16.onnx failed:Invalid model. Node input 'lm_head.weight' is not a graph input, initializer, or output of a previous node."
+  }
+}

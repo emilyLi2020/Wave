@@ -42,12 +42,13 @@ gitignored.
 Three models run in the browser alongside each other: Whisper (STT), Gemma 4 E2B (LLM), Kokoro (TTS). The web runtime is `@huggingface/transformers` v3 (transformers.js) on WebGPU. Optimizations are ranked by impact.
 
 ### High impact
-- **Strip vision + audio encoders.** Gemma 4 E2B ships a ~150M vision encoder and ~300M audio encoder. We are text-only — load only the text path from `onnx-community/gemma-4-E2B-it-ONNX`. Saves ~450M of weights and GPU memory.
+- **Encoder stripping happens at export time, not runtime.** The client loads from `Maelstrome/lora-wave-session-r32-onnx`, a text-only q4f16 export of our fine-tuned Gemma 4 E2B. Produced by `models/export_text_onnx.py` from the merged-16bit safetensors. The repo contains only `decoder_model_merged_q4f16.onnx` + `embed_tokens_q4f16.onnx` — no vision or audio encoder weights to download (~270 MB saved vs the upstream multimodal ONNX repo).
 - **Use the `q4f16` ONNX variant** with the WebGPU `shader-f16` feature enabled. INT4 weights + f16 math is the WebGPU sweet spot. Feature-detect `shader-f16` and fall back to `q4` only if unavailable.
 - **Pre-warm at app load** with a dummy 1-token generate behind a loading splash. First call pays shader compile + weight upload (2–8s on iPhone Safari); after warmup TTFT drops to a few hundred ms. Never unload mid-session.
 - **Stream tokens into Kokoro at the first sentence boundary** (`.`/`?`/`!`, or ~15 tokens, whichever first). Perceived latency is gated by TTS start, not full LLM completion.
 - **Prefix-cache the system prompt.** Reuse the cached prefix across turns. Every 100 prompt tokens is ~200–500ms of mobile prefill.
 - **Kokoro runs at fp16 + WebGPU by default** (~165 MB vs ~330 MB at fp32, no perceptible quality loss). See `KOKORO_RUNTIME_OPTIONS` in `lib/voice/types.ts` for q8/q4f16/q4 experimental options. q4 has audible artifacts on prosody — don't ship it as default for the meditation voice.
+- **Defensive `<|think|>` filter** runs on every Gemma generation (`stripThinking` in `lib/gemma/local-runtime.ts`). The fine-tune's chat template defaults `enable_thinking=false`, but training data may have contained reasoning traces, so the client strips any stray `<|think|>...</|think|>` blocks before they reach the UI or TTS.
 
 ### Medium impact
 - **Keep context tight (<512 tokens) to stay in Gemma 4's local sliding-window path.** The 128K context is irrelevant for voice turns and costs KV cache memory. Don't ship long histories.

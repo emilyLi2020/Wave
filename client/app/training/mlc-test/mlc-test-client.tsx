@@ -26,6 +26,7 @@ const MLC_APP_CONFIG: AppConfig = {
             ).toString(),
       overrides: {
         context_window_size: 4096,
+        sliding_window_size: -1,
       },
     },
   ],

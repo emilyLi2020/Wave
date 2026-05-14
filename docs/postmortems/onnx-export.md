@@ -8,7 +8,7 @@
 
 ## 1. Why hand-rolled in the first place
 
-The natural path for HF → ONNX is `optimum-cli export onnx`. We hit a documented blocker on the very first try, captured in [`models/successful_runs/local_final/REPORT.md`](successful_runs/local_final/REPORT.md) lines 296–305:
+The natural path for HF → ONNX is `optimum-cli export onnx`. We hit a documented blocker on the very first try, captured in [`models/successful_runs/local_final/REPORT.md`](../../models/successful_runs/local_final/REPORT.md) lines 296–305:
 
 > ONNX (NOT exported in this run): Optimum 2.1.0 doesn't support Gemma 4 (transforms pinned to 4.57.6, doesn't recognize `model_type=gemma4`).
 
@@ -19,7 +19,7 @@ The realistic alternatives the report flagged:
 2. Use `transformers.js`'s `scripts/convert.py` — relies on Optimum internally, same blocker
 3. Hand-roll `torch.onnx.export` against `Gemma4TextForCausalLM`, then quantize with `onnxruntime`
 
-We chose option 3. Script: [`models/export_text_onnx.py`](export_text_onnx.py).
+We chose option 3. Script: [`models/export_text_onnx.py`](../../models/export_text_onnx.py).
 
 ## 2. The iteration sequence
 
@@ -210,8 +210,8 @@ File a feature request linking the genai #2062 issue and the existence of `onnx-
 
 ## File references
 
-- Export script: [`models/export_text_onnx.py`](export_text_onnx.py)
-- Pyproject deps: [`models/pyproject.toml`](pyproject.toml)
-- Overnight automation log: [`models/runs/AUTOMATION_LOG.md`](runs/AUTOMATION_LOG.md) (gitignored, local only)
-- Bench script: [`models/runs/bench/bench.ts`](runs/bench/bench.ts) (gitignored, local only)
-- Original LoRA REPORT.md noting the Optimum blocker: [`models/successful_runs/local_final/REPORT.md`](successful_runs/local_final/REPORT.md)
+- Export script: [`models/export_text_onnx.py`](../../models/export_text_onnx.py)
+- Pyproject deps: [`models/pyproject.toml`](../../models/pyproject.toml)
+- Overnight automation log: [`models/runs/AUTOMATION_LOG.md`](../../models/runs/AUTOMATION_LOG.md) (gitignored, local only)
+- Bench script: [`models/runs/bench/bench.ts`](../../models/runs/bench/bench.ts) (gitignored, local only)
+- Original LoRA REPORT.md noting the Optimum blocker: [`models/successful_runs/local_final/REPORT.md`](../../models/successful_runs/local_final/REPORT.md)
