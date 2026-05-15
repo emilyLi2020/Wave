@@ -210,14 +210,16 @@ export function CompareAllClient() {
 
   return (
     <div
-      style={{
-        padding: 24,
-        fontFamily: "system-ui, sans-serif",
-        maxWidth: 1400,
-      }}
+      className="mx-auto w-full max-w-6xl p-4 sm:p-6"
+      style={{ fontFamily: "system-ui, sans-serif" }}
     >
-      <h1>MLC PR #3485 — 3-way comparison</h1>
-      <p style={{ color: "#666", marginTop: 0 }}>
+      <h1 className="text-2xl font-semibold sm:text-3xl">
+        MLC PR #3485 — 3-way comparison
+      </h1>
+      <p
+        className="text-sm sm:text-base"
+        style={{ color: "#666", marginTop: 0 }}
+      >
         All three models use the <strong>same WASM build state</strong> (PR
         #3485 + relax PR #346, no patches), <strong>same prompts</strong>, same
         engine settings (<code>temperature=0, max_tokens=60</code>). Loads one
@@ -229,14 +231,7 @@ export function CompareAllClient() {
         )}
       </p>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 16,
-          marginTop: 24,
-        }}
-      >
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MODELS.map((spec) => (
           <div
             key={spec.key}
@@ -331,14 +326,14 @@ export function CompareAllClient() {
       {TEST_PROMPTS.some((p) =>
         MODELS.some((m) => results[m.key]?.some((r) => r.prompt === p)),
       ) && (
-        <div style={{ marginTop: 32 }}>
-          <h2 style={{ fontSize: 18 }}>Results</h2>
+        <div style={{ marginTop: 32 }} className="-mx-4 sm:mx-0 overflow-x-auto">
+          <h2 style={{ fontSize: 18 }} className="mx-4 sm:mx-0">Results</h2>
           <table
             style={{
               borderCollapse: "collapse",
-              width: "100%",
               fontSize: 13,
             }}
+            className="mt-2 w-full min-w-[720px]"
           >
             <thead>
               <tr>

@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import { assertModelsEnabled } from "@/lib/models/guard";
 
+import { MobileNav } from "./mobile-nav";
 import { SidebarLink } from "./sidebar-link";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export default function ModelsLayout({
   return (
     <div className="min-h-full bg-background">
       <header className="border-b border-border bg-surface">
-        <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:h-14 sm:flex-nowrap sm:gap-y-0 sm:px-6 sm:py-0">
           <Link
             href="/models"
             className="flex items-center gap-2 font-semibold tracking-tight"
@@ -34,30 +35,31 @@ export default function ModelsLayout({
               aria-hidden
               className="inline-block h-3 w-6 rounded-full bg-accent"
             />
-            <span>WAVE — model tests</span>
+            <span className="text-sm sm:text-base">WAVE — model tests</span>
           </Link>
-          <div className="flex items-center gap-4 text-xs text-foreground/60">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/60 sm:gap-4">
             <span className="rounded-full border border-warn/40 bg-warn-soft px-2 py-0.5 text-warn">
-              Internal · dev only
+              <span className="sm:hidden">dev</span>
+              <span className="hidden sm:inline">Internal · dev only</span>
             </span>
             <Link
               href="/training"
               className="text-foreground/60 hover:text-accent transition-colors"
             >
-              ↗ Training data
+              ↗ Training
             </Link>
             <Link
               href="/"
               className="text-foreground/60 hover:text-accent transition-colors"
             >
-              ↗ Patient app
+              ↗ App
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-6 py-8 grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="space-y-1">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8">
+        <MobileNav>
           <SidebarLink href="/models" label="Overview" />
 
           <div className="pt-6 pb-2 text-xs uppercase tracking-wide text-accent px-2">
@@ -108,9 +110,9 @@ export default function ModelsLayout({
             href="/models/onnx-test/compare"
             label="A/B · upstream vs fine-tune (historical)"
           />
-        </aside>
+        </MobileNav>
 
-        <section>{children}</section>
+        <section className="min-w-0">{children}</section>
       </div>
     </div>
   );

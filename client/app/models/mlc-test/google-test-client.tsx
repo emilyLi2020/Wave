@@ -105,13 +105,19 @@ export function GoogleTestClient() {
   }, []);
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", maxWidth: 900 }}>
-      <h1>google/gemma-4-E2B-it Diagnostic (official upstream, no fine-tune)</h1>
-      <p style={{ color: "#666" }}>
-        Tests <code>{MODEL_ID}</code> from <code>/mlc-google-it-export/</code>. If
-        outputs here are coherent but our fine-tune isn't, the LoRA training has
-        a subtle issue. If outputs here also break, PR #3485 itself has bugs
-        independent of any custom weights.{" "}
+    <div
+      className="mx-auto w-full max-w-3xl p-4 sm:p-6"
+      style={{ fontFamily: "system-ui, sans-serif" }}
+    >
+      <h1 className="text-2xl font-semibold sm:text-3xl">
+        google/gemma-4-E2B-it Diagnostic (official upstream, no fine-tune)
+      </h1>
+      <p style={{ color: "#666" }} className="text-sm sm:text-base break-words">
+        Tests <code className="break-all">{MODEL_ID}</code> from{" "}
+        <code>/mlc-google-it-export/</code>. If outputs here are coherent but
+        our fine-tune isn't, the LoRA training has a subtle issue. If outputs
+        here also break, PR #3485 itself has bugs independent of any custom
+        weights.{" "}
         {hasWebGPU ? (
           <span style={{ color: "green" }}>✅ WebGPU</span>
         ) : (
@@ -119,7 +125,7 @@ export function GoogleTestClient() {
         )}
       </p>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="mt-4 flex flex-wrap gap-2">
         <button
           onClick={load}
           disabled={phase === "loading" || phase === "ready" || phase === "generating"}
@@ -130,7 +136,7 @@ export function GoogleTestClient() {
         <button
           onClick={runTrials}
           disabled={phase !== "ready"}
-          style={{ padding: "8px 16px", fontSize: 16, marginLeft: 8 }}
+          style={{ padding: "8px 16px", fontSize: 16 }}
         >
           2. Run diagnostic prompts
         </button>

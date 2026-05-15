@@ -277,14 +277,22 @@ export function CompareClient() {
   }, [runMlcTrial, runOnnxTrial]);
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", maxWidth: 1200 }}>
-      <h1>Runtime Comparison — ONNX (upstream base) vs MLC (our fine-tune)</h1>
-      <p style={{ color: "#666" }}>
+    <div
+      className="mx-auto w-full max-w-5xl p-4 sm:p-6"
+      style={{ fontFamily: "system-ui, sans-serif" }}
+    >
+      <h1 className="text-2xl font-semibold sm:text-3xl">
+        Runtime Comparison — ONNX (upstream base) vs MLC (our fine-tune)
+      </h1>
+      <p style={{ color: "#666" }} className="text-sm sm:text-base">
         Same prompts, same temperature, same max_tokens. Load both engines, then
         run prompts to compare TTFT, tok/s, and output quality side-by-side.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+      <div
+        className="mt-4 grid gap-4 sm:grid-cols-2"
+        style={{ marginTop: 16 }}
+      >
         <RuntimeCard
           title="ONNX upstream base"
           subtitle="onnx-community/gemma-4-E2B-it-ONNX via @huggingface/transformers"
@@ -401,7 +409,7 @@ function ResultsTable({ trials }: { trials: Trial[] }) {
           style={{ border: "1px solid #ddd", borderRadius: 6, padding: 12, marginTop: 12 }}
         >
           <div style={{ fontWeight: 500, marginBottom: 8 }}>{prompt}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid gap-3 sm:grid-cols-2">
             {group.map((t, i) => (
               <div
                 key={i}

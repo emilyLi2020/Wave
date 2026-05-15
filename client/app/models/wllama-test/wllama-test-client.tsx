@@ -111,6 +111,7 @@ export function WllamaTestClient() {
   const [localHost, setLocalHost] = useState<string>(LOCAL_GGUF_HOST);
   const [useLocal, setUseLocal] = useState<boolean>(false);
   const [nCtx, setNCtx] = useState<number>(WAVE_GGUF_DEFAULT_N_CTX);
+  const [forceWasm, setForceWasm] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -123,6 +124,7 @@ export function WllamaTestClient() {
       const parsed = Number.parseInt(c, 10);
       if (Number.isFinite(parsed) && parsed > 0) setNCtx(parsed);
     }
+    if (params.get("wasm") === "1") setForceWasm(true);
   }, []);
 
   const loadModel = useCallback(async () => {
@@ -131,9 +133,10 @@ export function WllamaTestClient() {
       useLocalMirror: useLocal,
       localHost,
     });
+    const backendLabel = forceWasm ? "WASM" : "WebGPU";
     setLoad({
       phase: "loading",
-      message: `Loading ${sourceLabel} (n_ctx=${nCtx})…`,
+      message: `Loading ${sourceLabel} (n_ctx=${nCtx}, ${backendLabel})…`,
       percent: 0,
     });
     try {
@@ -141,10 +144,11 @@ export function WllamaTestClient() {
         nCtx,
         useLocalMirror: useLocal,
         localHost,
+        nGpuLayers: forceWasm ? 0 : undefined,
         onProgress: ({ percent }) => {
           setLoad({
             phase: "loading",
-            message: `Downloading ${sourceLabel} ${percent}% (n_ctx=${nCtx})`,
+            message: `Downloading ${sourceLabel} ${percent}% (n_ctx=${nCtx}, ${backendLabel})`,
             percent,
           });
         },
@@ -162,7 +166,7 @@ export function WllamaTestClient() {
         percent: 0,
       });
     }
-  }, [useLocal, localHost, nCtx, load.phase]);
+  }, [useLocal, localHost, nCtx, forceWasm, load.phase]);
 
   const runTask = useCallback(
     async (
@@ -267,30 +271,31 @@ export function WllamaTestClient() {
   const canRun = load.phase === "ready" && running === null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-8">
+    <div className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:space-y-8 sm:p-6 lg:p-8">
       <header>
         <p className="text-xs uppercase tracking-wide text-foreground/50">
           Browser-runtime GGUF · wllama
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
           WAVE fine-tune via @wllama/wllama (GGUF)
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-foreground/70 leading-relaxed">
-          Loads <code className="font-mono">gemma-4-e2b-it-peft.Q4_K_M</code>{" "}
+          Loads <code className="font-mono break-all">gemma-4-e2b-it-peft.Q4_K_M</code>{" "}
           (5-part split, ~3.2 GB total) via wllama's WebGPU/WASM runtime.
           Bypasses onnxruntime-web's WebGPU fp16 overflow bug entirely.
         </p>
       </header>
 
-      <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-        Loads <code>{WAVE_GGUF_REPO}</code> / <code>{WAVE_GGUF_FILE}</code> from
-        HF (~3.2 GB in 5 shards). First load cached by the browser's
-        CacheStorage. Append <code>?local=1</code> to fetch from a local-hf
-        mirror at <code>{localHost}</code> instead (faster iteration when
-        working on the GGUF).
+      <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900 break-words">
+        Loads <code className="break-all">{WAVE_GGUF_REPO}</code> /{" "}
+        <code className="break-all">{WAVE_GGUF_FILE}</code> from HF (~3.2 GB in
+        5 shards). First load cached by the browser's CacheStorage. Append{" "}
+        <code>?local=1</code> to fetch from a local-hf mirror at{" "}
+        <code className="break-all">{localHost}</code> instead (faster iteration
+        when working on the GGUF).
       </div>
 
-      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 break-words">
         <strong>Heads up:</strong> &quot;Run all 3 tasks&quot; runs back-to-back
         on one wllama session. Without the{" "}
         <code>swa_full: true</code> load param (set in{" "}
@@ -310,8 +315,8 @@ export function WllamaTestClient() {
         rebuild at a cost of ~250 MiB extra KV memory.
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface p-5">
-        <div className="flex items-baseline justify-between gap-2">
+      <div className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="font-semibold tracking-tight" style={{ color: "#10b981" }}>
             Fine-tune (PEFT-merged Q4_K_M GGUF)
           </h3>
@@ -323,6 +328,20 @@ export function WllamaTestClient() {
           {describeWaveWllamaSource({ useLocalMirror: useLocal, localHost })}
         </p>
         <p className="mt-3 text-xs text-foreground/70">{load.message}</p>
+        <label className="mt-3 flex items-center gap-2 text-xs text-foreground/70">
+          <input
+            type="checkbox"
+            checked={forceWasm}
+            disabled={load.phase === "loading" || load.phase === "ready"}
+            onChange={(e) => setForceWasm(e.target.checked)}
+          />
+          <span>
+            Force WASM backend (disable WebGPU). Use this if you hit{" "}
+            <code className="text-[11px]">SET_ROWS</code> aborts on Gemma —
+            wllama 3.1.1&apos;s WebGPU backend doesn&apos;t implement that op for
+            the iSWA KV cache that <code>swa_full: true</code> activates.
+          </span>
+        </label>
         <button
           type="button"
           disabled={load.phase === "loading" || load.phase === "ready"}
@@ -375,10 +394,10 @@ export function WllamaTestClient() {
         return (
           <section
             key={key}
-            className="rounded-2xl border border-border bg-surface-muted/30 p-5"
+            className="rounded-2xl border border-border bg-surface-muted/30 p-4 sm:p-5"
           >
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">{key}</h2>
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h2 className="text-base font-semibold tracking-tight sm:text-lg">{key}</h2>
               <span className="text-[11px] text-foreground/55">
                 {r.elapsedMs.toFixed(0)} ms · {r.tokensPerSecond.toFixed(1)} tok/s
               </span>

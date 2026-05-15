@@ -101,23 +101,23 @@ export default function ModelsOverviewPage() {
   assertModelsEnabled();
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 sm:space-y-10">
       <div>
         <p className="text-xs uppercase tracking-wide text-foreground/50">
           Browser-runtime test pages
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
           Model tests.
         </h1>
-        <p className="mt-3 max-w-2xl text-foreground/70 leading-relaxed">
+        <p className="mt-3 max-w-2xl text-sm text-foreground/70 leading-relaxed sm:text-base">
           Dev-only pages that load model runtimes in the browser to validate
           correctness, compare backends, and measure latency. Separate from{" "}
           <Link href="/training" className="text-accent hover:underline">
             /training
           </Link>{" "}
           (training data collection). All pages here render their own chrome and
-          require <code>NEXT_PUBLIC_MODELS_ENABLED=true</code> (or the older
-          training flag).
+          require <code className="break-all">NEXT_PUBLIC_MODELS_ENABLED=true</code>{" "}
+          (or the older training flag).
         </p>
       </div>
 
@@ -126,7 +126,7 @@ export default function ModelsOverviewPage() {
       <Section title="MLC runtime (PR #3485)" pages={MLC_PAGES} />
       <Section title="Voice loop" pages={VOICE_PAGES} />
 
-      <div className="rounded-2xl border border-border bg-surface-muted/40 p-6 text-sm text-foreground/70">
+      <div className="rounded-2xl border border-border bg-surface-muted/40 p-4 text-sm text-foreground/70 sm:p-6">
         <p>
           <strong>Heads up.</strong> These pages download large model assets
           (3–6 GB) and pin WebGPU memory. Reload between long sessions if your
@@ -140,19 +140,19 @@ export default function ModelsOverviewPage() {
 function Section({ title, pages }: { title: string; pages: TestPage[] }) {
   return (
     <div>
-      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h2>
       <ul className="mt-3 grid gap-3 md:grid-cols-2">
         {pages.map((p) => (
           <li
             key={p.href}
-            className={`rounded-2xl border bg-surface p-5 transition hover:border-accent/60 ${
+            className={`rounded-2xl border bg-surface p-4 transition hover:border-accent/60 sm:p-5 ${
               p.badge === "primary"
                 ? "border-accent/40 bg-accent-soft/20"
                 : "border-border"
             }`}
           >
             <Link href={p.href} className="block">
-              <div className="flex items-baseline justify-between gap-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-semibold hover:text-accent">{p.title}</h3>
                 {p.badge === "primary" ? (
                   <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-white">
@@ -166,7 +166,7 @@ function Section({ title, pages }: { title: string; pages: TestPage[] }) {
               <p className="mt-2 text-xs text-foreground/55 leading-relaxed">
                 {p.details}
               </p>
-              <p className="mt-3 text-xs font-mono text-foreground/50">
+              <p className="mt-3 break-all text-xs font-mono text-foreground/50">
                 {p.href}
               </p>
             </Link>

@@ -147,11 +147,16 @@ export function MlcTestClient() {
   }, []);
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", maxWidth: 900 }}>
-      <h1>MLC WebGPU Test — Fine-tuned Gemma 4 E2B</h1>
-      <p style={{ color: "#666" }}>
-        Loads <code>{MODEL_ID}</code> from <code>/mlc-export/</code> via
-        @mlc-ai/web-llm.{" "}
+    <div
+      className="mx-auto w-full max-w-3xl p-4 sm:p-6"
+      style={{ fontFamily: "system-ui, sans-serif" }}
+    >
+      <h1 className="text-2xl font-semibold sm:text-3xl">
+        MLC WebGPU Test — Fine-tuned Gemma 4 E2B
+      </h1>
+      <p style={{ color: "#666" }} className="text-sm sm:text-base break-words">
+        Loads <code className="break-all">{MODEL_ID}</code> from{" "}
+        <code>/mlc-export/</code> via @mlc-ai/web-llm.{" "}
         {hasWebGPU ? (
           <span style={{ color: "green" }}>✅ WebGPU available</span>
         ) : (
@@ -159,7 +164,7 @@ export function MlcTestClient() {
         )}
       </p>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="mt-4 flex flex-wrap gap-2">
         <button
           onClick={load}
           disabled={phase === "loading" || phase === "generating" || phase === "ready"}
@@ -170,7 +175,7 @@ export function MlcTestClient() {
         <button
           onClick={runTrials}
           disabled={phase !== "ready"}
-          style={{ padding: "8px 16px", fontSize: 16, marginLeft: 8 }}
+          style={{ padding: "8px 16px", fontSize: 16 }}
         >
           2. Run {TEST_PROMPTS.length} test prompts
         </button>
@@ -223,9 +228,12 @@ export function MlcTestClient() {
       )}
 
       {trials.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h3>Results summary</h3>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <div style={{ marginTop: 24 }} className="-mx-4 sm:mx-0 overflow-x-auto">
+          <h3 className="mx-4 sm:mx-0">Results summary</h3>
+          <table
+            style={{ borderCollapse: "collapse", fontSize: 13 }}
+            className="mt-2 w-full min-w-[640px]"
+          >
             <thead>
               <tr style={{ background: "#f0f0f0" }}>
                 <th style={{ textAlign: "left", padding: 6, border: "1px solid #ddd" }}>Prompt</th>

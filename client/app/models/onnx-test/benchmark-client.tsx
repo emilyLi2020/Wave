@@ -543,17 +543,18 @@ export function OnnxBenchmarkClient() {
 
   return (
     <div
+      className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8"
       style={{
-        padding: 32,
         fontFamily:
           "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        maxWidth: 1100,
-        margin: "0 auto",
         color: "#1f2937",
       }}
     >
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, fontSize: 26, letterSpacing: -0.3 }}>
+        <h1
+          className="text-2xl sm:text-[26px]"
+          style={{ margin: 0, letterSpacing: -0.3 }}
+        >
           Runtime benchmark · ONNX base vs wllama fine-tune
         </h1>
         <p style={{ color: "#6b7280", marginTop: 8, lineHeight: 1.5, fontSize: 14 }}>
@@ -601,12 +602,8 @@ export function OnnxBenchmarkClient() {
 
       {/* Runtime cards */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
-          marginBottom: 16,
-        }}
+        className="grid gap-4 sm:grid-cols-2"
+        style={{ marginBottom: 16 }}
       >
         <RuntimeCard
           runtime="onnx"
@@ -654,7 +651,7 @@ export function OnnxBenchmarkClient() {
         >
           Scenarios benchmarked each run
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {(Object.keys(SCENARIOS) as ScenarioKey[]).map((k) => {
             const s = SCENARIOS[k];
             return (
@@ -735,10 +732,8 @@ export function OnnxBenchmarkClient() {
 
       {/* Run button + status */}
       <div
+        className="flex flex-wrap items-center gap-3"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
           padding: 16,
           background: "#f9fafb",
           border: "1px solid #e5e7eb",
@@ -781,7 +776,10 @@ export function OnnxBenchmarkClient() {
         >
           Clear results
         </button>
-        <div style={{ marginLeft: "auto", color: "#6b7280", fontSize: 13 }}>
+        <div
+          className="sm:ml-auto"
+          style={{ color: "#6b7280", fontSize: 13 }}
+        >
           {results.length > 0
             ? `ONNX: ${onnxOk.length} ok · wllama: ${wllamaOk.length} ok`
             : "No runs yet."}
@@ -1075,16 +1073,15 @@ function ResultsView({ results }: { results: RunResult[] }) {
   return (
     <div>
       <div
+        className="grid gap-3 sm:grid-cols-[140px_1fr_1fr] lg:grid-cols-[180px_1fr_1fr]"
         style={{
-          display: "grid",
-          gridTemplateColumns: "180px 1fr 1fr",
-          gap: 12,
           marginBottom: 16,
           alignItems: "stretch",
         }}
       >
-        <div /> {/* corner */}
+        <div className="hidden sm:block" /> {/* corner */}
         <div
+          className="hidden sm:block"
           style={{
             fontSize: 12,
             fontWeight: 600,
@@ -1097,6 +1094,7 @@ function ResultsView({ results }: { results: RunResult[] }) {
           ONNX (base)
         </div>
         <div
+          className="hidden sm:block"
           style={{
             fontSize: 12,
             fontWeight: 600,
@@ -1124,14 +1122,17 @@ function ResultsView({ results }: { results: RunResult[] }) {
 
       {/* Per-turn detail table */}
       <div
+        className="overflow-x-auto"
         style={{
           border: "1px solid #e5e7eb",
           borderRadius: 8,
-          overflow: "hidden",
           background: "white",
         }}
       >
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <table
+          className="min-w-[720px]"
+          style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
+        >
           <thead style={{ background: "#f9fafb" }}>
             <tr>
               <Th>Runtime</Th>
@@ -1214,6 +1215,7 @@ function ResultsView({ results }: { results: RunResult[] }) {
                   }}
                 >
                   <div
+                    className="break-words"
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
@@ -1227,7 +1229,10 @@ function ResultsView({ results }: { results: RunResult[] }) {
                     · turn {r.turnIndex}/{r.totalTurns} · {r.tokenCount} tok ·{" "}
                     {fmtTps(r.decodeTokensPerSec)}
                   </div>
-                  <div style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                  <div
+                    className="break-words"
+                    style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.5 }}
+                  >
                     {r.output}
                   </div>
                 </div>
@@ -1299,6 +1304,19 @@ function SummaryBox({ runtime, rows }: { runtime: RuntimeKey; rows: RunResult[] 
         borderRadius: 8,
       }}
     >
+      <div
+        className="sm:hidden"
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: meta.color,
+          textTransform: "uppercase",
+          letterSpacing: 0.4,
+          marginBottom: 6,
+        }}
+      >
+        {runtime === "onnx" ? "ONNX (base)" : "wllama (fine-tune)"}
+      </div>
       {rows.length === 0 ? (
         <div style={{ fontSize: 12, color: "#9ca3af" }}>No runs yet.</div>
       ) : (

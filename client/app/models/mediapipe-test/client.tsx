@@ -222,12 +222,12 @@ export function MediaPipeTestClient() {
   void MAX_TOKENS_BY_TASK; // (informational; MediaPipe uses maxTokens from createFromOptions, not per-call)
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:space-y-8 sm:p-6 lg:p-8">
       <header>
         <p className="text-xs uppercase tracking-wide text-foreground/50">
           MediaPipe LLM Inference (WebGPU, LiteRT runtime)
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
           MediaPipe · base Gemma 4 E2B (WAVE prompts)
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-foreground/70 leading-relaxed">
@@ -246,7 +246,7 @@ export function MediaPipeTestClient() {
         </p>
       </header>
 
-      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 break-words">
         <strong>This is the base model.</strong> MediaPipe does not yet have a
         public Gemma 4 PEFT-merged conversion path. We are validating only the
         runtime here; the fine-tune cannot ship through this path until Google
@@ -260,8 +260,8 @@ export function MediaPipeTestClient() {
         ).
       </div>
 
-      <section className="rounded-2xl border border-border bg-surface p-5">
-        <div className="flex items-baseline justify-between gap-2">
+      <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="font-semibold tracking-tight">Model</h3>
           <span className="text-[10px] uppercase tracking-wide text-foreground/50">
             {load.phase}
@@ -329,9 +329,9 @@ export function MediaPipeTestClient() {
 
 function TaskOutput({ label, result }: { label: TaskKey; result?: TaskResult }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface-muted/30 p-5">
+    <section className="rounded-2xl border border-border bg-surface-muted/30 p-4 sm:p-5">
       <div className="mb-3">
-        <h2 className="text-lg font-semibold tracking-tight capitalize">{label}</h2>
+        <h2 className="text-base font-semibold tracking-tight capitalize sm:text-lg">{label}</h2>
       </div>
       {result === undefined ? (
         <p className="text-xs italic text-foreground/45">Not run yet.</p>

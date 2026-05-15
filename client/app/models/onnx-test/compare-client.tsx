@@ -463,12 +463,12 @@ export function OnnxCompareClient() {
   const canRun = activeSlot !== null && !busy && running === null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:space-y-8 sm:p-6 lg:p-8">
       <header>
         <p className="text-xs uppercase tracking-wide text-foreground/50">
           Browser-runtime task comparison
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
           ONNX A/B · production tasks
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-foreground/70 leading-relaxed">
@@ -482,7 +482,7 @@ export function OnnxCompareClient() {
         </p>
       </header>
 
-      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 break-words">
         <strong>Backend = WebGPU only.</strong> Both models use{" "}
         <code>com.microsoft.GatherBlockQuantized</code> for the int4 embed/PLE
         tables, and onnxruntime-web has no CPU kernel for it — the WASM path
@@ -494,7 +494,7 @@ export function OnnxCompareClient() {
       </div>
 
       {useLocal.current.enabled ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900 break-words">
           <strong>?local=1 active.</strong> Fine-tune column will fetch from{" "}
           <code>{useLocal.current.host}</code> instead of huggingface.co.
           Start the server first: <code>cd client && pnpm exec tsx scripts/serve-local-hf.ts</code>.
@@ -617,8 +617,8 @@ function RuntimeCard({
           : "Load";
 
   return (
-    <div className={`rounded-2xl border bg-surface p-5 ${borderClass}`}>
-      <div className="flex items-baseline justify-between gap-2">
+    <div className={`rounded-2xl border bg-surface p-4 sm:p-5 ${borderClass}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3
           className="font-semibold tracking-tight"
           style={{ color: meta.accent }}
@@ -661,10 +661,10 @@ function TaskRow<T>({
   renderResult,
 }: TaskRowProps<T>) {
   return (
-    <section className="rounded-2xl border border-border bg-surface-muted/30 p-5">
+    <section className="rounded-2xl border border-border bg-surface-muted/30 p-4 sm:p-5">
       <div className="mb-3">
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-1 text-xs text-foreground/55">{description}</p>
+        <h2 className="text-base font-semibold tracking-tight sm:text-lg">{title}</h2>
+        <p className="mt-1 text-xs leading-relaxed text-foreground/55">{description}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Column slot="upstream" result={upstream} renderResult={renderResult} />

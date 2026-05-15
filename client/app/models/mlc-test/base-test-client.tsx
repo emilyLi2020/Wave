@@ -103,13 +103,18 @@ export function BaseTestClient() {
   }, []);
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", maxWidth: 900 }}>
-      <h1>BASE Gemma 4 E2B Diagnostic (no fine-tune)</h1>
-      <p style={{ color: "#666" }}>
-        Tests <code>{MODEL_ID}</code> from <code>/mlc-base-export/</code>. If
-        outputs here are coherent, PR #3485 works fine and our fine-tune merge
-        is at fault. If outputs here are gibberish, PR #3485 has the numerical
-        bug.{" "}
+    <div
+      className="mx-auto w-full max-w-3xl p-4 sm:p-6"
+      style={{ fontFamily: "system-ui, sans-serif" }}
+    >
+      <h1 className="text-2xl font-semibold sm:text-3xl">
+        BASE Gemma 4 E2B Diagnostic (no fine-tune)
+      </h1>
+      <p style={{ color: "#666" }} className="text-sm sm:text-base break-words">
+        Tests <code className="break-all">{MODEL_ID}</code> from{" "}
+        <code>/mlc-base-export/</code>. If outputs here are coherent, PR #3485
+        works fine and our fine-tune merge is at fault. If outputs here are
+        gibberish, PR #3485 has the numerical bug.{" "}
         {hasWebGPU ? (
           <span style={{ color: "green" }}>✅ WebGPU</span>
         ) : (
@@ -117,7 +122,7 @@ export function BaseTestClient() {
         )}
       </p>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="mt-4 flex flex-wrap gap-2">
         <button
           onClick={load}
           disabled={phase === "loading" || phase === "ready" || phase === "generating"}
@@ -128,7 +133,7 @@ export function BaseTestClient() {
         <button
           onClick={runTrials}
           disabled={phase !== "ready"}
-          style={{ padding: "8px 16px", fontSize: 16, marginLeft: 8 }}
+          style={{ padding: "8px 16px", fontSize: 16 }}
         >
           2. Run diagnostic prompts
         </button>

@@ -1324,14 +1324,14 @@ export function VoiceTestClient() {
   submitVadAudioTurnRef.current = submitVadAudioTurn;
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm">
+    <div className="space-y-6 sm:space-y-8">
+      <section className="rounded-3xl border border-border bg-surface p-4 shadow-sm sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-foreground/50">
               Developer-only voice loop
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
               On-device mock check-in test
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/70">
@@ -1361,11 +1361,11 @@ export function VoiceTestClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="rounded-3xl border border-border bg-surface p-6">
+      <section className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 rounded-3xl border border-border bg-surface p-4 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">
+              <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
                 Conversation
               </h2>
               <p className="mt-1 text-sm text-foreground/60">
@@ -1675,7 +1675,7 @@ function MockCheckInCard() {
             medication, trigger, prior chunk, and next phase as prompt context.
           </p>
         </div>
-        <div className="grid min-w-64 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-2 text-xs sm:min-w-64 sm:grid-cols-2 lg:grid-cols-1">
           <DebugRow
             label="Intake"
             value={`${mock.intakeIntensity}/10, current about ${mock.currentScore}/10`}
@@ -1776,7 +1776,7 @@ function ConfigPanel({
   onBargeInChange: (enabled: boolean) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-border bg-surface p-5">
+    <section className="rounded-3xl border border-border bg-surface p-4 sm:p-5">
       <h2 className="font-semibold">Stack settings</h2>
       <label className="mt-4 block text-sm font-medium">
         Whisper model
@@ -1962,7 +1962,7 @@ function RuntimePanel({
   metrics: LastRunMetrics;
 }) {
   return (
-    <section className="rounded-3xl border border-border bg-surface p-5">
+    <section className="rounded-3xl border border-border bg-surface p-4 sm:p-5">
       <h2 className="font-semibold">Runtime debug</h2>
       <dl className="mt-4 space-y-3 text-sm">
         <DebugRow label="Gemma" value={`${gemmaState.phase} / ${gemmaState.device ?? "unknown"}`} />
