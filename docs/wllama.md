@@ -81,6 +81,30 @@ After v7, the remaining divergence vs upstream (`onnx-community/gemma-4-E2B-it-O
 
 wllama doesn't use `onnxruntime-web` at all. It compiles llama.cpp's WebGPU kernels via Emscripten and ships its own runtime. llama.cpp's Gemma 4 path has been first-class since launch ([blog post](https://huggingface.co/blog/gemma4)), supports the full chat template, and runs the same Q4_K_M GGUF that's used by Ollama, LM Studio, and `llama-cli` — so the browser path inherits whatever correctness those non-browser paths have.
 
+## Runtime performance — measured
+
+Captured on Windows 11 / Chrome / NVIDIA Blackwell discrete GPU via [`/models/onnx-test/benchmark`](../client/app/models/onnx-test/benchmark-client.tsx) (3 runs per scenario, temperature 0, greedy decode). Both runtimes confirmed on WebGPU — `navigator.gpu.requestAdapter` returns a real adapter for both, and ORT logs the same adapter-init warning that wllama does. So this is an apples-to-apples WebGPU comparison, not a "ONNX on CPU vs wllama on GPU" comparison.
+
+| Scenario | Metric | ONNX base (q4f16) | wllama fine-tune (Q4_K_M) | wllama advantage |
+|---|---|---|---|---|
+| Phase narration | Decode | 6.8 tok/s | 38.5 tok/s | **5.7×** |
+| Phase narration | TTFT | 203 ms | 276 ms | ONNX +73 ms |
+| Phase narration | Total (~65 tok) | 9.45 s | 2.02 s | **4.7×** |
+| Check-in (multi-turn) | Decode | 6.6 tok/s | 40.3 tok/s | **6.1×** |
+| Check-in | TTFT | 295 ms | 276 ms | wllama +19 ms |
+| Check-in | Total per turn (~85 tok) | 14.67 s | 2.21 s | **6.6×** |
+| Reflection | Decode | 6.5 tok/s | 36.8 tok/s | **5.7×** |
+| Reflection | TTFT | 237 ms | 299 ms | ONNX +62 ms |
+| Reflection | Total (200 tok cap) | 30.71 s | 4.55 s | **6.7×** |
+
+**Decode is the bottleneck for ONNX.** Prefill (TTFT) is roughly tied — within ~70ms either way. But ONNX decode is pinned at ~6.6 tok/s across every scenario, regardless of context length, which is the giveaway that the limit is per-token dispatch overhead, not prefill or model size.
+
+**GPU utilization tells the story:** at 6.6 tok/s, ORT pegs the GPU at ~10% utilization while CPU works hard. wllama at 38 tok/s saturates the GPU. Same hardware, same Gemma 4 E2B at q4 quantization — totally different dispatch pattern.
+
+Why: onnxruntime-web uses **JSEP** (JavaScript Execution Provider) to deliver WebGPU. JSEP dispatches each ONNX op from WASM to WebGPU individually with a sync barrier between them. Gemma 4 decode is hundreds of small ops per token (RMSNorm, MatMulNBits, RoPE, attention, gates), so the GPU spends most of its time idle waiting for the next op from the WASM module. llama.cpp's WebGPU backend (in wllama) fuses these into bigger compute shaders that do more work per dispatch and keep the GPU fed continuously.
+
+This is a structural ORT-web limitation, not something we can fix from the application side without rewriting the runtime. Even if the fp16 correctness bug ([`docs/onnx-webgpu-divergence.md`](onnx-webgpu-divergence.md)) were resolved, this 6× throughput gap would remain.
+
 ## How `?local=1` works
 
 The test page defaults to HF, so it works without any local infrastructure. For fast iteration on the GGUF itself:
