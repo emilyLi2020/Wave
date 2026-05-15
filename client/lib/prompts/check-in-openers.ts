@@ -3,10 +3,10 @@
  *
  * NO LONGER THE RUNTIME SOURCE OF TRUTH.
  *
- * As of the LLM-driven check-in rewrite, the live `<CheckInChat />`
+ * As of the LLM-driven check-in rewrite, the live `<VoiceCheckIn />`
  * surface lets the LLM produce every agent turn — there are no
  * scripted openers in the live chat. Readiness is now signaled by
- * the model's `endConversation` tool call, not a regex match against
+ * the model's `endConversation` signal, not a regex match against
  * Turn 5.
  *
  * This file remains as the canonical phrasing the scripted fallback
@@ -16,7 +16,7 @@
  * equivalent so a fallback session reads the same as a live one.
  *
  * @deprecated for runtime use by the live chat surface. Importing
- * `CHECK_IN_OPENERS` from `<CheckInChat />` is a bug. Fallback paths
+ * `CHECK_IN_OPENERS` from `<VoiceCheckIn />` is a bug. Fallback paths
  * and Synthetix scaffolding may still consume these.
  */
 
