@@ -6,7 +6,7 @@
  * card shown after check-in 5.
  */
 
-import { generateGemmaReflection } from "@/lib/gemma/local-runtime";
+import { generateWllamaReflection as generateGemmaReflection } from "@/lib/gemma/wllama-generators";
 import { fallbackReflection } from "@/lib/prompts/fallback-bank";
 import {
   reflectionPayloadSchema,

@@ -19,15 +19,15 @@ export const KOKORO_MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
 export const KOKORO_DEFAULT_VOICE_ID = "af_heart";
 export const KOKORO_RUNTIME_OPTIONS = [
   {
-    id: "fp16-webgpu",
-    label: "fp16 + WebGPU (default)",
-    dtype: "fp16",
+    id: "fp32-webgpu",
+    label: "fp32 + WebGPU (default)",
+    dtype: "fp32",
     device: "webgpu",
   },
   {
-    id: "fp32-webgpu",
-    label: "fp32 + WebGPU (fidelity)",
-    dtype: "fp32",
+    id: "fp16-webgpu",
+    label: "fp16 + WebGPU (faster, silent on some NVIDIA WebGPU)",
+    dtype: "fp16",
     device: "webgpu",
   },
   {
@@ -59,8 +59,8 @@ export type KokoroRuntimeOption = (typeof KOKORO_RUNTIME_OPTIONS)[number];
 export type KokoroRuntimeId = KokoroRuntimeOption["id"];
 export type KokoroDtype = KokoroRuntimeOption["dtype"];
 export type KokoroDevice = KokoroRuntimeOption["device"];
-export const KOKORO_DEFAULT_RUNTIME_ID: KokoroRuntimeId = "fp16-webgpu";
-export const KOKORO_DTYPE: KokoroDtype = "fp16";
+export const KOKORO_DEFAULT_RUNTIME_ID: KokoroRuntimeId = "fp32-webgpu";
+export const KOKORO_DTYPE: KokoroDtype = "fp32";
 export const KOKORO_DEVICE: KokoroDevice = "webgpu";
 
 export interface VoiceModelLoadState {

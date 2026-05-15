@@ -27,8 +27,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { AmbientAudioBed, type AmbientAudioBedHandle } from "./ambient-audio-bed";
-import { CheckInChat } from "./check-in-chat";
 import { ChunkPlayer } from "./chunk-player";
+import { VoiceCheckIn } from "./voice-check-in";
 import { IntakeForm, type IntakeAnswers } from "./intake-form";
 import { NarrationCard } from "./narration-card";
 import { NextStepChips } from "./next-step-chips";
@@ -43,6 +43,10 @@ import {
   generateReflection,
   type ReflectionTitle,
 } from "@/lib/gemma/session";
+import {
+  createWhisperSpeechToTextEngine,
+  preloadKokoroTextToSpeech,
+} from "@/lib/voice";
 import type {
   ReflectionContext,
   ReflectionPayload,
@@ -284,6 +288,15 @@ export function SessionMachine() {
     const controller = new AbortController();
     let cancelled = false;
 
+    // Warm the voice models in parallel with chunk generation so the
+    // check-in surface that opens next has Whisper + Kokoro already
+    // ready. Both factories are memoized singletons, so the 5× per
+    // session repeated calls are no-ops after the first one.
+    void createWhisperSpeechToTextEngine("onnx-community/whisper-base.en").catch(
+      () => undefined,
+    );
+    void preloadKokoroTextToSpeech("fp32-webgpu").catch(() => undefined);
+
     void generateChunk({
       context: {
         chunkNumber: state.currentChunk,
@@ -400,7 +413,7 @@ export function SessionMachine() {
       ) : null}
 
       {state.phase === "checkIn" && profile ? (
-        <CheckInChat
+        <VoiceCheckIn
           key={`checkin-${state.currentChunk}`}
           chunkNumber={state.currentChunk}
           priorScores={priorScores}

@@ -37,6 +37,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AnimatedWave } from "./animated-wave";
+import {
+  createKokoroTextToSpeechEngine,
+  KOKORO_DEFAULT_RUNTIME_ID,
+  KOKORO_DEFAULT_VOICE_ID,
+  type KokoroTextToSpeechEngine,
+} from "@/lib/voice";
 import type { Chunk, Segment } from "@/types/session";
 
 interface Props {
@@ -52,11 +58,10 @@ interface Props {
   currentIntensity?: number;
 }
 
-const MIN_TEXT_DISPLAY_MS = 3000;
-const TEXT_MS_PER_CHAR = 55;
-const DEMO_BEAT_MS = 2000;
-const DEMO_MIN_TEXT_DISPLAY_MS = 1200;
-const DEMO_TEXT_MS_PER_CHAR = 22;
+// Demo-mode fast pause between spoken lines. Real mode comes from each
+// segment's own `duration` (default 5 s, set by `DEFAULT_LINE_PAUSE_SECONDS`
+// in `lib/gemma/chunk.ts`).
+const DEMO_BEAT_MS = 1000;
 
 export function ChunkPlayer({
   chunk,
@@ -66,6 +71,20 @@ export function ChunkPlayer({
 }: Props) {
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
   const advanceHandleRef = useRef<number | null>(null);
+  const kokoroRef = useRef<KokoroTextToSpeechEngine | null>(null);
+
+  // Lazily create the Kokoro engine on first text segment. Whisper/Kokoro
+  // are already preloaded during the `loadingChunk` phase by
+  // session-machine, so the engine factory call here is cheap (it just
+  // wires up the API surface; the model itself is cached).
+  const getKokoro = useCallback((): KokoroTextToSpeechEngine => {
+    if (!kokoroRef.current) {
+      kokoroRef.current = createKokoroTextToSpeechEngine(
+        KOKORO_DEFAULT_RUNTIME_ID,
+      );
+    }
+    return kokoroRef.current;
+  }, []);
 
   // Reset when the chunk changes (re-mounted by the session machine on
   // every chunk boundary, but defensive in case parents reuse the
@@ -73,6 +92,13 @@ export function ChunkPlayer({
   useEffect(() => {
     setCurrentSegmentIndex(0);
   }, [chunk.id]);
+
+  // Stop any in-flight Kokoro playback on unmount.
+  useEffect(() => {
+    return () => {
+      kokoroRef.current?.stop();
+    };
+  }, []);
 
   const segments = chunk.segments;
   const segment: Segment | undefined = segments[currentSegmentIndex];
@@ -83,28 +109,50 @@ export function ChunkPlayer({
       return;
     }
 
-    const advance = () => setCurrentSegmentIndex((idx) => idx + 1);
+    let cancelled = false;
+    const advance = () => {
+      if (cancelled) return;
+      setCurrentSegmentIndex((idx) => idx + 1);
+    };
 
-    let delayMs: number;
     if (segment.type === "text") {
-      const minMs = demoMode
-        ? DEMO_MIN_TEXT_DISPLAY_MS
-        : MIN_TEXT_DISPLAY_MS;
-      const perChar = demoMode ? DEMO_TEXT_MS_PER_CHAR : TEXT_MS_PER_CHAR;
-      delayMs = Math.max(minMs, segment.content.length * perChar);
-    } else if (segment.type === "pause") {
-      delayMs = demoMode ? DEMO_BEAT_MS : segment.duration * 1000;
-    } else {
-      delayMs = demoMode ? DEMO_BEAT_MS : segment.duration * 1000;
+      const kokoro = getKokoro();
+      // Read the line aloud; advance the INSTANT playback ends, not a
+      // beat sooner. We deliberately use no fallback timer — the
+      // narration should never get truncated because we guessed wrong
+      // about reading speed. If Kokoro genuinely errors (not abort),
+      // log it and advance so the patient isn't stuck staring at the
+      // line; a model that fails this way will surface as audible
+      // silence followed by the next line, which is the gentlest
+      // failure mode.
+      void kokoro
+        .speak(segment.content, KOKORO_DEFAULT_VOICE_ID)
+        .then(() => advance())
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === "AbortError") {
+            return;
+          }
+          if (typeof console !== "undefined") {
+            console.warn("[wave] ChunkPlayer Kokoro speak failed", err);
+          }
+          advance();
+        });
+      return () => {
+        cancelled = true;
+        kokoro.stop();
+      };
     }
 
+    // pause / breath: timer-driven beats of silence between spoken lines.
+    const delayMs = demoMode ? DEMO_BEAT_MS : segment.duration * 1000;
     const handle = window.setTimeout(advance, delayMs);
     advanceHandleRef.current = handle;
     return () => {
+      cancelled = true;
       window.clearTimeout(handle);
       advanceHandleRef.current = null;
     };
-  }, [segment, onComplete, demoMode]);
+  }, [segment, onComplete, demoMode, getKokoro]);
 
   // Skip the current non-breath segment. Breath segments are deliberately
   // not skippable — the paced breath *is* the intervention, not waiting on
@@ -117,6 +165,8 @@ export function ChunkPlayer({
       window.clearTimeout(advanceHandleRef.current);
       advanceHandleRef.current = null;
     }
+    // If a text line is mid-Kokoro-speak, cut it cleanly.
+    kokoroRef.current?.stop();
     setCurrentSegmentIndex((idx) => idx + 1);
   }, [segment]);
 

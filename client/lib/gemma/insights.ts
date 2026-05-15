@@ -1,4 +1,4 @@
-import { generateGemmaInsights } from "@/lib/gemma/local-runtime";
+import { generateWllamaInsights as generateGemmaInsights } from "@/lib/gemma/wllama-generators";
 import { insightsPayloadSchema, type InsightsPayload } from "@/lib/prompts/schemas";
 import type { Session } from "@/types/models";
 

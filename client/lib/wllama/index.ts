@@ -19,3 +19,11 @@ export {
   type LoadWaveWllamaOptions,
   type WllamaInstance,
 } from "./client";
+
+export {
+  getWaveWllamaLoadState,
+  preloadWaveWllama,
+  subscribeWaveWllamaLoad,
+  type WaveWllamaLoadState,
+  type WaveWllamaPhase,
+} from "./wave-instance";

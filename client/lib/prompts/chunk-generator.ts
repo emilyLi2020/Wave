@@ -183,6 +183,9 @@ ${historyBlock}
 Generate the narration for this chunk as a JSON object of the form:
 { "lines": [ "...", "...", ... ] }
 
+Example response (generic placeholders, replace with real narration):
+{ "lines": ["str 1", "str 2", "str 3", "str 4", "str 5", "str 6"] }
+
 Requirements:
 - Exactly ${CHUNK_LINE_COUNT} lines. Do not return ${CHUNK_LINE_COUNT - 1}, ${CHUNK_LINE_COUNT + 1}, or any other count.
 - Each line is plain text, one to three short sentences.

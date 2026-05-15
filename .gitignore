@@ -39,3 +39,9 @@ client/public/onnx-finetune-export
 # Large local eval bundles. Build per-machine; exceeds GitHub file limit.
 wave-linux-eval-bundle.zip
 
+# Linux VM handoff bundle (rebuild via tar; ships to remote trainer).
+models-bundle.tar.gz
+
+# Local tool-calling probe outputs.
+test_tool_calling_*.log
+

@@ -3,15 +3,13 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import {
-  getGemmaModelLoadState,
-  preloadLocalGemma,
-  subscribeGemmaModelLoad,
-  type GemmaModelLoadState,
-} from "@/lib/gemma/local-runtime";
-import {
   MOCK_VOICE_CHECK_IN_SESSION,
   generateVoiceTestReply,
+  getVoiceTestLlmLoadState,
+  preloadVoiceTestLlm,
+  subscribeVoiceTestLlmLoad,
   type GenerateVoiceTestReplyResult,
+  type VoiceTestLlmLoadState,
   type VoiceTestTurn,
 } from "@/lib/gemma/voice-test";
 import {
@@ -172,7 +170,7 @@ function createInitialHistory(): VoiceTestTurn[] {
 export function VoiceTestClient() {
   const [status, setStatus] = useState<VoiceLoopStatus>("idle");
   const [selectedModelId, setSelectedModelId] =
-    useState<WhisperModelId>("onnx-community/whisper-tiny.en");
+    useState<WhisperModelId>("onnx-community/whisper-base.en");
   const [ttsBackend, setTtsBackend] =
     useState<TextToSpeechBackendId>("kokoro");
   const [playbackMode, setPlaybackMode] =
@@ -186,8 +184,8 @@ export function VoiceTestClient() {
   const [capabilities, setCapabilities] =
     useState<VoiceRuntimeCapabilities | null>(null);
   const [onlineStatus, setOnlineStatus] = useState<boolean | null>(null);
-  const [gemmaState, setGemmaState] = useState<GemmaModelLoadState>(
-    getGemmaModelLoadState(),
+  const [gemmaState, setGemmaState] = useState<VoiceTestLlmLoadState>(
+    getVoiceTestLlmLoadState(),
   );
   const [whisperState, setWhisperState] = useState<VoiceModelLoadState>(
     getWhisperLoadState(),
@@ -247,6 +245,7 @@ export function VoiceTestClient() {
   const interruptionInProgressRef = useRef(false);
   const interruptionModeArmedRef = useRef(false);
   const interruptionArmPendingRef = useRef(false);
+  const openerSpokenRef = useRef(false);
   const startRecordingRef = useRef<
     (source?: RecordingSource) => void
   >(() => undefined);
@@ -321,7 +320,7 @@ export function VoiceTestClient() {
       if (defaultLocalVoice) setSelectedVoiceURI(defaultLocalVoice.voiceURI);
     });
 
-    const unsubscribeGemma = subscribeGemmaModelLoad(setGemmaState);
+    const unsubscribeGemma = subscribeVoiceTestLlmLoad(setGemmaState);
     const unsubscribeWhisper = subscribeWhisperLoad(setWhisperState);
     const unsubscribeKokoro = subscribeKokoroLoad(setKokoroState);
     return () => {
@@ -469,12 +468,27 @@ export function VoiceTestClient() {
     }
 
     setErrorMessage(null);
-    setWarningMessage("Hands-free mode is listening for your next voice turn.");
+    setWarningMessage(
+      openerSpokenRef.current
+        ? "Hands-free mode is listening for your next voice turn."
+        : "Hands-free mode is starting; the assistant will speak the opener first.",
+    );
     handsFreeEnabledRef.current = true;
     try {
       const listener = await ensureVadListener();
       setHandsFreeEnabled(true);
+      // Ensure TTS is loaded before speaking the opener — phase stays "idle"
+      // during preload so the status-driven useEffect doesn't toggle the VAD
+      // listener through pause/resume mid-startup.
+      if (ttsBackend === "kokoro") {
+        await preloadKokoroTextToSpeech(selectedKokoroRuntimeId);
+        await ensureKokoroVoices();
+      }
+      // Speak the mock opener before resuming VAD so the user hears the
+      // question and our own TTS doesn't get captured as a "patient turn."
+      await speakOpenerIfPending();
       setVoicePhase("listening", "hands_free_start", "hands-free listening");
+      setWarningMessage("Hands-free mode is listening for your next voice turn.");
       listener.resume("normal");
     } catch (err) {
       handsFreeEnabledRef.current = false;
@@ -570,7 +584,11 @@ export function VoiceTestClient() {
 
   function handleVadLevel(nextVadLevel: VadListenerLevel): void {
     setVadLevel(nextVadLevel);
-    if (activeRecordingSourceRef.current) {
+    // Show live audio level whenever VAD is actively listening — either
+    // because we're already in a capture (manual/hands-free/interruption) or
+    // because hands-free is enabled and waiting for speech. Without this,
+    // the meter sits at 0 during the hands-free idle wait and feels broken.
+    if (activeRecordingSourceRef.current || handsFreeEnabledRef.current) {
       setLevel({
         rms: nextVadLevel.rms,
         peak: nextVadLevel.peak,
@@ -731,13 +749,15 @@ export function VoiceTestClient() {
 
     try {
       await createWhisperSpeechToTextEngine(selectedModelId);
-      await preloadLocalGemma();
+      await preloadVoiceTestLlm();
       if (ttsBackend === "kokoro") {
         await preloadKokoroTextToSpeech(selectedKokoroRuntimeId);
         await ensureKokoroVoices();
       }
       setVoicePhase("idle", "turn_idle", "models ready");
-      setWarningMessage("Local voice models are ready.");
+      setWarningMessage(
+        "Local voice models are ready. Start hands-free to hear the assistant opener.",
+      );
     } catch (err) {
       setVoicePhase("error", "turn_failed", toErrorMessage(err));
       setErrorMessage(toErrorMessage(err));
@@ -1112,6 +1132,7 @@ export function VoiceTestClient() {
   function handleResetConversation() {
     cancelActiveAssistantTurn("cancel");
     historyRef.current = createInitialHistory();
+    openerSpokenRef.current = false;
     setTranscript(createInitialTranscript());
     setAssistantDraft(null);
     setStreamingTtsStatus("idle");
@@ -1143,6 +1164,24 @@ export function VoiceTestClient() {
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") throw err;
       return speakFullAssistantReply(finalText, `Streaming Kokoro failed: ${toErrorMessage(err)}`);
+    }
+  }
+
+  async function speakOpenerIfPending(): Promise<void> {
+    if (openerSpokenRef.current) return;
+    if (historyRef.current.length !== 1) return;
+    if (historyRef.current[0]?.role !== "assistant") return;
+    const opener = MOCK_VOICE_CHECK_IN_SESSION.opener;
+    openerSpokenRef.current = true;
+    setVoicePhase("speaking", "tts_chunk_start", "speaking mock opener");
+    try {
+      await speakFullAssistantReply(opener);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      openerSpokenRef.current = false;
+      setWarningMessage(`Could not speak opener: ${toErrorMessage(err)}`);
+    } finally {
+      setVoicePhase("idle", "turn_idle", "opener spoken");
     }
   }
 
@@ -1335,9 +1374,10 @@ export function VoiceTestClient() {
               On-device mock check-in test
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/70">
-              This page tests mic capture, Whisper STT, the local Gemma runtime,
-              and local TTS inside a mocked WAVE check-in. It is not linked from
-              the patient app and does not modify the clinical session flow.
+              This page tests mic capture, Whisper STT, the WAVE fine-tune Gemma
+              running through wllama (GGUF), and local TTS inside a mocked WAVE
+              check-in. It is not linked from the patient app and does not
+              modify the clinical session flow.
             </p>
           </div>
           <StatusPill status={status} />
@@ -1392,7 +1432,7 @@ export function VoiceTestClient() {
                   id: "streaming",
                   role: "assistant",
                   content: visibleAssistantDraft,
-                  meta: "streaming from local Gemma",
+                  meta: "streaming from Gemma via wllama",
                 }}
               />
             ) : null}
@@ -1529,7 +1569,7 @@ function ModelWarmupStrip({
   ttsBackend,
 }: {
   loopStatus: VoiceLoopStatus;
-  gemmaState: GemmaModelLoadState;
+  gemmaState: VoiceTestLlmLoadState;
   whisperState: VoiceModelLoadState;
   kokoroState: VoiceModelLoadState;
   ttsBackend: TextToSpeechBackendId;
@@ -1941,7 +1981,7 @@ function RuntimePanel({
   onlineStatus,
   metrics,
 }: {
-  gemmaState: GemmaModelLoadState;
+  gemmaState: VoiceTestLlmLoadState;
   whisperState: VoiceModelLoadState;
   kokoroState: VoiceModelLoadState;
   ttsBackend: TextToSpeechBackendId;
@@ -2131,7 +2171,7 @@ function formatSttMeta(result: SpeechToTextResult): string {
 }
 
 function formatGemmaMeta(result: GenerateVoiceTestReplyResult): string {
-  return `Gemma ${result.source} / ${formatMs(result.elapsedMs)}`;
+  return `Gemma wllama ${result.source} / ${formatMs(result.elapsedMs)}`;
 }
 
 function formatMs(value: number | null): string {

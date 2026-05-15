@@ -13,7 +13,7 @@
  */
 
 import { fallbackCheckInTurn } from "@/lib/prompts/fallback-bank";
-import { generateGemmaCheckIn } from "@/lib/gemma/local-runtime";
+import { generateWllamaCheckIn as generateGemmaCheckIn } from "@/lib/gemma/wllama-generators";
 import type { ChunkNumber, ObstacleCategory } from "@/types/session";
 import type { CheckInContextPayload } from "@/lib/prompts/schemas";
 

@@ -3,38 +3,38 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  GEMMA_MODEL_ID,
-  getGemmaModelLoadState,
-  preloadLocalGemma,
-  subscribeGemmaModelLoad,
-  type GemmaModelFileLoadState,
-  type GemmaModelLoadState,
-} from "@/lib/gemma/local-runtime";
+  describeWaveWllamaSource,
+  getWaveWllamaLoadState,
+  preloadWaveWllama,
+  subscribeWaveWllamaLoad,
+  WAVE_GGUF_FILE,
+  WAVE_GGUF_REPO,
+  type WaveWllamaLoadState,
+} from "@/lib/wllama";
 
 interface Props {
   children: React.ReactNode;
 }
 
 export function ModelPreloadGate({ children }: Props) {
-  const [state, setState] = useState<GemmaModelLoadState>(
-    getGemmaModelLoadState,
+  const [state, setState] = useState<WaveWllamaLoadState>(
+    getWaveWllamaLoadState,
   );
 
   useEffect(() => {
-    return subscribeGemmaModelLoad(setState);
+    return subscribeWaveWllamaLoad(setState);
   }, []);
 
   function handleStart() {
-    void preloadLocalGemma().catch((err) => {
+    void preloadWaveWllama().catch((err) => {
       if (typeof console === "undefined") return;
-      console.error("[wave] Gemma preload failed", err);
+      console.error("[wave] wllama preload failed", err);
     });
   }
 
   const runtimeLabel = useMemo(() => {
     if (state.device === "webgpu") return "WebGPU acceleration";
-    if (state.device === "wasm") return "browser fallback runtime";
-    if (state.device === "cpu") return "CPU runtime";
+    if (state.device === "wasm") return "browser WASM fallback";
     return "checking device support";
   }, [state.device]);
 
@@ -47,25 +47,16 @@ export function ModelPreloadGate({ children }: Props) {
   const isLoading = state.phase === "loading";
   const showProgress = isLoading && state.progress !== null;
   const isError = state.phase === "error";
-  const completedFiles = state.files.filter(
-    (fileState) => fileState.progress === 100,
-  ).length;
   const statusLabel = isError
     ? "Setup paused"
     : isIdle
       ? "Ready to start"
-      : "Preparing local Gemma model";
-  const detailLabel = state.file
-    ? `${state.status} ${state.file}`
-    : isIdle
-      ? "The download has not started yet."
-      : state.message;
-  const summaryLabel =
-    state.files.length > 0
-      ? `${completedFiles}/${state.files.length} files`
-      : showProgress
-        ? `${progress}%`
-        : runtimeLabel;
+      : "Downloading Gemma GGUF";
+  const detailLabel = isIdle
+    ? "The download has not started yet."
+    : state.message;
+  const summaryLabel = showProgress ? `${progress}%` : runtimeLabel;
+  const sourceLabel = describeWaveWllamaSource();
 
   return (
     <section className="flex min-h-[calc(100vh-8rem)] items-center justify-center bg-background px-6 py-12 text-foreground">
@@ -95,16 +86,15 @@ export function ModelPreloadGate({ children }: Props) {
         </div>
 
         <p className="mt-6 text-sm leading-relaxed text-foreground/70">
-          WAVE uses Gemma locally for sessions, check-ins, reflections, and
-          insights. The first visit downloads and caches the model; after that,
-          the app can reuse it from browser storage.
+          WAVE runs the fine-tuned Gemma locally via wllama (GGUF) for chunks,
+          check-ins, reflections, and insights. The first visit downloads and
+          caches the model (~3.2 GB across 5 shards); after that, the app
+          reuses it from browser storage.
         </p>
 
         <div className="mt-6 rounded-2xl border border-border bg-surface-muted p-4">
           <div className="flex items-center justify-between gap-4 text-sm">
-            <span className="min-w-0 font-medium">
-              {statusLabel}
-            </span>
+            <span className="min-w-0 font-medium">{statusLabel}</span>
             <span className="w-28 shrink-0 text-right font-mono tabular-nums text-foreground/50">
               {summaryLabel}
             </span>
@@ -117,31 +107,32 @@ export function ModelPreloadGate({ children }: Props) {
             {detailLabel}
           </p>
 
-          {state.files.length > 0 ? (
-            <ul className="mt-4 max-h-56 space-y-3 overflow-y-auto pr-1">
-              {state.files.map((fileState) => (
-                <ModelFileProgress
-                  key={fileState.file}
-                  fileState={fileState}
-                />
-              ))}
-            </ul>
+          {showProgress ? (
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-border">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           ) : null}
 
           <dl className="mt-4 grid gap-3 text-xs text-foreground/55 sm:grid-cols-2">
             <div>
-              <dt className="font-medium text-foreground/70">Model</dt>
-              <dd className="mt-1 h-4 truncate" title={GEMMA_MODEL_ID}>
-                {GEMMA_MODEL_ID}
+              <dt className="font-medium text-foreground/70">Repo</dt>
+              <dd className="mt-1 h-4 truncate" title={WAVE_GGUF_REPO}>
+                {WAVE_GGUF_REPO}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-foreground/70">Current file</dt>
-              <dd
-                className="mt-1 h-4 truncate"
-                title={state.file ?? undefined}
-              >
-                {state.file ?? (isError ? "not available" : "checking cache")}
+              <dt className="font-medium text-foreground/70">First shard</dt>
+              <dd className="mt-1 h-4 truncate" title={WAVE_GGUF_FILE}>
+                {WAVE_GGUF_FILE.split("/").pop() ?? WAVE_GGUF_FILE}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="font-medium text-foreground/70">Source</dt>
+              <dd className="mt-1 h-4 truncate" title={sourceLabel}>
+                {sourceLabel}
               </dd>
             </div>
           </dl>
@@ -183,55 +174,4 @@ export function ModelPreloadGate({ children }: Props) {
       </section>
     </section>
   );
-}
-
-function ModelFileProgress({
-  fileState,
-}: {
-  fileState: GemmaModelFileLoadState;
-}) {
-  const progress = fileState.progress ?? 0;
-  const progressLabel =
-    fileState.progress !== null ? `${fileState.progress}%` : fileState.status;
-  const byteLabel =
-    fileState.loaded !== null && fileState.total !== null
-      ? `${formatBytes(fileState.loaded)} / ${formatBytes(fileState.total)}`
-      : null;
-
-  return (
-    <li>
-      <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
-        <span className="min-w-0 truncate font-medium" title={fileState.file}>
-          {formatFileName(fileState.file)}
-        </span>
-        <span className="shrink-0 font-mono tabular-nums text-foreground/50">
-          {progressLabel}
-        </span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-border">
-        <div
-          className="h-full rounded-full bg-accent transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-      {byteLabel ? (
-        <p className="mt-1 truncate text-[0.7rem] text-foreground/45">
-          {byteLabel}
-        </p>
-      ) : null}
-    </li>
-  );
-}
-
-function formatFileName(file: string): string {
-  return file.split("/").pop() ?? file;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const kilobytes = bytes / 1024;
-  if (kilobytes < 1024) return `${kilobytes.toFixed(1)} KB`;
-  const megabytes = kilobytes / 1024;
-  if (megabytes < 1024) return `${megabytes.toFixed(1)} MB`;
-  return `${(megabytes / 1024).toFixed(1)} GB`;
 }

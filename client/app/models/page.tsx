@@ -22,6 +22,14 @@ const WLLAMA_PAGES: TestPage[] = [
       "WebGPU enabled by default (V3.1+), WASM SIMD fallback. Smoke / Phase / Check-in / Reflection buttons. Defaults to HF Hub; append ?local=1 to fetch from a local-hf mirror at localhost:8765/gguf/ for fast iteration. See docs/wllama.md.",
     badge: "primary",
   },
+  {
+    href: "/models/wllama-schema-probe",
+    title: "wllama · structured-output + tool-calling probe",
+    blurb:
+      "Empirical check for whether response_format json_schema (strict) and tools/tool_choice actually work with our Gemma fine-tune GGUF in wllama 3.1.1. Four buttons: chunk schema, reflection schema, batch tool call, streamed tool call.",
+    details:
+      "Use this before refactoring the production chunk/reflection/check-in generators. Each probe surfaces the raw model output + parsed result + pass/fail verdict.",
+  },
 ];
 
 const ONNX_PAGES: TestPage[] = [
@@ -89,9 +97,9 @@ const MLC_PAGES: TestPage[] = [
 const VOICE_PAGES: TestPage[] = [
   {
     href: "/models/voice-test",
-    title: "Voice loop · STT → LLM → TTS",
+    title: "Voice loop · Whisper → Gemma (wllama) → Kokoro",
     blurb:
-      "End-to-end voice round-trip: Whisper STT, fine-tune LLM, Kokoro TTS. Used to validate latency and audio quality of the full pipeline.",
+      "End-to-end voice round-trip: Whisper STT, WAVE fine-tune Gemma via wllama (GGUF), Kokoro TTS. Used to validate latency and audio quality of the full pipeline.",
     details:
       "VAD-driven turn detection via @ricky0123/vad-web. State machine in voice-turn-machine.ts.",
   },

@@ -16,17 +16,18 @@ import {
   type ChunkGenerationContextPayload,
   type ChunkLinesPayload,
 } from "@/lib/prompts/schemas";
-import { generateGemmaChunk } from "@/lib/gemma/local-runtime";
+import { generateWllamaChunk as generateGemmaChunk } from "@/lib/gemma/wllama-generators";
 import { fallbackChunk } from "@/lib/prompts/fallback-bank";
 import type { Chunk, ChunkNumber, Segment } from "@/types/session";
 
 /**
- * Default pause length (seconds) inserted between consecutive text
- * lines in a generated chunk. Demo mode in `<ChunkPlayer />`
- * collapses this to 2 s globally — see DEMO_BEAT_MS in
- * `chunk-player.tsx`.
+ * Default pause length (seconds) inserted between consecutive spoken
+ * narration lines. The text is read aloud by Kokoro TTS now — the pause
+ * is the beat of silence between sentences, not reading time. Demo mode
+ * in `<ChunkPlayer />` collapses this to 1 s globally — see
+ * `DEMO_BEAT_MS` in `chunk-player.tsx`.
  */
-export const DEFAULT_LINE_PAUSE_SECONDS = 7;
+export const DEFAULT_LINE_PAUSE_SECONDS = 5;
 
 const CHUNK_TITLES: Record<ChunkNumber, string> = {
   1: "Settle in",

@@ -3,19 +3,19 @@
 /**
  * Continuous ambient audio bed for the urge surfing session.
  *
- * Synthesized client-side via Web Audio API (PRD § Session Runtime
- * Requirements rule 6, AGENTS.md > Tech Stack > "session path makes
- * zero LLM network requests"). The audio is:
+ * Source priority (first one that succeeds wins):
  *
- *   - A 4-second pink-noise AudioBuffer looped indefinitely as the
- *     ocean texture. Pink noise (1/f spectrum) sounds more like
- *     surf / wind than white noise and avoids the harsh top-end
- *     hiss of an unfiltered noise source.
- *   - A slow LFO (~0.06 Hz, ~16-second period) oscillator routed
- *     into a GainNode that modulates the noise amplitude in a slow
- *     in-out swell, mimicking the rise and fall of waves.
- *   - A master gain at ~0.2 so the bed is present but never the
- *     loudest thing in the room.
+ *   1. `/audio/ocean-waves.mp3` — a real public-domain ocean recording
+ *      bundled in `client/public/audio/` (see the README in that
+ *      directory for sources and conversion notes). Loaded once,
+ *      decoded into an AudioBuffer, looped indefinitely.
+ *   2. Synthesized pink-noise fallback — a 4-second pink-noise
+ *      AudioBuffer looped indefinitely with a slow LFO modulating the
+ *      master gain to mimic the rise and fall of waves. Used if the
+ *      recording is absent or decode fails.
+ *
+ * Either source goes through the same master gain (~0.2) so the bed
+ * is present but never the loudest thing in the room.
  *
  * Lifecycle
  *
@@ -38,9 +38,9 @@
  *
  * Privacy
  *
- *   No audio leaves the device. There is no microphone capture, no
- *   uploads, no remote audio asset — every sample is generated on
- *   the user's machine.
+ *   No audio leaves the device. The recording (when present) is
+ *   served from the same origin as the app — nothing leaves the
+ *   user's machine.
  */
 
 import {
@@ -66,6 +66,7 @@ const NOISE_BUFFER_SECONDS = 4;
 const LFO_FREQUENCY_HZ = 0.06;
 const LFO_DEPTH = 0.55;
 const FADE_IN_SECONDS = 1.2;
+const OCEAN_SAMPLE_URL = "/audio/ocean-waves.mp3";
 
 interface Props {
   /** Hidden in some surfaces (e.g. intake) where the toggle would distract. */
@@ -178,15 +179,54 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
           const ctx = new Ctor();
           audioContextRef.current = ctx;
 
-          const noiseBuffer = ctx.createBuffer(
-            1,
-            ctx.sampleRate * NOISE_BUFFER_SECONDS,
-            ctx.sampleRate,
-          );
-          fillPinkNoise(noiseBuffer.getChannelData(0));
+          // Try the real recording first; fall back to synthesized pink
+          // noise if it's not bundled or fails to decode.
+          let buffer: AudioBuffer | null = null;
+          let usingRecording = false;
+          let recordingError: unknown = null;
+          try {
+            const response = await fetch(OCEAN_SAMPLE_URL, {
+              cache: "force-cache",
+            });
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              buffer = await ctx.decodeAudioData(arrayBuffer);
+              usingRecording = true;
+            } else {
+              recordingError = `HTTP ${response.status}`;
+            }
+          } catch (err) {
+            recordingError = err;
+          }
+          if (!buffer) {
+            buffer = ctx.createBuffer(
+              1,
+              ctx.sampleRate * NOISE_BUFFER_SECONDS,
+              ctx.sampleRate,
+            );
+            fillPinkNoise(buffer.getChannelData(0));
+          }
+          if (typeof console !== "undefined") {
+            if (usingRecording) {
+              console.info(
+                "[wave] AmbientAudioBed: playing ocean recording from %s (%.1fs, %dch @ %dHz)",
+                OCEAN_SAMPLE_URL,
+                buffer.duration,
+                buffer.numberOfChannels,
+                buffer.sampleRate,
+              );
+            } else {
+              console.info(
+                "[wave] AmbientAudioBed: falling back to synthesized pink noise. Reason: %s. Drop a file at client/public/audio/ocean-waves.mp3 to override.",
+                recordingError instanceof Error
+                  ? recordingError.message
+                  : String(recordingError ?? "file missing"),
+              );
+            }
+          }
 
           const noiseSource = ctx.createBufferSource();
-          noiseSource.buffer = noiseBuffer;
+          noiseSource.buffer = buffer;
           noiseSource.loop = true;
 
           const masterGain = ctx.createGain();
@@ -196,23 +236,26 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
             ctx.currentTime + FADE_IN_SECONDS,
           );
 
-          const lfo = ctx.createOscillator();
-          lfo.frequency.value = LFO_FREQUENCY_HZ;
-
-          const lfoGain = ctx.createGain();
-          // The LFO modulates around a midpoint so the master gain
-          // smoothly oscillates between (1 - depth) and (1 + depth)
-          // of its set value. We achieve this with a separate offset
-          // node by feeding lfoGain into masterGain.gain.
-          lfoGain.gain.value = TARGET_GAIN * LFO_DEPTH;
-
           noiseSource.connect(masterGain);
           masterGain.connect(ctx.destination);
-          lfo.connect(lfoGain);
-          lfoGain.connect(masterGain.gain);
+
+          // The LFO swell exists to give the synthesized pink noise an
+          // ocean-like rise/fall. A real recording already has natural
+          // wave variation, so we skip the LFO when the recording is
+          // playing — modulating it again over the top sounds artificial.
+          let lfo: OscillatorNode | null = null;
+          let lfoGain: GainNode | null = null;
+          if (!usingRecording) {
+            lfo = ctx.createOscillator();
+            lfo.frequency.value = LFO_FREQUENCY_HZ;
+            lfoGain = ctx.createGain();
+            lfoGain.gain.value = TARGET_GAIN * LFO_DEPTH;
+            lfo.connect(lfoGain);
+            lfoGain.connect(masterGain.gain);
+            lfo.start();
+          }
 
           noiseSource.start();
-          lfo.start();
 
           noiseSourceRef.current = noiseSource;
           masterGainRef.current = masterGain;

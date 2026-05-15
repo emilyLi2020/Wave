@@ -8,10 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "prepare:vad-assets": "node scripts/copy-vad-assets.mjs",
-    "test": "pnpm test:gemma",
+    "test": "pnpm test:gemma && pnpm test:voice-loop",
     "test:gemma": "tsx scripts/test-gemma-boundaries.ts",
     "test:gemma:live": "tsx scripts/test-fallback.ts",
-    "test:gemma:tools:live": "tsx scripts/test-gemma-ai-sdk-tools-live.ts"
+    "test:gemma:tools:live": "tsx scripts/test-gemma-ai-sdk-tools-live.ts",
+    "test:voice-loop": "tsx scripts/test-extract-craving-score.ts && tsx scripts/test-wllama-generators.ts"
   },
   "dependencies": {
     "@browser-ai/transformers-js": "^2.2.2",
