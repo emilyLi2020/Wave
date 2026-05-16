@@ -3,35 +3,48 @@
 // client/lib/gemma/wllama-generators.ts so swapping is a one-line import
 // change downstream.
 //
-// Strategy notes for the LiteRT port:
-//   - The wrapper's LLMConfig has no response_format / grammar option, unlike
-//     llama.cpp's wllama. We rely on the existing <output_contract> prompt
-//     blocks + extractFirstJsonObject + Zod at the call site instead of
-//     engine-enforced JSON schema.
-//   - The wrapper's chat surface (sendMessage / sendMessageAsync) treats the
-//     system prompt as load-time config and per-call messages as user-only.
-//     Each WAVE flow has its own composed system prompt (WAVE_SYSTEM_PROMPT
-//     + flow-specific additions), so we load with NO system prompt and pass
-//     the full composed prompt as one user message after resetConversation().
-//     If output quality on the fine-tune degrades vs. wllama, fall back to
-//     either (a) loading the model once per flow with that flow's system
-//     prompt, or (b) using applyGemmaTemplate to bypass the wrapper's chat
-//     template entirely.
-//   - sendMessageAsync has no AbortSignal. Aborting from JS stops accumulation
-//     but the native generator keeps running until done. For barge-in (step 5c)
-//     we'll either close() and reload, or upstream a cancel PR.
+// Strategy notes for the LiteRT port (carry from wllama):
+//   - The wrapper's LLMConfig has no response_format / grammar option.
+//     We rely on the existing <output_contract> prompt blocks +
+//     extractFirstJsonObject + Zod at the call site instead of engine-enforced
+//     JSON schema. Per plan: "Drop json_schema for check-in, keep a strict
+//     JSON <output_contract> in the prompt, and parse the trailing
+//     endConversation field after stream end via parseCheckInJson."
+//   - The wrapper's chat surface treats systemPrompt as load-time config and
+//     per-call messages as user-only. Each WAVE flow has its own composed
+//     system prompt, so we load with NO system prompt and pass the full
+//     composed prompt as one user message after resetConversation(). If
+//     output quality on the fine-tune degrades vs. wllama, fall back to per
+//     -flow reloads or bypass via applyGemmaTemplate.
+//   - sendMessageAsync has no AbortSignal. Aborting from JS stops the
+//     accumulator but the native generator keeps running until done. For
+//     step 5c barge-in we'll either close() and reload, or upstream a cancel
+//     PR.
+//   - Check-in's onDelta semantics mirror wllama: fire ONCE at stream end
+//     with the sanitized reply. Streaming the raw JSON-in-progress to the
+//     voice loop would leak `{"reply": "...` fragments into the sentence
+//     buffer, which Kokoro would then speak. A future step (5c polish) can
+//     add a JSON-aware streaming state machine that emits chars only from
+//     inside the `reply` string.
 
 import { createLLM } from "react-native-litert-lm";
 import type { LiteRTLMInstance } from "react-native-litert-lm";
 
-import { buildChunkPrompt } from "@/prompts/chunk-generator";
-import type { ChunkGenerationContextPayload } from "@/prompts/schemas";
+import { buildCheckInPrompt } from "@/lib/prompts/check-in";
+import { buildChunkPrompt } from "@/lib/prompts/chunk-generator";
+import { buildInsightsPrompt } from "@/lib/prompts/insights";
+import { buildReflectionPrompt } from "@/lib/prompts/reflection";
+import type {
+  CheckInContextPayload,
+  ChunkGenerationContextPayload,
+  ReflectionContext,
+} from "@/lib/prompts/schemas";
 import type {
   CheckInChatTurnPayload,
-  GenerateOptions,
-  LocalChunkResult,
-  LocalCheckInResult,
-} from "./types";
+  EndConversationSignal,
+} from "@/lib/gemma/checkin";
+import type { ObstacleCategory } from "@/types/session";
+import type { Session } from "@/types/models";
 
 // HF Hub path for the fine-tuned LITERTLM bundle. Verified on HF at this exact
 // URL (5,071,689,680 bytes); the wrapper auto-caches into iOS sandbox
@@ -39,21 +52,51 @@ import type {
 export const WAVE_LITERT_URL =
   "https://huggingface.co/Maelstrome/lora-wave-session-r32/resolve/main/mediapipe/model.litertlm";
 
+interface GenerateOptions {
+  maxNewTokens: number;
+  signal?: AbortSignal;
+  onDelta?: (accumulated: string) => void;
+}
+
+export interface LocalChunkResult {
+  text: string;
+}
+
+export interface LocalCheckInResult {
+  text: string;
+  endConversation: EndConversationSignal | null;
+}
+
+const CHECK_IN_TOOL_NONE_OBSTACLE = "none" as const;
+const ALLOWED_OBSTACLES: readonly ObstacleCategory[] = [
+  "cannot_visualize",
+  "mind_wandering",
+  "urge_overwhelming",
+  "breath_tight",
+  "breath_anxiety",
+  "gave_in",
+  "guilt_failure",
+  "physical_discomfort",
+  "sleepiness",
+];
+const CHECK_IN_TOOL_OBSTACLES = [
+  CHECK_IN_TOOL_NONE_OBSTACLE,
+  ...ALLOWED_OBSTACLES,
+] as const;
+
+// ────────────────────────────────────────────────────────────────────────
+// Singleton model lifecycle
+// ────────────────────────────────────────────────────────────────────────
+
 let llmPromise: Promise<LiteRTLMInstance> | null = null;
 
 export type LoadProgressCallback = (progressPct: number) => void;
 
 interface LoadOptions {
   onProgress?: LoadProgressCallback;
-  /** Override the default GPU backend (e.g. 'cpu' if GPU fails on a device). */
   backend?: "gpu" | "cpu" | "npu";
 }
 
-/**
- * Singleton load. Subsequent calls return the same instance; first call
- * triggers download + load with the wrapper's built-in caching to iOS
- * Library/Caches/litert_models/.
- */
 export function preloadWaveLiteRT(
   opts?: LoadOptions,
 ): Promise<LiteRTLMInstance> {
@@ -63,8 +106,8 @@ export function preloadWaveLiteRT(
       await llm.loadModel(
         WAVE_LITERT_URL,
         {
-          // No systemPrompt here; we pass per-flow composed prompts as user
-          // messages after resetConversation(). See file header for rationale.
+          // No systemPrompt; per-flow composed prompts go in the user msg
+          // after resetConversation(). See file header.
           backend: opts?.backend ?? "gpu",
           maxTokens: 512,
           temperature: 0,
@@ -89,26 +132,9 @@ export async function unloadWaveLiteRT(): Promise<void> {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Helpers (ported verbatim from wllama-generators.ts)
+// Generation primitive
 // ────────────────────────────────────────────────────────────────────────
 
-function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-}
-
-export function extractFirstJsonObject(text: string): string {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) return text.trim();
-  return text.slice(start, end + 1);
-}
-
-/**
- * Stream a one-shot generation. Resets the wrapper's conversation before
- * starting so single-shot flows (chunk/reflection/insights) don't accumulate
- * KV state across calls. Multi-turn flows (check-in) bypass this and manage
- * their own history.
- */
 function streamOnce(
   llm: LiteRTLMInstance,
   prompt: string,
@@ -160,27 +186,179 @@ export async function generateWllamaChunk(
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Stubs — implemented in step 3 (port prompts + generators + wrappers)
+// Reflection (final structured card after check-in 5)
 // ────────────────────────────────────────────────────────────────────────
 
 export async function generateWllamaReflection(
-  _input: unknown,
-  _options: GenerateOptions,
+  input: ReflectionContext,
+  options: GenerateOptions,
 ): Promise<LocalChunkResult> {
-  throw new Error("generateWllamaReflection: not implemented yet (step 3)");
+  throwIfAborted(options.signal);
+  const llm = await preloadWaveLiteRT();
+  throwIfAborted(options.signal);
+
+  const prompt = buildReflectionPrompt(input);
+  const combined = `${prompt.systemPrompt}\n\n${prompt.userPrompt}`;
+
+  const raw = await streamOnce(llm, combined, options);
+  throwIfAborted(options.signal);
+  return { text: extractFirstJsonObject(raw) };
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Insights (cross-session patterns card, /insights page)
+// ────────────────────────────────────────────────────────────────────────
 
 export async function generateWllamaInsights(
-  _sessions: readonly unknown[],
-  _options: GenerateOptions,
+  sessions: readonly Session[],
+  options: GenerateOptions,
 ): Promise<LocalChunkResult> {
-  throw new Error("generateWllamaInsights: not implemented yet (step 3)");
+  throwIfAborted(options.signal);
+  const llm = await preloadWaveLiteRT();
+  throwIfAborted(options.signal);
+
+  const prompt = buildInsightsPrompt([...sessions]);
+  const combined = `${prompt.systemPrompt}\n\n${prompt.userPrompt}`;
+
+  const raw = await streamOnce(llm, combined, options);
+  throwIfAborted(options.signal);
+  return { text: extractFirstJsonObject(raw) };
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Multi-turn check-in
+// ────────────────────────────────────────────────────────────────────────
+
 export async function generateWllamaCheckIn(
-  _history: readonly CheckInChatTurnPayload[],
-  _context: unknown,
-  _options: GenerateOptions,
+  history: readonly CheckInChatTurnPayload[],
+  context: CheckInContextPayload,
+  options: GenerateOptions,
 ): Promise<LocalCheckInResult> {
-  throw new Error("generateWllamaCheckIn: not implemented yet (step 3)");
+  throwIfAborted(options.signal);
+  const llm = await preloadWaveLiteRT();
+  throwIfAborted(options.signal);
+
+  const agentTurnsInHistory = history.filter((t) => t.role === "agent").length;
+  const { systemPrompt, contextBlock } = buildCheckInPrompt(context, {
+    agentTurnsInHistory,
+  });
+
+  // The wrapper does not expose a multi-turn injection API (no setHistory).
+  // Flatten the alternating conversation into a single user message inside a
+  // resetConversation()-bounded turn. This re-prefills the prompt every call
+  // (slower than wllama's chat completion at higher turn counts) but matches
+  // the wllama-generators semantics exactly: same context in, same JSON out.
+  const composedSystem = `${systemPrompt}
+
+<output_contract>
+Respond with a JSON object matching this exact schema:
+
+{
+  "reply": "<patient-facing prose, 1-3 short sentences>",
+  "endConversation": null | { "cravingScore": <integer 1-10>, "obstacleCategory": "<one of: ${CHECK_IN_TOOL_OBSTACLES.join(", ")}>" }
+}
+
+Rules:
+- "reply" is the visible patient-facing text the speaker will hear. Plain prose, no markdown, no lists.
+- "endConversation" is null UNLESS this check-in is complete and the patient is ready to continue.
+- When ending, "obstacleCategory" is "${CHECK_IN_TOOL_NONE_OBSTACLE}" when no clear obstacle is present.
+- Emit nothing outside the JSON object — no preamble, no analysis, no extra keys.
+</output_contract>`;
+
+  const historyText = history
+    .map((t) => `${t.role === "agent" ? "WAVE" : "Patient"}: ${t.content}`)
+    .join("\n");
+
+  const combined = `${composedSystem}
+
+${contextBlock}
+
+${historyText}
+
+WAVE:`;
+
+  const raw = await streamOnce(llm, combined, {
+    ...options,
+    // Suppress incremental delta emission during check-in: the JSON wrapper
+    // means mid-stream chars are useless to the caller. The voice loop in
+    // step 5c relies on the final-fire semantic (see file header).
+    onDelta: undefined,
+  });
+  throwIfAborted(options.signal);
+
+  const parsed = parseCheckInJson(raw);
+  const replyText = sanitizeCheckInModelText(parsed.reply);
+  options.onDelta?.(replyText);
+
+  const endConversation = normalizeEndConversation(parsed.endConversation);
+  return { text: replyText, endConversation };
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// helpers (verbatim port from wllama-generators.ts)
+// ────────────────────────────────────────────────────────────────────────
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+}
+
+export function extractFirstJsonObject(text: string): string {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return text.trim();
+  return text.slice(start, end + 1);
+}
+
+interface CheckInJsonOutput {
+  reply: string;
+  endConversation: {
+    cravingScore: number;
+    obstacleCategory: string;
+  } | null;
+}
+
+export function parseCheckInJson(raw: string): CheckInJsonOutput {
+  const candidate = extractFirstJsonObject(raw);
+  try {
+    const parsed = JSON.parse(candidate) as Partial<CheckInJsonOutput>;
+    const reply = typeof parsed.reply === "string" ? parsed.reply : "";
+    const endConversation =
+      parsed.endConversation &&
+      typeof parsed.endConversation === "object" &&
+      "cravingScore" in parsed.endConversation
+        ? parsed.endConversation
+        : null;
+    return { reply, endConversation };
+  } catch {
+    return { reply: raw.trim(), endConversation: null };
+  }
+}
+
+export function normalizeEndConversation(
+  signal: CheckInJsonOutput["endConversation"],
+): EndConversationSignal | null {
+  if (!signal) return null;
+  const score = Math.round(signal.cravingScore);
+  if (!Number.isFinite(score) || score < 1 || score > 10) return null;
+  const obstacle = signal.obstacleCategory;
+  if (obstacle === CHECK_IN_TOOL_NONE_OBSTACLE) {
+    return { cravingScore: score, obstacleCategory: null };
+  }
+  if (ALLOWED_OBSTACLES.includes(obstacle as ObstacleCategory)) {
+    return {
+      cravingScore: score,
+      obstacleCategory: obstacle as ObstacleCategory,
+    };
+  }
+  return { cravingScore: score, obstacleCategory: null };
+}
+
+function sanitizeCheckInModelText(text: string): string {
+  return text
+    .replace(/\]\s*\[/g, " ")
+    .replace(/[\[\]]/g, "")
+    .replace(/[–—]/g, ",")
+    .replace(/\s+([,.;:?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }

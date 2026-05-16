@@ -3,6 +3,13 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@/lib/prompts/*": ["./src/prompts/*"],
+      "@/lib/session/*": ["./src/session/*"],
+      "@/lib/training/*": ["./src/prompts/*"],
+      "@/lib/voice/*": ["./src/voice/*"],
+      "@/lib/gemma/*": ["./src/gemma/*"],
+      "@/lib/wllama/*": ["./src/runtime/*"],
+      "@/types/*": ["./src/types/*"],
       "@/*": ["./src/*", "./*"]
     }
   },
