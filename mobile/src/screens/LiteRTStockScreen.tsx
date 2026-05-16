@@ -104,17 +104,21 @@ export default function LiteRTStockScreen() {
       const llm = createLLM({ enableMemoryTracking: true });
       await llm.loadModel(nativePath, {
         backend: "gpu",
-        // maxTokens is effectively the **total token budget** (input +
-        // output) in this wrapper despite the TS comment saying "to
-        // generate". With maxTokens=256 we got "input too long, 1846 > 256"
-        // when sending the full WAVE chunk-1 prompt; with maxTokens=2048
-        // we got "failed to invoke compiled model" (bundle prefill shapes
-        // don't accept arbitrary lengths). 1024 matches the maintainer's
-        // example app and is the sweet spot that the bundle's compiled
-        // graph accepts. Input prompts must stay short enough to leave
-        // room for output within 1024.
+        // Path A fix (react-native-litert-lm-wave fork): upstream collapsed
+        // the engine KV budget and the per-call decode cap into one
+        // `maxTokens`, so no single value could run the ~1846-token WAVE
+        // chunk-1 prompt (256 → "input too long, 1846 > 256"; 2048 →
+        // "failed to invoke compiled model" because the decode batch
+        // exceeded the bundle's compiled 256-token chunk). The fork splits
+        // them:
+        //  - engineMaxTokens 2048 → matches the stock litert-community
+        //    Gemma 4 E2B bundle's compiled cache_length; holds the
+        //    1846-token input plus ~200 output.
+        //  - outputMaxTokens 200 → within the bundle's compiled 256-token
+        //    decode chunk.
         systemPrompt: "You are WAVE, a calm voice guiding someone through urge surfing. Reply in 1-2 short sentences.",
-        maxTokens: 1024,
+        engineMaxTokens: 2048,
+        outputMaxTokens: 200,
         temperature: 0,
         topK: 1,
       });

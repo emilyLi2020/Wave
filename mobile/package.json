@@ -36,7 +36,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
-    "react-native-litert-lm": "0.3.6",
+    "react-native-litert-lm": "github:IdkwhatImD0ing/react-native-litert-lm-wave#wave/maxtokens-decouple",
     "react-native-nitro-modules": "^0.35.6",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",

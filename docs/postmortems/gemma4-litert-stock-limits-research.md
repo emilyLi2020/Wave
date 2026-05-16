@@ -158,6 +158,59 @@ constrained by the bundle's compiled cache_length=2048, but usable.
 
 To open a PR upstream or fork, the wrapper is single-file: `cpp/HybridLiteRTLM.cpp`.
 
+#### Outcome — Path A implemented (2026-05-16)
+
+Path A was taken. Fork published at
+[`IdkwhatImD0ing/react-native-litert-lm-wave`](https://github.com/IdkwhatImD0ing/react-native-litert-lm-wave)
+(branch `wave/maxtokens-decouple`, based on upstream `0.3.6`), consumed by
+`mobile/package.json` as a git dependency:
+`"react-native-litert-lm": "github:IdkwhatImD0ing/react-native-litert-lm-wave#wave/maxtokens-decouple"`.
+
+What changed in the fork vs upstream `0.3.6`:
+
+- **`cpp/HybridLiteRTLM.{hpp,cpp}`** — added `engineMaxTokens_` (default
+  2048) and `outputMaxTokens_` (default 256) members. Config parsing now
+  resolves: explicit knob → legacy `maxTokens` → default. Line 334 feeds
+  `engineMaxTokens_` to `litert_lm_engine_settings_set_max_num_tokens`;
+  line 391 feeds `outputMaxTokens_` to
+  `litert_lm_session_config_set_max_output_tokens`. The two knobs are no
+  longer the same value.
+- **`nitrogen/generated/shared/c++/LLMConfig.hpp`** — the Nitro struct is
+  codegen'd, so it was hand-extended: two `std::optional<double>` members,
+  constructor params given `= std::nullopt` defaults (so the Android
+  `JLLMConfig` 6-arg call site still compiles untouched), and
+  `fromJSI` / `toJSI` / `canConvert` updated.
+- **`src/specs/LiteRTLM.nitro.ts` + `lib/specs/LiteRTLM.nitro.d.ts`** —
+  typed `engineMaxTokens?` / `outputMaxTokens?`; `maxTokens` marked
+  `@deprecated` (kept as the back-compat fallback for both).
+- **`scripts/postinstall.js`** — extracts a committed
+  `LiteRTLM-ios-frameworks.zip` (the rebuilt `main-2f70ce8` framework from
+  Issue #13, 64 MB, tracked in the fork) instead of downloading the stale
+  upstream `v0.3.6` release asset — which is the v0.10.2 framework and has
+  404'd before ([upstream #9](https://github.com/hung-yueh/react-native-litert-lm/issues/9)).
+  This makes a clean `npm install` reproduce the known-good runtime;
+  previously the `main-2f70ce8` framework only existed as an
+  un-reproducible local mutation of `node_modules` on other branches.
+
+WAVE call sites updated to the split knobs:
+
+- `src/screens/LiteRTStockScreen.tsx` (the prize-eligible stock demo):
+  `engineMaxTokens: 2048, outputMaxTokens: 200` — the 1846-token chunk-1
+  prompt now fits without slimming.
+- `src/screens/LiteRTSmokeScreen.tsx`: same 2048 / 200.
+- `src/runtime/litert-generators.ts` (parked fine-tune path): `4096 / 256`
+  to match that bundle's `--cache_length=4096` export.
+
+Verified locally: git-dep install resolves the fork (`lib/` ships
+committed, no `prepare` build needed), `postinstall` extracts the
+`main-2f70ce8` xcframework into `ios/Frameworks/` (podspec vendors exactly
+that path), and `npx tsc --noEmit` on the mobile app is clean with the new
+knobs. **Not yet verified:** the native C++ compiles only at EAS/Xcode
+build time, and the decisive proof — the full 1846-token WAVE chunk-1
+prompt actually generating on a physical iPhone through stock Gemma 4 —
+still needs the `/tests/litert-stock` on-device smoke. That is the
+remaining open item for this path.
+
 ### Path B: Use a different bundle with a larger compiled cache
 
 The litert-community org publishes only `gemma-4-E2B-it.litertlm` and
@@ -230,7 +283,11 @@ non-trivial native development.
 
 ## What ships now
 
-- **Stock Gemma 4 LiteRT page** (`/tests/litert-stock`) — needs the prompt slimmed to ≤~1700 tokens (cache_length=2048 minus a buffer) OR needs Path A's wrapper fix. Current commit `8389c8e` uses a short demo prompt that fits; that's the working state until either change ships.
+- **Stock Gemma 4 LiteRT page** (`/tests/litert-stock`) — Path A shipped
+  (see "Outcome" above). The fork's split `engineMaxTokens: 2048` /
+  `outputMaxTokens: 200` removes the conflation, so the full 1846-token
+  chunk-1 prompt no longer needs slimming. Pending the on-device iPhone
+  smoke to confirm generation end-to-end.
 - **Existing `/tests/litert`** (fine-tune target) — stays parked behind issue #13 / #11.
 
 The deeper research run from parallel-cli is saved at

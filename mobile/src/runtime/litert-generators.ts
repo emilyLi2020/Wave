@@ -125,7 +125,14 @@ export function preloadWaveLiteRT(
         // own note flagged GPU dylibs not registering. Revert to "gpu"
         // once Metal init is confirmed working on iPhone.
         backend: opts?.backend ?? "cpu",
-        maxTokens: 512,
+        // Fork (react-native-litert-lm-wave) split knobs. The fine-tune
+        // litert-lm-v3 bundle was exported with --cache_length=4096
+        // --prefill_lengths=[512,1024] (see litert-lm-mobile-finetune.md
+        // step 3), so the engine KV budget can be the full 4096 and the
+        // WAVE chunk-1/reflection prompts finally fit. outputMaxTokens
+        // stays at the conservative 256-token decode-chunk default.
+        engineMaxTokens: 4096,
+        outputMaxTokens: 256,
         temperature: 0,
         topK: 1,
       });
