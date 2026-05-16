@@ -220,25 +220,36 @@ yet, no matter what flags you pass**. Treat the TODO comment as a hard stop.
 
 ## What ships instead
 
-Three options, ranked by effort-to-certainty ratio:
+Update after Issue #13: the runtime-side version skew was closed by rebuilding
+the iOS `LiteRTLM.xcframework` from `google-ai-edge/LiteRT-LM` `main` commit
+`2f70ce879d1dd4c4a22e597b2c0a03f9799fef7d`. The artifact ships from
+`Maelstrome/lora-wave-session-r32/native/ios/LiteRTLM-ios-frameworks.zip` and
+is installed by `mobile/scripts/install-litert-ios-framework.js` after
+`npm install`, replacing the stale framework bundled by
+`react-native-litert-lm@0.3.6`.
 
-1. **Rebuild LiteRTLM-Swift xcframework against LiteRT-LM main, bridge as Expo Module** — 1-2 days on macOS. Closes the runtime-side version skew. Doesn't necessarily close the converter-side metadata gap (Dokotela's case suggests it might fail with pad-token generation). Highest hope; non-trivial work; useful even if it requires waiting for `litert-torch` to fix its Gemma 4 metadata builder.
-2. **Use stock `litert-community/gemma-4-E2B-it.litertlm` via `react-native-litert-lm` with WAVE prompts injected at system-message scope** — works today, loses the fine-tune. Qualifies for the "uses LiteRT" prize requirement. ~1-2 h to wire.
-3. **Fall back to `llama.rn` + GGUF** (the original contingency in the pivot plan). GGUF shards already on HF at `Maelstrome/lora-wave-session-r32/gguf/`. Keeps the fine-tune. ~3-4 h. Does not qualify for the LiteRT prize.
+Local verification with the rebuilt runtime loaded
+`Maelstrome/lora-wave-session-r32/litert-lm-v3/model.litertlm` on macOS CPU
+and generated coherent text. macOS GPU registration failed in the CLI
+environment, so the remaining proof is the physical iPhone `/tests/litert`
+Metal smoke. If that passes, the LiteRT path ships with the fine-tune instead
+of falling back to stock Gemma or GGUF.
 
-The hybrid path — stock Gemma via LiteRT for the prize-qualifying demo, plus
-llama.rn + GGUF for the production-quality flow that uses the fine-tune —
-is the highest-EV option for the hackathon timeline if option 1 doesn't
-complete in time.
+Fallback options if the iPhone smoke still fails:
+
+1. **Use stock `litert-community/gemma-4-E2B-it.litertlm` via `react-native-litert-lm` with WAVE prompts injected at system-message scope** — works today, loses the fine-tune. Qualifies for the "uses LiteRT" prize requirement. ~1-2 h to wire.
+2. **Fall back to `llama.rn` + GGUF** (the original contingency in the pivot plan). GGUF shards already on HF at `Maelstrome/lora-wave-session-r32/gguf/`. Keeps the fine-tune. ~3-4 h. Does not qualify for the LiteRT prize.
 
 ## File references
 
 - **The fine-tune (works correctly in PyTorch)**: `Maelstrome/lora-wave-session-r32` (LoRA adapter) + `unsloth/gemma-4-E2B-it` base
-- **The three bundles we built (all rejected)**: `Maelstrome/lora-wave-session-r32/{mediapipe,litert-lm,litert-lm-v2}/model.litertlm`
+- **The bundles we built during diagnosis**: `Maelstrome/lora-wave-session-r32/{mediapipe,litert-lm,litert-lm-v2,litert-lm-v3}/model.litertlm`
+- **The rebuilt iOS framework artifact**: `Maelstrome/lora-wave-session-r32/native/ios/LiteRTLM-ios-frameworks.zip`
 - **The stock bundle that loads**: `litert-community/gemma-4-E2B-it.litertlm`
 - **The wrapper we're pinned to**: `react-native-litert-lm@0.3.6` (`mobile/.npmrc`'s `legacy-peer-deps=true`)
-- **The mobile entry point**: `mobile/src/runtime/litert-generators.ts`, `mobile/src/runtime/mediapipe-generators.ts` (parallel path also blocked)
-- **The smoke screens**: `mobile/src/screens/{LiteRTSmokeScreen,MediaPipeSmokeScreen}.tsx`
+- **The mobile entry point**: `mobile/src/runtime/litert-generators.ts`
+- **The smoke screen**: `mobile/src/screens/LiteRTSmokeScreen.tsx`
+- **The framework installer**: `mobile/scripts/install-litert-ios-framework.js`
 - **Cache layer with exact-size invalidation**: `mobile/src/runtime/model-cache.ts`
 - **Sibling postmortem (browser-side parallel)**: [`mediapipe-finetune.md`](./mediapipe-finetune.md)
 - **Cross-cutting iOS browser ceiling**: [`ios-safari-browser.md`](./ios-safari-browser.md)

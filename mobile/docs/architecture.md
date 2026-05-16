@@ -21,7 +21,7 @@ the UI shell are new.
 
 | Layer | Library | Hardware target |
 |---|---|---|
-| LLM (primary) | `react-native-litert-lm` 0.3.7 (Nitro Modules) | Metal GPU |
+| LLM (primary) | `react-native-litert-lm` 0.3.6 (Nitro Modules) + rebuilt LiteRT-LM iOS XCFramework | Metal GPU |
 | LLM (contingency) | `llama.rn` (not yet installed) | Metal GPU |
 | STT | `whisper.rn` 0.6.0 | Metal GPU initially; CoreML ANE encoder is a follow-up |
 | TTS | `react-native-sherpa-onnx` 0.4.3 (Kokoro 82M) | ANE via CoreML EP |
@@ -92,6 +92,9 @@ mobile/
 │
 ├── scripts/
 │   ├── download-kokoro.sh        One-shot fetch+extract of Kokoro bundle
+│   ├── install-litert-ios-framework.js
+│   │                            Downloads the rebuilt LiteRT-LM iOS
+│   │                            XCFramework from HF after npm install
 │   └── reset-project.js          From scaffold
 │
 ├── docs/
@@ -103,8 +106,31 @@ mobile/
 ├── package.json                  Deps + scripts
 ├── tsconfig.json                 Path aliases (see "Module resolution" below)
 └── .npmrc                        legacy-peer-deps=true (required for
-                                  react-native-litert-lm@0.3.7 + Expo 54)
+                                  react-native-litert-lm + Expo 54)
 ```
+
+## Native LiteRT-LM Framework
+
+`react-native-litert-lm@0.3.6` is the pinned wrapper, but its original iOS
+framework was built from an older LiteRT-LM runtime that rejected WAVE's
+Gemma 4 LiteRT-LM bundles at engine creation. The app replaces that framework
+after install:
+
+```
+npm install
+  → scripts/install-litert-ios-framework.js
+      → downloads Maelstrome/lora-wave-session-r32/native/ios/LiteRTLM-ios-frameworks.zip
+      → verifies byte size + SHA256
+      → extracts to node_modules/react-native-litert-lm/ios/Frameworks/
+```
+
+The HF artifact was built from `google-ai-edge/LiteRT-LM` `main` commit
+`2f70ce879d1dd4c4a22e597b2c0a03f9799fef7d` with the wrapper's
+`scripts/build-ios-engine.sh`, which stubs the Rust / llguidance constrained
+decoding pieces for iOS. Local macOS CLI verification used the same current
+runtime with FST constraints disabled and loaded
+`litert-lm-v3/model.litertlm` successfully on CPU; physical iPhone Metal
+validation still happens through `/tests/litert`.
 
 ## The port boundary
 

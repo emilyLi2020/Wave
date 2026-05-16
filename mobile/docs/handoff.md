@@ -3,14 +3,41 @@
 Skim this if you just cloned the repo or are starting a fresh session. For
 the deeper architecture, read `docs/architecture.md` next.
 
-## ✅ Blocker resolved (2026-05-16)
+## ✅ LiteRT-LM iOS framework rebuilt (2026-05-16)
+
+Issue #13 is resolved up through local runtime verification. A current
+LiteRT-LM `LiteRTLM.xcframework` was rebuilt on macOS from
+`google-ai-edge/LiteRT-LM` `main` commit
+`2f70ce879d1dd4c4a22e597b2c0a03f9799fef7d` using Xcode 26.5 and the
+wrapper's `scripts/build-ios-engine.sh` flow. The zipped framework and
+build metadata are on Hugging Face:
+
+- `Maelstrome/lora-wave-session-r32/native/ios/LiteRTLM-ios-frameworks.zip`
+- `Maelstrome/lora-wave-session-r32/native/ios/LiteRTLM-ios-frameworks-build-metadata.json`
+
+`mobile/scripts/install-litert-ios-framework.js` now runs after `npm install`,
+downloads that HF asset, verifies byte size + SHA256, and installs it into
+`node_modules/react-native-litert-lm/ios/Frameworks/LiteRTLM.xcframework`.
+This intentionally overwrites the stale framework that ships with
+`react-native-litert-lm@0.3.6`.
+
+Local verification passed with the rebuilt LiteRT-LM runtime against the
+current WAVE bundle at
+`Maelstrome/lora-wave-session-r32/litert-lm-v3/model.litertlm`
+(`2,560,956,368` bytes): the macOS CLI loaded the bundle on CPU and generated
+`Hi! How can I help you today?` for prompt `hi`. macOS GPU registration failed
+for the CLI environment, so the remaining acceptance check is the physical
+iPhone `/tests/litert` smoke using Metal.
+
+## Previous bundle blocker recap (2026-05-16)
 
 Issue #11 is closed. The fine-tune was re-exported via `litert-torch 0.9.0`
 on a rented Threadripper box (PEFT merge → `litert_torch.generative.export_hf`
 with `dynamic_wi4_afp32` quant + `externalize_embedder=True`). New bundle is
-at `Maelstrome/lora-wave-session-r32/litert-lm/model.litertlm` (2.56 GB);
-the old `mediapipe/model.litertlm` is preserved as-is. Magic header bytes
-match the stock `litert-community/gemma-4-E2B-it.litertlm` exactly.
+at `Maelstrome/lora-wave-session-r32/litert-lm-v3/model.litertlm` (2.56 GB);
+older `litert-lm`, `litert-lm-v2`, and `mediapipe` artifacts are preserved
+as diagnostics. Magic header bytes match the stock
+`litert-community/gemma-4-E2B-it.litertlm` exactly.
 
 `mobile/src/runtime/model-cache.ts` already points at the new URL. **If your
 device had the old 5 GB bundle cached**, the cache-hit check now requires
@@ -123,7 +150,9 @@ test page.
 - **`react-native-litert-lm` pinned to `0.3.6`** (not the latest `0.3.7` —
   that release is broken upstream; iOS frameworks asset was never attached
   to the GitHub release. See [hung-yueh#9](https://github.com/hung-yueh/react-native-litert-lm/issues/9)).
-  If a `0.3.8` lands with the asset fix, we can move forward.
+  We intentionally replace its bundled iOS framework after install via
+  `scripts/install-litert-ios-framework.js`, using the rebuilt HF artifact
+  under `native/ios/`.
 
 - **`app.json` bundle identifier is a placeholder** (`com.wave.mobile`).
   If your Apple team needs a specific bundle ID, change it before the

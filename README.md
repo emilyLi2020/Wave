@@ -4,6 +4,7 @@ An offline-first, medication-aware urge surfing companion for SUD recovery.
 
 - **Cursor / Claude Code skills** live under `.agents/skills/` and `.claude/skills/`.
 - **WAVE web demo** lives under `client/` (Next.js 16 + TypeScript + Tailwind v4).
+- **WAVE mobile demo** lives under `mobile/` (Expo / React Native iOS). It patches `react-native-litert-lm@0.3.6` at install time with a rebuilt LiteRT-LM iOS XCFramework hosted on Hugging Face.
 - **Specs** live at the repo root — see `AGENTS.md` (agent instructions, tech stack, code style, domain constraints) and `PRD.md` (user flow, pages, data model, medication-aware prompt logic).
 
 ## Run the web demo

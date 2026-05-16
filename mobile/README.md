@@ -21,7 +21,7 @@ Native iOS port of the Wave fine-tune. The web app at `../client/` is closed on 
 
 ## One-time setup (host)
 
-1. **Apple Developer Program enrollment** (~$99/yr, 24-48h approval). Required for the `com.apple.developer.kernel.increased-memory-limit` entitlement that keeps the 4.7 GB Gemma + voice models resident.
+1. **Apple Developer Program enrollment** (~$99/yr, 24-48h approval). Required for the `com.apple.developer.kernel.increased-memory-limit` entitlement that keeps the 2.56 GB Gemma LiteRT-LM bundle + voice models resident.
 2. Install Expo + EAS CLI: `npm i -g eas-cli`.
 3. `eas login` with the same Apple-linked Expo account.
 4. Register the physical iPhone 15 Pro / 16 Pro UDID in the Apple Developer portal **and** with EAS (`eas device:create`).
@@ -47,7 +47,8 @@ npx expo start --dev-client
 
 ## Dependency notes
 
-- `react-native-litert-lm@0.3.7` declares `peerOptional expo@>=55.0.0`. We're on Expo 54 (the latest stable as of this scaffold). `.npmrc` sets `legacy-peer-deps=true` so installs proceed; if a runtime issue appears, the fix is to either bump Expo to the next SDK or downgrade `react-native-litert-lm` to a 0.3.x release that matches Expo 54.
+- `react-native-litert-lm@0.3.6` is pinned. The package's bundled iOS framework is stale for WAVE's Gemma 4 LiteRT-LM bundle, so `npm install` runs `scripts/install-litert-ios-framework.js` to fetch the rebuilt `LiteRTLM.xcframework` from `Maelstrome/lora-wave-session-r32/native/ios/` on Hugging Face and verify its SHA256 before EAS builds.
+- `react-native-litert-lm` declares `peerOptional expo@>=55.0.0`. We're on Expo 54. `.npmrc` sets `legacy-peer-deps=true` so installs proceed; keep that until the wrapper drops the constraint or the app moves to Expo 55.
 - New Architecture (`newArchEnabled: true` in `app.json`) is required by Nitro Modules.
 
 ## Repo layout

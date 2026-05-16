@@ -317,10 +317,10 @@ export default function LiteRTSmokeScreen() {
       <View style={styles.diagnosticBlock}>
         <Text style={styles.diagnosticHead}>Diagnostic</Text>
         <Text selectable style={styles.diagnosticBody}>
-          If "Generate" fails with "Failed to create LiteRT-LM engine",
-          tap below to test the unmodified Gemma 4 (2.6 GB, separate
-          download). Loading it confirms our fine-tune bundle is the
-          problem (issue #11), not the wrapper or device.
+          If &quot;Generate&quot; fails with &quot;Failed to create LiteRT-LM
+          engine&quot;, tap below to test the unmodified Gemma 4 (2.6 GB,
+          separate download). Loading it confirms our fine-tune bundle is
+          the problem (issue #11), not the wrapper or device.
         </Text>
         <Pressable
           style={[styles.buttonSecondary, isBusy && styles.buttonDisabled]}
