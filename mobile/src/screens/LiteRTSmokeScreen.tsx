@@ -31,7 +31,14 @@ import {
   preloadWaveLiteRT,
   unloadWaveLiteRT,
 } from "@/runtime/litert-generators";
-import type { LiteRTLMInstance } from "react-native-litert-lm";
+import { createLLM, type LiteRTLMInstance } from "react-native-litert-lm";
+
+// Diagnostic-only URL — the stock unmodified Gemma 4 E2B-IT bundle from
+// litert-community. Loading this successfully while our fine-tune bundle
+// fails confirms the format-flavor mismatch (issue Maelstrome/Wave#11).
+// 2.59 GB; downloads into the wrapper's own cache, NOT our model-cache layer.
+const STOCK_GEMMA4_URL =
+  "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm";
 
 const SAMPLE_CONTEXT: ChunkGenerationContextPayload = {
   chunkNumber: 1,
@@ -170,6 +177,43 @@ export default function LiteRTSmokeScreen() {
     }
   };
 
+  const onLoadStockGemma = async () => {
+    // Diagnostic: load the unmodified Gemma 4 from litert-community. If this
+    // succeeds while onLoad() fails, the issue is our bundle format
+    // (issue #11), not the wrapper / device / entitlement / Metal.
+    setPhase("downloading");
+    setError(null);
+    setDownloadPct(0);
+    setOutput("");
+    setStats(null);
+    try {
+      const llm = createLLM({ enableMemoryTracking: true });
+      // wrapper.loadModel auto-downloads HTTPS URLs into the wrapper's own
+      // cache dir (Library/Caches/litert_models/) — bypasses our cache
+      // layer entirely, which is fine for a one-off diagnostic.
+      await llm.loadModel(
+        STOCK_GEMMA4_URL,
+        { backend: "gpu", maxTokens: 256, temperature: 0, topK: 1 },
+        (p) => {
+          setDownloadPct(p);
+          if (p >= 1) setPhase("loading");
+        },
+      );
+      llmRef.current = llm;
+      setMemory(llm.getMemoryUsage());
+      startMemoryPoll(llm);
+      setPhase("ready");
+      setError(
+        "Stock Gemma 4 loaded OK → format mismatch confirmed; see issue #11.",
+      );
+    } catch (e) {
+      setError(
+        `Stock Gemma 4 also failed: ${e instanceof Error ? e.message : String(e)} — wrapper/device issue, not bundle format.`,
+      );
+      setPhase("error");
+    }
+  };
+
   const onUnload = async () => {
     if (memTimerRef.current) {
       clearInterval(memTimerRef.current);
@@ -270,6 +314,25 @@ export default function LiteRTSmokeScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.diagnosticBlock}>
+        <Text style={styles.diagnosticHead}>Diagnostic</Text>
+        <Text selectable style={styles.diagnosticBody}>
+          If "Generate" fails with "Failed to create LiteRT-LM engine",
+          tap below to test the unmodified Gemma 4 (2.6 GB, separate
+          download). Loading it confirms our fine-tune bundle is the
+          problem (issue #11), not the wrapper or device.
+        </Text>
+        <Pressable
+          style={[styles.buttonSecondary, isBusy && styles.buttonDisabled]}
+          disabled={isBusy}
+          onPress={onLoadStockGemma}
+        >
+          <Text style={styles.buttonSecondaryText}>
+            Try stock Gemma 4 (diagnostic)
+          </Text>
+        </Pressable>
+      </View>
+
       {output.length > 0 && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>Streaming output</Text>
@@ -347,4 +410,19 @@ const styles = StyleSheet.create({
     borderColor: "#3F3F50",
   },
   buttonSecondaryText: { color: "#9CA3AF", fontWeight: "600", fontSize: 13 },
+  diagnosticBlock: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#23232F",
+    gap: 8,
+  },
+  diagnosticHead: {
+    color: "#6B7280",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  diagnosticBody: { color: "#9CA3AF", fontSize: 12, lineHeight: 17 },
 });
