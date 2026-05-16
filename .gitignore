@@ -28,6 +28,9 @@ logs/
 .claude/
 .playwright-mcp/
 
+# Scratch / research clones (e.g. vendor-package source pulls for pre-flight grep).
+.tmp/
+
 # Local artifacts copied/symlinked into client/public/ for browser testing.
 # Re-create per-machine after running the export pipeline. See
 # docs/onnx-windows-handoff.md and docs/postmortems/mlc-finetune.md.
