@@ -166,9 +166,12 @@ export default function WhisperTestScreen() {
     phase === "transcribing";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Whisper STT smoke</Text>
-      <Text style={styles.sub}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      <Text style={styles.sub} selectable>
         whisper.rn + ggml-tiny.en + Metal GPU. Mic → transcript end-to-end on iPhone.
       </Text>
 
@@ -191,9 +194,9 @@ export default function WhisperTestScreen() {
       {phase === "done" && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>Timing</Text>
-          <Text style={styles.kv}>Recording length: {fmtMs(recDurationMs)}</Text>
-          <Text style={styles.kv}>Transcription wall: {fmtMs(transcribeMs)}</Text>
-          <Text style={styles.kv}>
+          <Text selectable style={styles.kv}>Recording length: {fmtMs(recDurationMs)}</Text>
+          <Text selectable style={styles.kv}>Transcription wall: {fmtMs(transcribeMs)}</Text>
+          <Text selectable style={styles.kv}>
             RTF: {recDurationMs > 0 ? (transcribeMs / recDurationMs).toFixed(2) : "—"}
           </Text>
         </View>
@@ -202,7 +205,7 @@ export default function WhisperTestScreen() {
       {error && (
         <View style={[styles.panel, styles.errorPanel]}>
           <Text style={styles.panelHead}>Error</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text selectable style={styles.errorText}>{error}</Text>
         </View>
       )}
 
@@ -271,7 +274,6 @@ function phaseStyle(p: Phase) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
-  heading: { color: "#F1F1F4", fontSize: 20, fontWeight: "700" },
   sub: { color: "#9CA3AF", fontSize: 13 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusLabel: { color: "#9CA3AF", fontSize: 14 },
@@ -280,6 +282,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#16161F",
     padding: 12,
     borderRadius: 8,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
     gap: 4,
@@ -302,6 +305,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 6,
+    borderCurve: "continuous",
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 14, textAlign: "center" },

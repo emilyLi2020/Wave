@@ -279,9 +279,12 @@ export default function CombinedVoiceTestScreen() {
     phase === "speaking";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Combined voice loop</Text>
-      <Text style={styles.sub}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      <Text style={styles.sub} selectable>
         VAD-less push-to-talk MVP. Record → Whisper → LiteRT → Kokoro → play.
       </Text>
 
@@ -327,14 +330,14 @@ export default function CombinedVoiceTestScreen() {
       {error && (
         <View style={[styles.panel, styles.errorPanel]}>
           <Text style={styles.panelHead}>Error</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text selectable style={styles.errorText}>{error}</Text>
         </View>
       )}
 
       {transcript && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>You said ({fmtMs(stats.sttMs)})</Text>
-          <Text style={styles.outputText}>{transcript}</Text>
+          <Text selectable style={styles.outputText}>{transcript}</Text>
         </View>
       )}
 
@@ -343,14 +346,14 @@ export default function CombinedVoiceTestScreen() {
           <Text style={styles.panelHead}>
             LiteRT reply ({fmtMs(stats.llmMs)})
           </Text>
-          <Text style={styles.outputText}>{llmReply}</Text>
+          <Text selectable style={styles.outputText}>{llmReply}</Text>
         </View>
       )}
 
       {audioUri && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>Kokoro audio ({fmtMs(stats.ttsMs)})</Text>
-          <Text style={styles.kv}>{audioUri}</Text>
+          <Text selectable style={styles.kv}>{audioUri}</Text>
           <Pressable style={styles.smallButton} onPress={() => player.play()}>
             <Text style={styles.smallButtonText}>Replay</Text>
           </Pressable>
@@ -405,7 +408,6 @@ function phaseStyle(p: Phase) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
-  heading: { color: "#F1F1F4", fontSize: 20, fontWeight: "700" },
   sub: { color: "#9CA3AF", fontSize: 13 },
   subRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },
@@ -423,6 +425,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#16161F",
     padding: 12,
     borderRadius: 8,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
     gap: 4,
@@ -444,6 +447,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 6,
+    borderCurve: "continuous",
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 14, textAlign: "center" },
@@ -454,6 +458,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     borderRadius: 100,
     minWidth: 220,
+    // capsule shape; borderCurve: 'continuous' is unnecessary here
   },
   talkButtonHot: { backgroundColor: "#F87171" },
   talkButtonText: {
@@ -469,6 +474,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
+    borderCurve: "continuous",
   },
   smallButtonText: { color: "#F1F1F4", fontSize: 12, fontWeight: "600" },
 });

@@ -132,13 +132,13 @@ export default function CachePanel() {
                 </Text>
               </View>
             </View>
-            <Text style={styles.meta}>
+            <Text selectable style={styles.meta}>
               {actual} / {expected} expected
             </Text>
             {isBusy && busy?.action === "downloading" && (
               <View style={styles.progressRow}>
                 <ActivityIndicator size="small" />
-                <Text style={styles.progressText}>
+                <Text selectable style={styles.progressText}>
                   {((busy.pct ?? 0) * 100).toFixed(1)}%
                 </Text>
               </View>
@@ -184,7 +184,7 @@ export default function CachePanel() {
 
       {error && (
         <View style={styles.errorRow}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text selectable style={styles.errorText}>{error}</Text>
         </View>
       )}
     </View>
@@ -200,6 +200,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#16161F",
     padding: 10,
     borderRadius: 8,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
     gap: 4,

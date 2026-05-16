@@ -7,8 +7,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function ReflectionScreenRoute() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Reflection</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       <Text style={styles.sub}>
         TODO: render insight + journalPromptQuestion + NextStepChips. Use
         reflectionPayloadSchema for validation.

@@ -128,9 +128,12 @@ export default function KokoroTestScreen() {
   const isBusy = phase === "loading" || phase === "speaking";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Kokoro TTS smoke</Text>
-      <Text style={styles.sub}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      <Text style={styles.sub} selectable>
         react-native-sherpa-onnx + Kokoro-82M ONNX (CoreML EP). Text → audio on iPhone.
       </Text>
 
@@ -161,15 +164,15 @@ export default function KokoroTestScreen() {
       {phase === "played" && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>Result</Text>
-          <Text style={styles.kv}>Generation: {genMs.toFixed(0)} ms</Text>
-          <Text style={styles.kv}>Audio: {audioPath ?? "—"}</Text>
+          <Text selectable style={styles.kv}>Generation: {genMs.toFixed(0)} ms</Text>
+          <Text selectable style={styles.kv}>Audio: {audioPath ?? "—"}</Text>
         </View>
       )}
 
       {error && (
         <View style={[styles.panel, styles.errorPanel]}>
           <Text style={styles.panelHead}>Error</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text selectable style={styles.errorText}>{error}</Text>
         </View>
       )}
 
@@ -228,7 +231,6 @@ function phaseStyle(p: Phase) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
-  heading: { color: "#F1F1F4", fontSize: 20, fontWeight: "700" },
   sub: { color: "#9CA3AF", fontSize: 13 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusLabel: { color: "#9CA3AF", fontSize: 14 },
@@ -237,6 +239,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#16161F",
     padding: 12,
     borderRadius: 8,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
     gap: 4,
@@ -260,6 +263,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#23232F",
     borderRadius: 6,
+    borderCurve: "continuous",
     padding: 10,
     color: "#F1F1F4",
     fontSize: 14,
@@ -272,6 +276,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 6,
+    borderCurve: "continuous",
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 14, textAlign: "center" },

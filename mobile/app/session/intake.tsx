@@ -8,8 +8,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function IntakeScreen() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Intake</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       <Text style={styles.sub}>
         TODO: port intake-form.tsx — intensity slider, MAT picker, medication
         status, trigger, demo-mode toggle. Submits IntakeAnswers into the

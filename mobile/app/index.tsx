@@ -80,7 +80,11 @@ function Row({ entry }: { entry: Entry }) {
 
 export default function DevMenu() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       <Text style={styles.section}>Tests</Text>
       <Text style={styles.sectionSub}>Isolated runtime smoke checks.</Text>
       {TEST_ENTRIES.map((e) => (
@@ -109,6 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#16161F",
     padding: 12,
     borderRadius: 8,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
     marginBottom: 6,
@@ -124,6 +129,7 @@ const styles = StyleSheet.create({
   badge: {
     borderWidth: 1,
     borderRadius: 4,
+    borderCurve: "continuous",
     paddingHorizontal: 6,
     paddingVertical: 2,
   },

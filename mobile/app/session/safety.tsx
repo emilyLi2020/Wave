@@ -7,8 +7,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function SafetyScreenRoute() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Safety screen</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       <Text style={styles.sub}>
         TODO: port safety-screen.tsx — two yes/no questions, handoff path
         (SAMHSA), proceed path with usedSubstanceToday flag.

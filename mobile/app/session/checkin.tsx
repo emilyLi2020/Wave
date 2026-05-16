@@ -8,8 +8,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function CheckInScreenRoute() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Check-in</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       <Text style={styles.sub}>
         TODO: wire the conversational voice loop from
         src/voice/use-check-in-voice-loop.ts (after step 5c). Multi-turn LLM

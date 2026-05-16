@@ -186,9 +186,12 @@ export default function LiteRTSmokeScreen() {
   const isBusy = phase === "downloading" || phase === "loading" || phase === "generating";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>LiteRT smoke — Step 2 go/no-go</Text>
-      <Text style={styles.sub}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      <Text style={styles.sub} selectable>
         Loads gemma-4-e2b WAVE fine-tune from HF, generates chunk 1, validates output.
       </Text>
 
@@ -207,9 +210,9 @@ export default function LiteRTSmokeScreen() {
       {memory && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>Memory (live)</Text>
-          <Text style={styles.kv}>RSS: {fmtBytes(memory.residentBytes)}</Text>
-          <Text style={styles.kv}>Native heap: {fmtBytes(memory.nativeHeapBytes)}</Text>
-          <Text style={styles.kv}>Available: {fmtBytes(memory.availableMemoryBytes)}</Text>
+          <Text selectable style={styles.kv}>RSS: {fmtBytes(memory.residentBytes)}</Text>
+          <Text selectable style={styles.kv}>Native heap: {fmtBytes(memory.nativeHeapBytes)}</Text>
+          <Text selectable style={styles.kv}>Available: {fmtBytes(memory.availableMemoryBytes)}</Text>
           {memory.isLowMemory && (
             <Text style={[styles.kv, { color: "#F87171" }]}>
               ⚠ System reports low memory
@@ -221,12 +224,12 @@ export default function LiteRTSmokeScreen() {
       {stats && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>Generation stats</Text>
-          <Text style={styles.kv}>TTFT: {stats.ttftMs.toFixed(0)} ms</Text>
-          <Text style={styles.kv}>Total: {stats.totalMs.toFixed(0)} ms</Text>
-          <Text style={styles.kv}>
+          <Text selectable style={styles.kv}>TTFT: {stats.ttftMs.toFixed(0)} ms</Text>
+          <Text selectable style={styles.kv}>Total: {stats.totalMs.toFixed(0)} ms</Text>
+          <Text selectable style={styles.kv}>
             Tokens: {stats.promptTokens} in / {stats.completionTokens} out
           </Text>
-          <Text style={styles.kv}>
+          <Text selectable style={styles.kv}>
             Decode: {stats.tokensPerSecond.toFixed(1)} tok/s
           </Text>
         </View>
@@ -235,7 +238,7 @@ export default function LiteRTSmokeScreen() {
       {error && (
         <View style={[styles.panel, styles.errorPanel]}>
           <Text style={styles.panelHead}>Error</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text selectable style={styles.errorText}>{error}</Text>
         </View>
       )}
 
@@ -300,7 +303,6 @@ function phaseStyle(p: Phase) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
-  heading: { color: "#F1F1F4", fontSize: 20, fontWeight: "700" },
   sub: { color: "#9CA3AF", fontSize: 13 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusLabel: { color: "#9CA3AF", fontSize: 14 },
@@ -309,6 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#16161F",
     padding: 12,
     borderRadius: 8,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
     gap: 4,
@@ -331,6 +334,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 6,
+    borderCurve: "continuous",
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 13 },
@@ -338,6 +342,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 6,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#3F3F50",
   },
