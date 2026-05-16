@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "react-native-litert-lm": "^0.3.6"
+  }
+}

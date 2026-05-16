@@ -1,0 +1,167 @@
+Deep Research Prompt: Deploying a fine-tuned Gemma 4 E2B on iPhone via React Native
+====================================================================================
+
+BACKGROUND
+----------
+I'm shipping a fine-tuned `unsloth/gemma-4-E2B-it` LoRA (merged + quantized
+to GGUF Q4_K_M, ~3 GB) on-device for an iPhone meditation/recovery app
+(WAVE). Stack:
+
+  - React Native via Expo (managed/dev client workflow, EAS Build for
+    custom native modules)
+  - iOS target: iPhone 15 / 16 (A17 Pro / A18 / A18 Pro), iOS 18+
+  - Existing on-device ML in the app: Silero VAD via onnxruntime-react-native,
+    Kokoro TTS via sherpa-onnx. So we already have RN-bridged native
+    audio/ML modules working in production.
+  - Browser inference (web build of the app, sibling target) ships
+    Gemma via wllama (llama.cpp WebAssembly) and parses tool calls from
+    plain-text output. So we have a known-working wllama setup we can
+    point a native iOS runtime at.
+  - Prize requirement mandates the model be fine-tuned and run on-device.
+
+WHAT WE'VE TRIED ON iOS
+-----------------------
+1. react-native-litert-lm@0.3.6 — the Google Pixel team's LiteRT-LM
+   wrapper for RN. Stuck behind the upstream LiteRT-LM C++ release;
+   their .litertlm bundle format has no browser consumer and the iOS
+   side of the wrapper lags upstream. Dead end for our needs.
+
+2. MediaPipe LLM Inference (Google AI Edge) — the official Google
+   on-device LLM SDK. We pivoted to this for the prize requirement.
+   Has iOS SDK. Consumes a .task bundle (LiteRT-LM under the hood).
+   Unclear whether the React Native side has a maintained bridge or
+   if we'd be writing the Obj-C/Swift bridge ourselves.
+
+3. Considered but not yet tried:
+   - llama.rn (https://github.com/mybigday/llama.rn) — llama.cpp ported
+     to React Native, GGUF support, claimed iOS performance
+   - cactus (https://github.com/cactus-compute/cactus) — newer RN
+     LLM runtime
+   - Direct Swift bridge to llama.cpp from RN
+   - CoreML conversion (Gemma -> CoreML to hit Apple Neural Engine)
+
+CONSTRAINTS / REQUIREMENTS
+--------------------------
+- Model file ~3 GB Q4_K_M. Needs runtime download + cache (we can't ship
+  it inside the app bundle for App Store).
+- App must work offline after first launch.
+- Tool calling: model emits literal text `endConversation{cravingScore:N,
+  obstacleCategory:CAT}\n<closing speech>`. We need to regex-parse the
+  first line at the runtime layer.
+- Streaming token output to UI (for a chat-style check-in).
+- Background/foreground transitions: pause generation if backgrounded,
+  resume on return.
+- Expo workflow: the runtime must be installable as an Expo dev client
+  module (or via prebuild) — pure CocoaPods/SPM works fine, but plugins
+  that require ejecting from Expo entirely are a hard sell.
+- Apple Silicon: A17 Pro / A18 / A18 Pro. 8 GB RAM. Apple Neural Engine
+  available but rarely used by general LLM runtimes.
+
+RESEARCH QUESTIONS
+------------------
+1. Has anyone actually shipped a fine-tuned Gemma 4 E2B model (or Gemma
+   3 4B / similar small Gemma) inside an iPhone React Native app to
+   the App Store? Find specific apps, GitHub repos, blog posts, demos,
+   or App Store listings. Cite URLs, ideally with case studies including
+   tokens/sec, memory footprint, and crash rates.
+
+2. Best RN runtime for GGUF on iOS as of mid-2026:
+   a) llama.rn (mybigday) — current maturity, GGUF format support,
+      tool-calling parser hooks, iOS-specific tuning, known issues
+   b) cactus — production-ready? supported model formats? RN bridge
+      quality?
+   c) MediaPipe LLM Inference (Google AI Edge) iOS SDK — any community
+      RN bridge or do we write our own? Compatibility with Gemma 4 .task
+      bundles produced from a LoRA-merged checkpoint?
+   d) react-native-llm or similar emerging libs
+   e) Direct Swift bridge to llama.cpp — examples of teams who DIY'd
+      this and what it cost them
+   Compare on: (1) GGUF compatibility, (2) iOS performance (tokens/sec
+   on A18), (3) memory headroom, (4) streaming API, (5) maintenance
+   activity (commits in last 6 months), (6) Expo compatibility.
+
+3. Apple Neural Engine for Gemma: Has anyone successfully gotten Gemma
+   4 (E2B or larger) running on the ANE via CoreML conversion? What
+   tools (coremltools, ane-transformers)? Quantization formats supported?
+   Real benchmark numbers vs llama.cpp CPU/Metal? If ANE doesn't pan
+   out for LLMs, why — is it primarily a fixed-shape inference engine
+   poorly suited to autoregressive decode?
+
+4. Memory pressure on iPhone 15/16 (8 GB unified memory): What's the
+   actual practical ceiling for a Q4_K_M ~3 GB GGUF on iOS? Reports of
+   jetsam kills mid-generation? KV cache size at our context (~2400
+   prompt tokens, 200 generation tokens)? Strategies people use:
+   mlock disabled, smaller context window, mmap behavior.
+
+5. Token throughput on Apple Silicon: Real measurements (not vendor
+   marketing) for Gemma 4 E2B Q4_K_M on iPhone 15/16. Cite gist /
+   forum posts / Twitter benchmarks with iOS device + iOS version +
+   runtime version specified.
+
+6. App Store distribution patterns for ~3 GB models:
+   - On-demand resources (ODR)? (model as ODR asset bundled in app)
+   - Runtime download from CloudKit / our CDN / Hugging Face? UX patterns
+     for the first-launch download (~3 GB on cellular vs Wi-Fi prompts)
+   - Caching: where do shipping apps store these (Application Support
+     vs Documents)? Backup-exclusion attribute (iCloud doesn't try to
+     back up 3 GB)?
+   - Apple review: is there guidance/precedent for shipping LLM-powered
+     apps with multi-GB on-device weights? Any rejections we should
+     anticipate?
+
+7. Tool-call parsing layer: For a model that emits the function call
+   as plain text on line 1, what's the cleanest pattern in RN/Swift?
+   - Stream tokens to JS, regex on first complete line
+   - Detect-and-stop at end of first line, run regex, then resume to
+     get closing speech
+   - Stop sequences in llama.rn config
+
+8. Streaming + cancellation: How do shipping apps handle the user
+   navigating away mid-generation? Cancel and free KV cache cleanly?
+   Pause and resume? Show partial output as final?
+
+9. LoRA inference vs merged-and-quantized: Does any iOS runtime
+   support loading a base GGUF + a LoRA adapter at runtime, or is
+   everyone shipping merged-and-quantized monolithic GGUFs? Trade-offs
+   (adapter swap at runtime would let us A/B different LoRAs without
+   re-shipping a 3 GB blob).
+
+10. Comparable production deployments: Find 3-5 real-world apps that
+    ship local LLM inference on iOS today (Apple Intelligence aside).
+    What models? What runtimes? What pitfalls did they post-mortem
+    publicly? Examples: PrivateLLM, LLM Farm, MLC Chat, Pocket AI,
+    Enclave, etc. Are any of them React Native?
+
+11. Expo + native LLM module practical guide: Step-by-step from "a
+    fine-tuned GGUF on Hugging Face" to "tokens streaming in an Expo
+    iOS dev client." What .podspec / Expo config plugin patterns are
+    used? Anything specific to EAS Build for handling large native
+    binaries (e.g., llama.cpp universal binary)?
+
+12. Failure modes / red flags: What surprised people about Gemma 4
+    specifically on iOS that wasn't surprising for Llama / Mistral?
+    Tokenizer quirks? Special token handling on llama.cpp side
+    (does it correctly handle Gemma 4's `<|turn>`, `<|tool>`, `<|"|>`
+    specials we depend on)? Chat template support?
+
+WHAT I WANT FROM THE RESEARCH
+-----------------------------
+- Concrete examples of working iOS RN + small-Gemma deployments, with
+  URLs to repos / case studies / App Store listings
+- A ranked recommendation among (llama.rn, cactus, MediaPipe LLM
+  Inference iOS, custom Swift bridge) based on real evidence, not
+  marketing
+- A clear-eyed assessment: what's the FASTEST path from our current
+  state (fine-tuned LoRA on HF) to "user can use it on their iPhone"
+  with the fewest moving parts to debug
+- Numbers: tokens/sec, memory footprint, app size impact, first-launch
+  download UX patterns
+- If iOS deployment of a fine-tuned 3GB Gemma 4 GGUF in RN is
+  effectively un-shipped territory in mid-2026, say so directly and
+  propose alternatives (smaller model? remote inference fallback?
+  hybrid approach?)
+- Note any open issues / known bugs in the most viable runtimes that
+  would block our use case
+
+Length: 1500-3000 words, sources inline (URLs). Prioritize finding
+real shipped/published examples over theoretical recipes.

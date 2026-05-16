@@ -1,16 +1,19 @@
-// Kokoro TTS test page — text → audio via react-native-sherpa-onnx.
+// Kokoro TTS test page — text → streaming audio via react-native-sherpa-onnx.
 //
-// Kokoro ships as a multi-file ONNX bundle (~330 MB int8): model.onnx,
-// voices.bin, tokens.txt, lexicon-us-en.txt, plus an espeak-ng-data/ tree.
-// We follow path 2 from the plan: ship the bundle in the IPA via
-// mobile/assets/kokoro/ (gitignored, populated by scripts/download-kokoro.sh).
-// EAS Build packages the directory; sherpa-onnx loads it via the 'asset'
-// modelPath type — no first-launch download, no cache hop, no unzip.
+// Pinned to kokoro-en-v0_19 (fp32, 304 MB) — the empirical winner on
+// iPhone across TTFB, RTF, and audio cleanliness. CoreML EP on Apple
+// Silicon has no general int8 fast-path for arbitrary ops, so fp32
+// actually outperforms int8 here; v0.19 int8 also has a known
+// high-pitch quantization artifact.
 //
-// Until you run scripts/download-kokoro.sh, the assets/kokoro/ directory is
-// empty and the screen surfaces the setup instructions instead of trying to
-// load. Once present, "Speak" pushes text through createTTS with the
-// Kokoro modelType + CoreMLExecutionProvider.
+// Playback uses sherpa's built-in native PCM player (startPcmPlayer +
+// writePcmChunk + stopPcmPlayer). Sherpa splits the input into sentences
+// internally; each sentence emits an onChunk as soon as it's synthesized,
+// and we hand the float samples straight to the native audio queue —
+// no temp WAV files, no expo-audio round-trip. Streaming is
+// sentence-granularity, not within-sentence (Kokoro generates a sentence
+// in one forward pass), so for multi-sentence text TTFB drops to
+// per-sentence latency instead of total-paragraph latency.
 
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -23,109 +26,274 @@ import {
   View,
 } from "react-native";
 
-import * as FileSystem from "expo-file-system";
+import { setAudioModeAsync } from "expo-audio";
 
 // Lazy-import — react-native-sherpa-onnx pulls in native bindings only
 // resolved on device. Keeps Metro from crashing on web/dev imports.
-type TtsEngine = {
-  generateSpeech: (text: string, opts?: any) => Promise<any>;
+type StreamingTtsEngine = {
+  generateSpeechStream: (
+    text: string,
+    opts: unknown,
+    handlers: {
+      onChunk?: (c: { samples: number[]; sampleRate: number; isFinal: boolean }) => void;
+      onEnd?: (e: { cancelled: boolean }) => void;
+      onError?: (e: { message: string }) => void;
+    }
+  ) => Promise<{ cancel: () => Promise<void> }>;
+  cancelSpeechStream: () => Promise<void>;
+  startPcmPlayer: (sampleRate: number, channels: number) => Promise<void>;
+  writePcmChunk: (samples: number[]) => Promise<void>;
+  stopPcmPlayer: () => Promise<void>;
   destroy: () => Promise<void>;
 };
 
 const DEFAULT_TEXT =
-  "Welcome back. Take a breath. We're going to surf this together.";
+  "Welcome back. Take a breath. We're going to surf this together. " +
+  "Notice the air moving in, and the air moving out. Nothing else needs to happen right now.";
 
-// sherpa-onnx asset path. The runtime resolves this relative to the iOS
-// bundle (or android assets/) so all files inside mobile/assets/kokoro/
-// become available without manual require() per file.
-const KOKORO_ASSET_PATH = "kokoro";
+// Asset id in the k2-fsa/sherpa-onnx 'tts-models' release.
+const KOKORO_MODEL_ID = "kokoro-en-v0_19";
 
 type Phase =
   | "idle"
-  | "needsBundle"
+  | "downloading"
+  | "extracting"
   | "loading"
   | "ready"
   | "speaking"
   | "played"
   | "error";
 
+type ChunkStats = {
+  count: number;
+  totalSamples: number;
+  ttfbMs: number;
+  totalMs: number;
+  sampleRate: number;
+};
+
+const EMPTY_STATS: ChunkStats = {
+  count: 0,
+  totalSamples: 0,
+  ttfbMs: 0,
+  totalMs: 0,
+  sampleRate: 0,
+};
+
 export default function KokoroTestScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [text, setText] = useState(DEFAULT_TEXT);
   const [error, setError] = useState<string | null>(null);
-  const [genMs, setGenMs] = useState(0);
-  const [audioPath, setAudioPath] = useState<string | null>(null);
-  const engineRef = useRef<TtsEngine | null>(null);
+  const [stats, setStats] = useState<ChunkStats>(EMPTY_STATS);
+  const [percent, setPercent] = useState(0);
+  const [bytesDownloaded, setBytesDownloaded] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
+  const engineRef = useRef<StreamingTtsEngine | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const pcmPlayerActiveRef = useRef(false);
+
+  // Configure the audio session so playback works even with the silent
+  // switch on (sherpa's PCM player honors the app's AVAudioSession).
+  useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     return () => {
-      engineRef.current?.destroy().catch(() => {});
+      abortRef.current?.abort();
+      const engine = engineRef.current;
+      if (engine) {
+        (async () => {
+          try {
+            if (pcmPlayerActiveRef.current) {
+              await engine.stopPcmPlayer();
+            }
+          } catch {}
+          try {
+            await engine.destroy();
+          } catch {}
+        })();
+      }
     };
   }, []);
 
   const onLoad = async () => {
     setError(null);
-    setPhase("loading");
+    setPercent(0);
+    setBytesDownloaded(0);
+    setTotalBytes(0);
+    setPhase("downloading");
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      // Dynamic import keeps Metro happy when sherpa-onnx native code isn't
-      // present (e.g. web dev / type-check), and lets the screen render the
-      // "needsBundle" guidance below before the package is required.
-      // The TTS surface lives under the /tts subpath per the package's
-      // exports map; root re-export is limited (only types + utils).
+      const sherpaDownload: any = await import(
+        "react-native-sherpa-onnx/download"
+      );
       const sherpaTts: any = await import("react-native-sherpa-onnx/tts");
-      const tts = await sherpaTts.createTTS({
-        modelPath: { type: "asset", path: KOKORO_ASSET_PATH },
+
+      // ensureModelByCategory only reads the on-disk registry cache; on a
+      // fresh install it's empty and every id is "unknown". refresh first.
+      await sherpaDownload.refreshModelsByCategory(
+        sherpaDownload.ModelCategory.Tts,
+        { signal: controller.signal }
+      );
+
+      const result = await sherpaDownload.ensureModelByCategory(
+        sherpaDownload.ModelCategory.Tts,
+        KOKORO_MODEL_ID,
+        {
+          signal: controller.signal,
+          onProgress: (p: {
+            percent: number;
+            bytesDownloaded: number;
+            totalBytes: number;
+            phase?: "downloading" | "extracting";
+          }) => {
+            setPercent(p.percent);
+            setBytesDownloaded(p.bytesDownloaded);
+            setTotalBytes(p.totalBytes);
+            if (p.phase === "extracting") setPhase("extracting");
+            else if (p.phase === "downloading") setPhase("downloading");
+          },
+        }
+      );
+
+      setPhase("loading");
+      const tts = (await sherpaTts.createStreamingTTS({
+        modelPath: { type: "file", path: result.localPath },
         modelType: "kokoro",
-        // CoreMLExecutionProvider puts Kokoro on ANE alongside Whisper's
-        // encoder — they don't overlap in time during a turn, so no real
-        // contention. Verify with the combined test page.
         providers: ["CoreMLExecutionProvider"],
-      });
-      engineRef.current = tts as TtsEngine;
+      })) as StreamingTtsEngine;
+      engineRef.current = tts;
       setPhase("ready");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // Heuristic: if the error mentions missing files, route to the
-      // "needsBundle" guidance UI.
-      if (/not found|missing|no such file|enoent/i.test(msg)) {
-        setPhase("needsBundle");
-        setError(msg);
-      } else {
-        setPhase("error");
-        setError(msg);
-      }
+      setPhase("error");
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
+  const onCancelDownload = () => {
+    abortRef.current?.abort();
+    setPhase("idle");
+  };
+
   const onSpeak = async () => {
-    if (!engineRef.current) {
+    const engine = engineRef.current;
+    if (!engine) {
       setError("Kokoro not loaded yet");
       setPhase("error");
       return;
     }
     setError(null);
+    setStats(EMPTY_STATS);
     setPhase("speaking");
-    try {
-      const t0 = Date.now();
-      const audio = await engineRef.current.generateSpeech(text);
-      const t1 = Date.now();
-      setGenMs(t1 - t0);
 
-      const docDir =
-        (FileSystem as any).documentDirectory ??
-        ((FileSystem as any).Paths?.document?.uri as string | undefined);
-      const outPath = `${docDir}wave-models/kokoro/out-${Date.now()}.wav`;
-      // saveAudioToFile would go here once the engine is wired. Holding for
-      // bundle integration.
-      setAudioPath(outPath);
+    const t0 = Date.now();
+    let firstChunkAt = 0;
+    let chunkCount = 0;
+    let totalSamples = 0;
+    let playerSampleRate = 0;
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        engine
+          .generateSpeechStream(text, undefined, {
+            onChunk: (c) => {
+              // Lazy-start the player with the chunk's actual sample rate.
+              // getSampleRate() can disagree with what the model emits per
+              // chunk; trusting the chunk avoids resampling artifacts.
+              if (firstChunkAt === 0) {
+                firstChunkAt = Date.now();
+                playerSampleRate = c.sampleRate;
+                setStats((s) => ({
+                  ...s,
+                  ttfbMs: firstChunkAt - t0,
+                  sampleRate: c.sampleRate,
+                }));
+                engine
+                  .startPcmPlayer(c.sampleRate, 1)
+                  .then(() => {
+                    pcmPlayerActiveRef.current = true;
+                    return engine.writePcmChunk(c.samples);
+                  })
+                  .catch(() => {});
+              } else {
+                if (c.sampleRate !== playerSampleRate) {
+                  console.warn(
+                    `[Kokoro] chunk sampleRate ${c.sampleRate} != player ${playerSampleRate}`
+                  );
+                }
+                engine.writePcmChunk(c.samples).catch(() => {});
+              }
+              chunkCount += 1;
+              totalSamples += c.samples.length;
+              setStats((s) => ({
+                ...s,
+                count: chunkCount,
+                totalSamples,
+              }));
+            },
+            onEnd: (e) => {
+              if (e.cancelled) {
+                reject(new Error("Generation cancelled"));
+              } else {
+                resolve();
+              }
+            },
+            onError: (e) => reject(new Error(e.message)),
+          })
+          .catch(reject);
+      });
+
+      const totalMs = Date.now() - t0;
+      setStats((s) => ({
+        ...s,
+        count: chunkCount,
+        totalSamples,
+        totalMs,
+        sampleRate: playerSampleRate || 24_000,
+      }));
       setPhase("played");
+
+      // Wait for the scheduled audio queue to drain before stopping;
+      // [player stop] discards unplayed buffers otherwise.
+      const audioMs =
+        (totalSamples / (playerSampleRate || 24_000)) * 1000;
+      const elapsedSinceFirstChunk = Date.now() - firstChunkAt;
+      const drainMs = Math.max(0, audioMs - elapsedSinceFirstChunk) + 200;
+      setTimeout(() => {
+        engine.stopPcmPlayer().catch(() => {});
+        pcmPlayerActiveRef.current = false;
+      }, drainMs);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
+      try {
+        await engine.stopPcmPlayer();
+      } catch {}
+      pcmPlayerActiveRef.current = false;
     }
   };
 
-  const isBusy = phase === "loading" || phase === "speaking";
+  const onCancelSpeak = async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    try {
+      await engine.cancelSpeechStream();
+    } catch {}
+  };
+
+  const isDownloading = phase === "downloading" || phase === "extracting";
+  const isBusy = isDownloading || phase === "loading" || phase === "speaking";
+
+  const fmtMb = (b: number) => (b / 1024 / 1024).toFixed(1);
+  const audioSec =
+    stats.totalSamples > 0 && stats.sampleRate > 0
+      ? stats.totalSamples / stats.sampleRate
+      : 0;
+  const rtf =
+    audioSec > 0 && stats.totalMs > 0 ? stats.totalMs / 1000 / audioSec : 0;
 
   return (
     <ScrollView
@@ -134,7 +302,8 @@ export default function KokoroTestScreen() {
       contentInsetAdjustmentBehavior="automatic"
     >
       <Text style={styles.sub} selectable>
-        react-native-sherpa-onnx + Kokoro-82M ONNX (CoreML EP). Text → audio on iPhone.
+        Kokoro {KOKORO_MODEL_ID} (fp32, CoreML EP). Sentence-streaming
+        playback via sherpa's native PCM queue.
       </Text>
 
       <View style={styles.statusRow}>
@@ -143,29 +312,48 @@ export default function KokoroTestScreen() {
         {isBusy && <ActivityIndicator size="small" style={{ marginLeft: 8 }} />}
       </View>
 
-      {phase === "needsBundle" && (
+      {isDownloading && (
         <View style={styles.panel}>
-          <Text style={styles.panelHead}>Kokoro bundle missing</Text>
+          <Text style={styles.panelHead}>
+            {phase === "extracting" ? "Extracting" : "Downloading"} {KOKORO_MODEL_ID}
+          </Text>
           <Text style={styles.bodyText}>
-            mobile/assets/kokoro/ is empty (or missing model files). Populate it
-            once per dev machine:
+            {percent.toFixed(1)}%
+            {totalBytes > 0
+              ? ` — ${fmtMb(bytesDownloaded)} / ${fmtMb(totalBytes)} MB`
+              : ""}
           </Text>
-          <Text style={[styles.bodyText, styles.mono, { marginTop: 6 }]}>
-            cd mobile && ./scripts/download-kokoro.sh
+          <Text style={[styles.bodyText, styles.subtle, { marginTop: 4 }]}>
+            Saved to Documents/sherpa-onnx/models/tts/{KOKORO_MODEL_ID}/. Resumes
+            on relaunch if interrupted.
           </Text>
-          <Text style={[styles.bodyText, { marginTop: 6 }]}>
-            That fetches kokoro-en-v0.19 (~330 MB int8) from the sherpa-onnx
-            GitHub release into assets/kokoro/. EAS Build picks it up on the
-            next build.
-          </Text>
+          <Pressable
+            style={[styles.button, styles.cancelButton, { marginTop: 8 }]}
+            onPress={onCancelDownload}
+          >
+            <Text style={styles.buttonText}>Cancel</Text>
+          </Pressable>
         </View>
       )}
 
-      {phase === "played" && (
+      {(phase === "speaking" || phase === "played") && (
         <View style={styles.panel}>
-          <Text style={styles.panelHead}>Result</Text>
-          <Text selectable style={styles.kv}>Generation: {genMs.toFixed(0)} ms</Text>
-          <Text selectable style={styles.kv}>Audio: {audioPath ?? "—"}</Text>
+          <Text style={styles.panelHead}>Streaming stats</Text>
+          <Text selectable style={styles.kv}>
+            Time to first chunk: {stats.ttfbMs > 0 ? `${stats.ttfbMs} ms` : "—"}
+          </Text>
+          <Text selectable style={styles.kv}>
+            Chunks: {stats.count}
+          </Text>
+          <Text selectable style={styles.kv}>
+            Audio: {audioSec > 0 ? `${audioSec.toFixed(2)} s @ ${stats.sampleRate} Hz` : "—"}
+          </Text>
+          <Text selectable style={styles.kv}>
+            Total gen: {stats.totalMs > 0 ? `${stats.totalMs} ms` : "—"}
+          </Text>
+          <Text selectable style={styles.kv}>
+            RTF: {rtf > 0 ? `${rtf.toFixed(3)} (${(1 / rtf).toFixed(2)}× real-time)` : "—"}
+          </Text>
         </View>
       )}
 
@@ -203,8 +391,17 @@ export default function KokoroTestScreen() {
           disabled={phase !== "ready" && phase !== "played"}
           onPress={onSpeak}
         >
-          <Text style={styles.buttonText}>2. Speak</Text>
+          <Text style={styles.buttonText}>2. Speak (streaming)</Text>
         </Pressable>
+
+        {phase === "speaking" && (
+          <Pressable
+            style={[styles.button, styles.cancelButton]}
+            onPress={onCancelSpeak}
+          >
+            <Text style={styles.buttonText}>Stop</Text>
+          </Pressable>
+        )}
       </View>
     </ScrollView>
   );
@@ -220,8 +417,8 @@ function phaseStyle(p: Phase) {
       return { color: "#22D3EE" };
     case "speaking":
     case "loading":
-      return { color: "#FBBF24" };
-    case "needsBundle":
+    case "downloading":
+    case "extracting":
       return { color: "#FBBF24" };
     default:
       return { color: "#9CA3AF" };
@@ -232,6 +429,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
   sub: { color: "#9CA3AF", fontSize: 13 },
+  subtle: { fontSize: 12, color: "#9CA3AF" },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusLabel: { color: "#9CA3AF", fontSize: 14 },
   statusValue: { fontSize: 14, fontWeight: "600" },
@@ -255,7 +453,6 @@ const styles = StyleSheet.create({
   },
   kv: { color: "#F1F1F4", fontSize: 13, fontFamily: "Menlo" },
   bodyText: { color: "#F1F1F4", fontSize: 13, lineHeight: 18 },
-  mono: { fontFamily: "Menlo", color: "#22D3EE" },
   errorText: { color: "#F87171", fontSize: 13, fontFamily: "Menlo" },
   label: { color: "#9CA3AF", fontSize: 12, marginTop: 4 },
   textInput: {
@@ -279,5 +476,6 @@ const styles = StyleSheet.create({
     borderCurve: "continuous",
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
+  cancelButton: { backgroundColor: "#7F1D1D" },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 14, textAlign: "center" },
 });

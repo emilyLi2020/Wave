@@ -1,0 +1,55 @@
+# .easignore — only mobile/ is shipped to EAS Build.
+# This file overrides .gitignore for EAS archive selection, so it must also
+# replicate the mobile/.gitignore rules we still want applied.
+
+# --- Exclude everything outside mobile/ ---
+/client/
+/models/
+/docs/
+/logs/
+/supabase/
+/artifacts/
+/.tmp/
+/.playwright-mcp/
+/.cursor/
+/.claude/
+/.agents/
+/.vscode/
+/.git/
+
+# Top-level archives and scratch scripts at the repo root
+/*.tar.gz
+/*.zip
+/*.py
+/*.sh
+
+# Env files at repo root
+/.env
+/.env.*
+!/.env.example
+
+# --- Mirror of mobile/.gitignore (since .easignore replaces .gitignore) ---
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+app-example
+mobile/ios/
+mobile/android/
+mobile/assets/whisper-coreml/

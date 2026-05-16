@@ -6,6 +6,7 @@ export default function TestsLayout() {
       <Stack.Screen name="litert" options={{ title: "LiteRT smoke" }} />
       <Stack.Screen name="whisper" options={{ title: "Whisper STT" }} />
       <Stack.Screen name="kokoro" options={{ title: "Kokoro TTS" }} />
+      <Stack.Screen name="vad" options={{ title: "Silero VAD" }} />
       <Stack.Screen name="combined" options={{ title: "Combined voice loop" }} />
     </Stack>
   );

@@ -1,0 +1,207 @@
+Deep Research Prompt: Fine-tuning Gemma 4 E2B for tool calling in a multi-task LoRA
+====================================================================================
+
+BACKGROUND
+----------
+I'm fine-tuning `unsloth/gemma-4-E2B-it` to ship on-device for an iPhone
+meditation/recovery app (WAVE). The fine-tuned LoRA is required by a
+deployment prize that mandates fine-tuning — base model is not an option.
+Target inference runtime is LiteRT-LM via wllama / GGUF. Stack: Unsloth
+2026.5.2, transformers 5.5, trl 0.24, peft 0.19.1, PyTorch 2.10+cu128,
+B200 192GB. Training framework is TRL SFTTrainer with Unsloth FastModel
+patches.
+
+WHAT I'M FINE-TUNING
+--------------------
+Single LoRA adapter handling THREE surfaces in one dataset (4,757 rows total):
+
+  1. check_in_ending (15.1%, upweighted 3x from 240 unique): Patient signals
+     readiness; model must emit a tool call to endConversation(cravingScore,
+     obstacleCategory) AND a warm closing speech in the same assistant turn.
+  2. check_in_intermediate (27.2%): Mid-session check-in turns; plain
+     conversational replies, NO tool call.
+  3. phase_narration (32.6%) + reflection (25.0%): Structured JSON outputs
+     (existing v3 production LoRA handles these well; we want to preserve
+     that behavior).
+
+Chat template injects the endConversation tool spec via
+`apply_chat_template(messages, tools=[...])` for all check_in rows. Base
+Gemma 4 + this template emits the tool call as LITERAL TEXT (not the
+`<|tool_call>` special tokens — vocab IDs 48/49 stay at zero positions),
+shape:
+
+    endConversation{cravingScore:N,obstacleCategory:CAT}
+    <closing speech><turn|>
+
+We verified this empirically with token-level probes on 3 distinct ending
+rows; base is 100% reliable.
+
+FAILURE MODE
+------------
+Across multiple dataset designs and hyperparameter sweeps, the fine-tuned
+LoRA mode-collapses on the check_in_ending surface: it stops emitting the
+tool-call line entirely and produces a single canned closing-speech
+variant for every ending input, regardless of patient context (different
+craving scores, different obstacles, different dialogue history all
+produce identical 9-token output).
+
+Specifically, after training, the LoRA emits
+`Ready to continue into the body scan?<turn|>` for all 3 distinct ending
+test rows. This string does NOT appear in any training target — it's a
+paraphrastic blend of `Ready to continue` (from training closing speeches)
+and `into the body scan` (from clinician instructions in the user prompt).
+
+WHAT WE'VE TRIED
+----------------
+- v3: v3-style JSON wrapper `{"reply":"...","endConversation":{...}}` as
+  assistant content. r=32. Worked for phase/reflection; check_in tool
+  emission was a JSON wrapper, not native tool call. Shipping today.
+
+- v4: Multi-turn protocol — [system, user, asst(tool_calls=[...]),
+  tool({"status":"acknowledged"}), asst(reply)]. Renders as ONE model
+  turn containing <|tool_call>...<tool_call|><|tool_response>...<tool_response|>
+  <reply><turn|>. r=8, lr=5e-5, 3 epochs. Failed Gate 4 — LoRA emits plain
+  narration, no tool call.
+
+- v5: v4 + system prompt rewrite (dropped "Return strict JSON" instruction)
+  and task block rewrite ("Otherwise just reply" -> "Otherwise just
+  respond"). Same multi-turn structure, same hyperparameters. Same failure
+  mode: collapses to identical canned response across all 3 test rows.
+
+- v6: Reshaped target to match base's native emission — single assistant
+  message with content `endConversation{...}\n<closing speech>`. No
+  tool_calls field, no tool message, no synthetic ack. r=8, lr=5e-5,
+  1 epoch. Same failure mode.
+
+- Hyperparameter sweeps tried previously: lr in {5e-5, 1e-4, 2e-4},
+  r in {8, 16, 32}, epochs in {1, 2, 3}, dropout in {0, 0.05}. No
+  combination broke the mode collapse on check_in_ending.
+
+PROBE METHODOLOGY
+-----------------
+We render messages[:2] (system + user) via apply_chat_template(...,
+tools=[endConversation_spec], add_generation_prompt=True), generate with
+do_sample=False, and log every token id + piece. Base Gemma 4 produces
+39-56 tokens of varied output per row. Fine-tuned LoRA produces identical
+9-token canned output across all rows. Probe path was fixed to use the
+row's actual messages (not a stale hardcoded prompt), so this isn't a
+probe artifact — confirmed by inspecting raw token IDs.
+
+CLOSING SPEECH DIVERSITY IN TRAINING DATA
+-----------------------------------------
+The 240 unique ending rows use only FIVE distinct closing speeches
+(48x each):
+
+  1. Are you ready to head into the next part of the practice when you
+     tap continue?
+  2. Ready to continue with the next part, the sound anchor, and see if
+     it helps?
+  3. Ready to continue with the next part, the breathing, and see if it
+     helps?
+  4. Ready to continue with the next part, the closing reflection, and
+     see if it helps?
+  5. Is there anything from this session you want to carry with you as
+     you move through your day?
+
+So the targets are heavily repeated. The mode-collapse output doesn't
+match any of them exactly; it's a paraphrastic blend.
+
+RESEARCH QUESTIONS
+------------------
+1. State of the art for Gemma 4 E2B function-calling fine-tunes: What
+   public recipes, repos, datasets, or papers exist for fine-tuning Gemma
+   4 (especially the smaller E2B/E4B variants) specifically for
+   tool/function calling? Cite Hugging Face repos, GitHub examples, and
+   any blog posts with reproducible code. What hyperparameters did they
+   use?
+
+2. FunctionGemma (270M): Google released FunctionGemma — a 270M model
+   purpose-built for fine-tuning into function-calling. What's its
+   training recipe? Could it be used as a "tool-call expert" alongside
+   Gemma 4 E2B for the non-tool surfaces? Trade-offs for on-device
+   deployment via LiteRT-LM / wllama.
+
+3. Mode collapse to common closing-speech variant: Are there documented
+   cases of LoRA fine-tunes on Gemma (3 or 4) mode-collapsing to a single
+   canned response when training data has heavily repeated targets and a
+   strong "shortcut" output is available? What countermeasures actually
+   worked (loss-shaping, sampling tricks, anti-collapse losses, scheduled
+   sampling, contrastive losses, etc.)?
+
+4. Mixing tool-calling and JSON-output tasks in one LoRA: Multi-task LoRAs
+   that train both "emit function(args) as first tokens" AND "emit {...JSON...}
+   as first tokens" — is this known to be unstable? What's the recommended
+   pattern? Separate adapters per surface (with surface-conditioned routing
+   at inference)? Heavier upweighting of the minority class? Surface-tagged
+   prefix tokens?
+
+5. Class imbalance within a surface: Within the check_in surface alone
+   we have 720 ending : 1294 intermediate (1.8:1 against tool emission).
+   Standard remedies (upweighting, focal loss, balanced sampler) — which
+   have been validated for Gemma 4 LoRA fine-tunes? Anything published
+   showing how much upweight is enough to flip the gradient direction?
+
+6. Chat template traps: Unsloth's get_chat_template(tokenizer,
+   chat_template="gemma-4") silently drops the tools= argument when
+   rendering. We work around this by preserving the base tokenizer's
+   template. Are there other known divergences between Unsloth's bundled
+   gemma-4 template and the base unsloth/gemma-4-E2B-it tokenizer's chat
+   template? Does this matter for training-vs-inference distribution drift?
+
+7. train_on_responses_only with multi-message conversations: With
+   instruction_part=`<|turn>user\n` and response_part=`<|turn>model\n`,
+   does the masking still work correctly when an assistant turn contains
+   a structured tool_calls field (as in v4/v5)? Is the synthetic
+   tool-response message inside one model turn being unmasked when it
+   shouldn't be?
+
+8. Reference implementations: Best public examples of someone fine-tuning
+   a small (<=4B) Gemma variant for function calling and shipping it
+   on-device. Specifically tool-call emission preserved after LoRA.
+   Cite repos with eval results.
+
+9. Loss-curve diagnostics: What does a HEALTHY tool-calling LoRA training
+   run look like for Gemma 4 E2B? Final loss range? Loss progression shape?
+   Token-level eval setup? We see a 12 -> 1.5 plateau over 536 steps; is
+   this normal for this task class or under-trained?
+
+10. Alternative training strategies:
+    - DPO/RPO from base behavior (use base's native emission as positives,
+      our canned-response collapse as negatives)?
+    - Prefix tuning instead of LoRA?
+    - Full fine-tune of just a small subset of layers?
+    - Quantization-aware training?
+    - Two-stage curriculum (first ending check_ins only, then mix in
+      other surfaces)?
+
+11. Loss masking gotchas: For a target like
+    `endConversation{cravingScore:7,obstacleCategory:mind_wandering}\nReady to continue...`,
+    the first 17 tokens are highly templated (only the cravingScore digit
+    and obstacleCategory enum vary). The closing speech is more varied.
+    Could train_on_responses_only be inadvertently weighting the
+    high-entropy closing speech more heavily than the templated tool-call
+    line, causing the model to "give up" on the templated portion?
+
+12. What does production Google function-calling Gemma 4 actually look
+    like? Has anyone reverse-engineered the chat-template tool-call
+    protocol expected by Gemma 4's pretraining mix? Are we training
+    against a shape Google's pretrain mix doesn't reward?
+
+WHAT I WANT FROM THE RESEARCH
+-----------------------------
+- Concrete, cited findings — not generic "try a higher learning rate"
+  advice
+- Public repos / notebooks / datasets I can reproduce or compare against
+- Specific identified root causes for mode collapse on tool-emission
+  fine-tunes
+- Validated training recipes that have worked for small Gemma
+  function-calling
+- Direct quotes / code snippets from primary sources where possible
+- A ranked list of 3-5 next experiments with expected effect size, time
+  cost, and citations
+- If the answer is "what you're trying to do is structurally hard, do X
+  instead" — say that and propose X
+
+Length: 1500-3000 words, with sources inline (URLs). Skip the
+hyperparameter table I already have from Unsloth — focus on what I
+DON'T know.

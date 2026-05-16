@@ -14,6 +14,10 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: "Wave dev" }} />
         <Stack.Screen name="tests" options={{ headerShown: false }} />
         <Stack.Screen name="session" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ title: "Onboarding" }} />
+        <Stack.Screen name="dashboard" options={{ title: "Dashboard" }} />
+        <Stack.Screen name="history" options={{ title: "History" }} />
+        <Stack.Screen name="insights" options={{ title: "Insights" }} />
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>

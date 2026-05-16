@@ -1,8 +1,8 @@
 // Whisper STT test page — isolated mic → transcript path.
 //
 // Flow:
-//   1. Download ggml-tiny.en.bin (~78 MB) from HF on first launch, cache in
-//      documentDirectory + 'wave-models/whisper/'.
+//   1. Download ggml-base.en.bin (~148 MB) from HF on first launch, cache in
+//      documentDirectory + 'wave-models/whisper-base-en/'.
 //   2. initWhisper({ filePath, useGpu: true }) — Metal on iOS.
 //   3. expo-audio's useAudioRecorder captures mic audio to a WAV file.
 //   4. whisper.rn's transcribe(filePath, { language: 'en' }) on stop.
@@ -26,13 +26,48 @@ import {
 } from "react-native";
 import {
   AudioModule,
-  RecordingPresets,
+  AudioQuality,
+  IOSOutputFormat,
+  setAudioModeAsync,
   useAudioRecorder,
   useAudioRecorderState,
+  type RecordingOptions,
 } from "expo-audio";
 import { initWhisper, type WhisperContext } from "whisper.rn";
 
 import { ensureModel } from "@/runtime/model-cache";
+
+// whisper.rn requires 16 kHz mono 16-bit linear PCM in a WAV/RIFF container.
+// expo-audio's RecordingPresets.HIGH_QUALITY produces 44.1 kHz stereo AAC in
+// an M4A container — whisper.rn rejects it with "invalid wav file". On iOS,
+// AVAudioRecorder writes a proper RIFF/WAVE header when extension is .wav
+// and outputFormat is LinearPCM. Android's MediaRecorder cannot emit raw
+// PCM WAV; this preset is iOS-only for now.
+const WHISPER_RECORDING_OPTIONS: RecordingOptions = {
+  extension: ".wav",
+  sampleRate: 16_000,
+  numberOfChannels: 1,
+  bitRate: 16_000 * 16, // 256 kbps — for LPCM this is informational
+  ios: {
+    extension: ".wav",
+    outputFormat: IOSOutputFormat.LINEARPCM,
+    audioQuality: AudioQuality.MAX,
+    sampleRate: 16_000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  android: {
+    extension: ".wav",
+    sampleRate: 16_000,
+    outputFormat: "default",
+    audioEncoder: "default",
+  },
+  web: {
+    mimeType: "audio/wav",
+    bitsPerSecond: 256_000,
+  },
+};
 
 type Phase =
   | "idle"
@@ -49,6 +84,29 @@ function fmtMs(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms.toFixed(0)}ms`;
 }
 
+// Native modules (whisper.rn, expo-audio) sometimes throw plain objects
+// rather than Error instances. String(plainObj) yields "[object Object]",
+// which hides the real failure. Walk message/code/userInfo and fall back
+// to JSON before giving up.
+function stringifyErr(e: unknown): string {
+  if (e instanceof Error) return e.message || e.name;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const any = e as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof any.message === "string") parts.push(any.message);
+    if (typeof any.code === "string" || typeof any.code === "number") {
+      parts.push(`code=${any.code}`);
+    }
+    if (any.userInfo && typeof any.userInfo === "object") {
+      try { parts.push(`userInfo=${JSON.stringify(any.userInfo)}`); } catch {}
+    }
+    if (parts.length > 0) return parts.join(" · ");
+    try { return JSON.stringify(e); } catch { return String(e); }
+  }
+  return String(e);
+}
+
 export default function WhisperTestScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [downloadPct, setDownloadPct] = useState(0);
@@ -58,8 +116,17 @@ export default function WhisperTestScreen() {
   const [transcribeMs, setTranscribeMs] = useState(0);
 
   const ctxRef = useRef<WhisperContext | null>(null);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(WHISPER_RECORDING_OPTIONS);
   const recState = useAudioRecorderState(recorder);
+
+  // iOS rejects recorder.record() unless the audio session is configured for
+  // recording. playsInSilentMode keeps audio working if the mute switch is on.
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: true,
+    }).catch(() => {});
+  }, []);
 
   // Cleanup whisper context on unmount.
   useEffect(() => {
@@ -87,14 +154,14 @@ export default function WhisperTestScreen() {
 
     let localPath: string;
     try {
-      localPath = await ensureModel("whisper-tiny-en", {
+      localPath = await ensureModel("whisper-base-en", {
         onProgress: (p) => {
           setDownloadPct(p);
           if (p >= 1) setPhase("loading");
         },
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(stringifyErr(e));
       setPhase("error");
       return;
     }
@@ -107,7 +174,7 @@ export default function WhisperTestScreen() {
       });
       setPhase("ready");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(stringifyErr(e));
       setPhase("error");
     }
   };
@@ -121,7 +188,7 @@ export default function WhisperTestScreen() {
       recorder.record();
       setPhase("recording");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(stringifyErr(e));
       setPhase("error");
     }
   };
@@ -154,7 +221,7 @@ export default function WhisperTestScreen() {
       setTranscribeMs(t1 - t0);
       setPhase("done");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(stringifyErr(e));
       setPhase("error");
     }
   };
@@ -172,7 +239,7 @@ export default function WhisperTestScreen() {
       contentInsetAdjustmentBehavior="automatic"
     >
       <Text style={styles.sub} selectable>
-        whisper.rn + ggml-tiny.en + Metal GPU. Mic → transcript end-to-end on iPhone.
+        whisper.rn + ggml-base.en + Metal GPU. Mic → 16 kHz mono LPCM WAV → transcript on iPhone.
       </Text>
 
       <View style={styles.statusRow}>

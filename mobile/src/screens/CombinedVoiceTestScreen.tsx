@@ -34,13 +34,17 @@ import {
   useAudioPlayer,
   useAudioRecorder,
 } from "expo-audio";
-import { Paths } from "expo-file-system";
+import { Directory, Paths } from "expo-file-system";
 import { initWhisper, type WhisperContext } from "whisper.rn";
 
 import { preloadWaveLiteRT } from "@/runtime/litert-generators";
 import { ensureModel } from "@/runtime/model-cache";
 
-const KOKORO_ASSET_PATH = "kokoro";
+// Empirical winner on iPhone: fp32 has lower TTFB than int8 (CoreML EP
+// has no general int8 fast-path on Apple Silicon) and the cleanest
+// audio output of the four Kokoro variants. See KokoroTestScreen for
+// the A/B harness this conclusion came from.
+const KOKORO_MODEL_ID = "kokoro-en-v0_19";
 
 // A short, friendly system prompt — keeps responses tight so the round-trip
 // finishes fast enough to feel conversational. Real WAVE prompts plug in
@@ -85,6 +89,10 @@ export default function CombinedVoiceTestScreen() {
     llmMs: 0,
     ttsMs: 0,
   });
+  const [kokoroDownload, setKokoroDownload] = useState<{
+    percent: number;
+    phase: "downloading" | "extracting" | null;
+  }>({ percent: 0, phase: null });
 
   const whisperRef = useRef<WhisperContext | null>(null);
   const ttsRef = useRef<any>(null);
@@ -166,12 +174,41 @@ export default function CombinedVoiceTestScreen() {
       return;
     }
 
-    // Kokoro
+    // Kokoro — runtime download via sherpa's model manager. Saves to
+    // Documents/sherpa-onnx/models/tts/<id>/, resumes if interrupted.
     setSubsystems((s) => ({ ...s, kokoro: "loading" }));
+    setKokoroDownload({ percent: 0, phase: null });
     try {
-      const sherpa: any = await import("react-native-sherpa-onnx/tts");
-      ttsRef.current = await sherpa.createTTS({
-        modelPath: { type: "asset", path: KOKORO_ASSET_PATH },
+      const sherpaTts: any = await import("react-native-sherpa-onnx/tts");
+      const sherpaDownload: any = await import(
+        "react-native-sherpa-onnx/download"
+      );
+
+      // refreshModelsByCategory primes the on-disk registry cache that
+      // ensureModelByCategory reads from. Without this, fresh installs
+      // throw "Unknown model id".
+      await sherpaDownload.refreshModelsByCategory(
+        sherpaDownload.ModelCategory.Tts,
+      );
+      const result = await sherpaDownload.ensureModelByCategory(
+        sherpaDownload.ModelCategory.Tts,
+        KOKORO_MODEL_ID,
+        {
+          onProgress: (p: {
+            percent: number;
+            phase?: "downloading" | "extracting";
+          }) => {
+            setKokoroDownload({
+              percent: p.percent,
+              phase: p.phase ?? "downloading",
+            });
+          },
+        },
+      );
+      setKokoroDownload({ percent: 100, phase: null });
+
+      ttsRef.current = await sherpaTts.createTTS({
+        modelPath: { type: "file", path: result.localPath },
         modelType: "kokoro",
         providers: ["CoreMLExecutionProvider"],
       });
@@ -257,11 +294,15 @@ export default function CombinedVoiceTestScreen() {
       if (!tts) throw new Error("Kokoro not initialized");
       const audio = await tts.generateSpeech(reply.trim());
 
-      // saveAudioToFile writes a WAV the audio player can read.
+      // saveAudioToFile writes a WAV the audio player can read. Make
+      // sure the output directory exists — the native side won't mkdir.
       const sherpa: any = await import("react-native-sherpa-onnx/tts");
-      const wavPath = `${Paths.document.uri}wave-models/kokoro/last-${Date.now()}.wav`;
+      const outDir = new Directory(Paths.document, "wave-models", "kokoro");
+      outDir.create({ intermediates: true, idempotent: true });
+      const wavPath = `${outDir.uri}last-${Date.now()}.wav`;
       const savedPath = await sherpa.saveAudioToFile(audio, wavPath);
-      setAudioUri(savedPath ?? wavPath);
+      const ttsUri = savedPath ?? wavPath;
+      setAudioUri(ttsUri.startsWith("file://") ? ttsUri : `file://${ttsUri}`);
       const ttsMs = Date.now() - ttsT0;
       setStats((s) => ({ ...s, ttsMs }));
 
@@ -290,7 +331,15 @@ export default function CombinedVoiceTestScreen() {
 
       <SubsystemRow label="LiteRT" status={subsystems.litert} />
       <SubsystemRow label="Whisper" status={subsystems.whisper} />
-      <SubsystemRow label="Kokoro" status={subsystems.kokoro} />
+      <SubsystemRow
+        label="Kokoro"
+        status={subsystems.kokoro}
+        detail={
+          kokoroDownload.phase
+            ? `${kokoroDownload.phase} ${kokoroDownload.percent.toFixed(0)}%`
+            : undefined
+        }
+      />
 
       <View style={styles.statusRow}>
         <Text style={styles.statusLabel}>Phase:</Text>
@@ -366,9 +415,11 @@ export default function CombinedVoiceTestScreen() {
 function SubsystemRow({
   label,
   status,
+  detail,
 }: {
   label: string;
   status: SubsystemState[keyof SubsystemState];
+  detail?: string;
 }) {
   const color =
     status === "ready"
@@ -382,6 +433,7 @@ function SubsystemRow({
     <View style={styles.subRow}>
       <View style={[styles.dot, { backgroundColor: color }]} />
       <Text style={styles.subLabel}>{label}</Text>
+      {detail && <Text style={styles.subDetail}>{detail}</Text>}
       <Text style={[styles.subStatus, { color }]}>{status}</Text>
     </View>
   );
@@ -412,6 +464,12 @@ const styles = StyleSheet.create({
   subRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   subLabel: { color: "#F1F1F4", fontSize: 13, flex: 1 },
+  subDetail: {
+    color: "#9CA3AF",
+    fontSize: 11,
+    fontFamily: "Menlo",
+    marginRight: 8,
+  },
   subStatus: {
     fontSize: 11,
     fontWeight: "700",

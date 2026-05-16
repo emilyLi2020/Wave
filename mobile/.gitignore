@@ -42,8 +42,7 @@ app-example
 /ios
 /android
 
-# Locally-downloaded model bundles (fetched via scripts/download-*.sh)
-/assets/kokoro/
+# Locally-downloaded model bundles
 /assets/whisper-coreml/
 
 # EAS local build result files (created by `eas build` in the working dir

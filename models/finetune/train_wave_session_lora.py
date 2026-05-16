@@ -267,13 +267,24 @@ def normalize_prepared_example(raw: dict[str, Any], line_number: int) -> Example
             {"role": "user", "content": prompt},
             {"role": "assistant", "content": compact_json(output_payload)},
         ]
+    # Preserve full message structure including optional tool_calls fields
+    # (added for v4's multi-turn tool-call protocol). Each message may have
+    # `content` (string), `tool_calls` (list of structured calls), or both.
+    preserved_messages: list[dict[str, Any]] = []
+    for m in messages:
+        kept: dict[str, Any] = {"role": str(m["role"])}
+        if "content" in m and m["content"] is not None:
+            kept["content"] = str(m["content"])
+        if "tool_calls" in m:
+            kept["tool_calls"] = m["tool_calls"]
+        preserved_messages.append(kept)
     return Example(
         example_id=str(raw.get("id") or f"line-{line_number}"),
         surface=str(surface),
         prompt=prompt,
         output_payload=output_payload,
         metadata=metadata,
-        messages=[{"role": str(m["role"]), "content": str(m["content"])} for m in messages],
+        messages=preserved_messages,
         split_key=str(raw.get("splitKey") or build_split_key(surface, metadata)),
     )
 
@@ -531,13 +542,68 @@ def import_training_dependencies() -> tuple[Any, ...]:
     )
 
 
-def render_chat_text(tokenizer: Any, messages: list[dict[str, str]], add_generation_prompt: bool) -> str:
+# Tool spec rendered into the prompt for check-in surface rows so the model
+# learns to associate the tool schema in context with emitting native Gemma 4
+# `<|tool_call>...<tool_call|>` tokens. Mirrors the spec used by the inference
+# probe in `test_tool_calling.py` so train and inference distributions match.
+END_CONVERSATION_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "endConversation",
+        "description": (
+            "End the WAVE check-in after the patient is ready to continue."
+        ),
+        "parameters": {
+            "type": "object",
+            "required": ["cravingScore", "obstacleCategory"],
+            "properties": {
+                "cravingScore": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Patient's current craving score 1-10.",
+                },
+                "obstacleCategory": {
+                    "type": "string",
+                    "enum": [
+                        "none",
+                        "cannot_visualize",
+                        "mind_wandering",
+                        "urge_overwhelming",
+                        "breath_tight",
+                        "breath_anxiety",
+                        "gave_in",
+                        "guilt_failure",
+                        "physical_discomfort",
+                        "sleepiness",
+                    ],
+                },
+            },
+        },
+    },
+}
+
+
+def tools_for_example(example: "Example") -> list[dict[str, Any]] | None:
+    if example.surface == "check_in":
+        return [END_CONVERSATION_TOOL]
+    return None
+
+
+def render_chat_text(
+    tokenizer: Any,
+    messages: list[dict[str, str]],
+    add_generation_prompt: bool,
+    tools: list[dict[str, Any]] | None = None,
+) -> str:
     try:
-        return tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=add_generation_prompt,
-        )
+        kwargs: dict[str, Any] = {
+            "tokenize": False,
+            "add_generation_prompt": add_generation_prompt,
+        }
+        if tools is not None:
+            kwargs["tools"] = tools
+        return tokenizer.apply_chat_template(messages, **kwargs)
     except Exception:
         rendered = []
         for message in messages:
@@ -555,13 +621,47 @@ def tokenize_text(tokenizer: Any, text: str, **kwargs: Any) -> Any:
 
 
 def build_prompt_messages(example: Example) -> list[dict[str, str]]:
+    """Return the [system, user] pair used for inference-time rendering.
+
+    Prefer the row's own messages so any transform-time rewrites
+    (v5 system prompt rewrite, v5/v6 task block rewrite) flow through to
+    probes. Falls back to WAVE_JSON_SYSTEM_PROMPT + example.prompt for
+    legacy rows (pre-v4) that don't carry a messages field.
+    """
+    msgs = example.messages
+    if (
+        msgs
+        and len(msgs) >= 2
+        and msgs[0].get("role") == "system"
+        and msgs[1].get("role") == "user"
+    ):
+        return [
+            {"role": "system", "content": msgs[0]["content"]},
+            {"role": "user", "content": msgs[1]["content"]},
+        ]
     return [
         {"role": "system", "content": WAVE_JSON_SYSTEM_PROMPT},
         {"role": "user", "content": example.prompt},
     ]
 
 
-def build_full_messages(example: Example) -> list[dict[str, str]]:
+def build_full_messages(example: Example) -> list[dict[str, Any]]:
+    # If the row provides a complete multi-message conversation (v4 multi-turn
+    # tool protocol: system + user + assistant(tool_calls) + tool + assistant(content),
+    # or v1-v3 single-assistant: system + user + assistant(content)), use it
+    # verbatim so the chat template's tool-rendering branch fires correctly.
+    msgs = example.messages
+    has_multi_turn = (
+        msgs
+        and len(msgs) >= 3
+        and msgs[0].get("role") == "system"
+        and msgs[-1].get("role") == "assistant"
+        and any(("tool_calls" in m) or m.get("content") for m in msgs[2:])
+    )
+    if has_multi_turn:
+        return list(msgs)
+    # Legacy fallback (no `messages` field on the row): synthesize a single
+    # assistant turn from the structured output_payload.
     return [
         *build_prompt_messages(example),
         {"role": "assistant", "content": compact_json(example.output_payload)},
@@ -577,6 +677,7 @@ def build_hf_dataset(Dataset: Any, tokenizer: Any, examples: list[Example]) -> A
                 tokenizer,
                 build_full_messages(example),
                 add_generation_prompt=False,
+                tools=tools_for_example(example),
             ).removeprefix("<bos>"),
         }
         for example in examples
@@ -622,6 +723,7 @@ def write_token_length_report(
             tokenizer,
             build_full_messages(example),
             add_generation_prompt=False,
+            tools=tools_for_example(example),
         ).removeprefix("<bos>")
         tokenized = tokenize_text(tokenizer, text, add_special_tokens=False)
         token_count = count_input_ids(tokenized["input_ids"])
@@ -995,7 +1097,16 @@ def load_unsloth_model(args: argparse.Namespace, FastModel: Any, get_chat_templa
         load_in_4bit=not args.no_4bit,
         full_finetuning=False,
     )
+    # Unsloth's `gemma-4` chat template silently ignores the `tools=` argument,
+    # which means our tool-spec preamble never reaches the rendered training
+    # text. Preserve the base tokenizer's template (which renders tools
+    # natively via `<|tool>declaration:...<tool|>`) so train and inference
+    # distributions match. The base template still uses the `<|turn>user\n` /
+    # `<|turn>model\n` markers that `train_on_responses_only` expects.
+    base_template = tokenizer.chat_template
     tokenizer = get_chat_template(tokenizer, chat_template="gemma-4")
+    if base_template:
+        tokenizer.chat_template = base_template
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
@@ -1041,7 +1152,12 @@ def load_unsloth_generation_model(
             last_error = error
             continue
 
+        # Mirror load_unsloth_model: preserve base tokenizer's chat template so
+        # tools= survives apply_chat_template for inference.
+        base_template = tokenizer.chat_template
         tokenizer = get_chat_template(tokenizer, chat_template="gemma-4")
+        if base_template:
+            tokenizer.chat_template = base_template
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "right"
@@ -1318,7 +1434,10 @@ def evaluate_model_on_examples(
         else:
             completion_nll, completion_ppl, completion_token_count = 0.0, 0.0, 0
         prompt_messages = build_prompt_messages(example)
-        prompt_text = render_chat_text(tokenizer, prompt_messages, add_generation_prompt=True)
+        prompt_text = render_chat_text(
+            tokenizer, prompt_messages, add_generation_prompt=True,
+            tools=tools_for_example(example),
+        )
         device = next(model.parameters()).device
         inputs = tokenize_text(
             tokenizer,
@@ -1455,8 +1574,13 @@ def evaluate_completion_only_on_examples(
 
 
 def compute_completion_loss(model: Any, tokenizer: Any, example: Example, torch: Any) -> tuple[float, float, int]:
-    prompt_text = render_chat_text(tokenizer, build_prompt_messages(example), add_generation_prompt=True)
-    full_text = render_chat_text(tokenizer, build_full_messages(example), add_generation_prompt=False)
+    tools = tools_for_example(example)
+    prompt_text = render_chat_text(
+        tokenizer, build_prompt_messages(example), add_generation_prompt=True, tools=tools,
+    )
+    full_text = render_chat_text(
+        tokenizer, build_full_messages(example), add_generation_prompt=False, tools=tools,
+    )
     prompt_ids = tokenize_text(tokenizer, prompt_text, add_special_tokens=False)["input_ids"]
     encoded = tokenize_text(tokenizer, full_text, return_tensors="pt", add_special_tokens=False)
     device = next(model.parameters()).device
