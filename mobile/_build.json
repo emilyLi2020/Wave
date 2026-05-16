@@ -1,0 +1,53 @@
+{
+  "id": "7869b0df-99c8-4284-af9c-9e2da14ad25b",
+  "status": "ERRORED",
+  "platform": "IOS",
+  "error": {
+    "errorCode": "UNKNOWN_ERROR",
+    "message": "Unknown error. See logs of the Install dependencies build phase for more information."
+  },
+  "artifacts": {
+    "xcodeBuildLogsUrl": "https://job-logs.eascdn.net/production-xcode-logs/7869b0df-99c8-4284-af9c-9e2da14ad25b?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260516%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260516T041136Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=c00191ce6f2a488bf3dce284130514f2aaf11e7839fc73473cdd674e6d8fb89340294ff8de40ac52d11183ff7e358f8c21aa5b8379300f8782aadb6736c57e1d631528761fb9d55d55a36740c0c6cc6c39ab2eed6125375e62e2d9d86f247874e659109e5c11a0c3e98b3fc7516a6765d7a56f557f052f0e237d58122ebb95bd52cf35fd272d4ffc4f5510c94a9962437e1618c4f1241a1f6116fefd7d565e2b05aed9879321dfd27edb4a6f8fcc86dd52194f32611892ec1e79e53e557b62075fcbe60991b490e8f8ecfd4e388d593c8121029a40de8e0bc77e707953b84560bc564402ef2524971a7bc8db12dbd596394f96dc12d11674bb48ab53852ad337"
+  },
+  "fingerprint": {
+    "id": "019e2ef6-cabf-7bfc-92d0-4cccb0c3c0ec",
+    "hash": "40c6044318ae9cec1ef21f0e2d6f9929d97b5a03"
+  },
+  "initiatingActor": {
+    "id": "8d2e087d-3d7f-48f9-b6bd-5475ec5e9d3d",
+    "displayName": "billzhangsc"
+  },
+  "logFiles": [
+    "https://job-logs.eascdn.net/production/7869b0df-99c8-4284-af9c-9e2da14ad25b/1778904386459-0d598a94-8523-4e52-9d72-d3a6ab3fef70.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260516%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260516T041136Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=b49f36200e5cca756100678718a998d99edf47ed7372177ed3a68faef29eecf6aba415ed40690f8eab064a2117f5812a921783be0d74b5032f111ffe679883cd3ccfeb71b335fad029af6df01ff7cc74325db67bb8cb9838b444bd9e525615e352890ff5add5618e8e03603edc540cc958ebcd99853688f2fbb3bb270437300f30cd6279e1d9493ffff379b31b4e4aaeee1c6c12c093f43aa50e2d63e6dd582b68083acf77f79495d2ab2a75676210044bb0e289ceeb2c86f5658c069135c865ec4eaff8dffe85fde91e617cf22c79215e9a36af199eaeceefb7dc7527b6b9a3a6b5f656d50f209a9c2723e3fd90a226c0e1874a702cdfb0a851986873eb7eb7",
+    "https://job-logs.eascdn.net/production/7869b0df-99c8-4284-af9c-9e2da14ad25b/1778904388317-3dc8b718-5b02-4811-adf8-19f604a2c220.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260516%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260516T041136Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=4ab21645651d353f5f4f3b1a200d0fa843c1fb415f3cb742c0818149c98a9cbfbc1d7402b32ac1aae4aeb9810b9206639166e4da41ea4b57aadd9a298401cdb7688100a62ded0e4530a6499e5379b0aabd0551968d334456c46196898d4c8af512059572f4dd9993bdd45ba5fe27c2f78e1377ae9abe58597878e4f4efa6c969819b8d8a67f7a2a81faa58f62422c6851cb634c3f486b1fccb652a0471eec4503080c58cbdec18aefa4a5d98c8c088071e7f1a115def94d364d210702d45cbb00e40a2e8c29d191bd546484744077e40c1067df5f1c7226c6ba1fcc4890f03cd1faaf7a31cfeb6b95d2edb270705dddac5c46db8f252310e5e18be26dc81b308",
+    "https://job-logs.eascdn.net/production/7869b0df-99c8-4284-af9c-9e2da14ad25b/1778904388597-c10642ca-18e0-4c3b-aa95-ec1da3c99ad9.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260516%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260516T041136Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=7a34411ef20112ba3cc18a70327f8f624e775b60cce2039dcf86ec5d6715be5143f4f161ea394d26540b6343fb77c289012b8142e301cd68677f29fa546bee7b331719e90ea361c22cde930a769cd1d808194049d0b1f427ceae55d6e78ad0725166182146d1fa84e00c58b71ae7a27fdb5142a885af0622a9926a28cea901e0e2c5bd2bb0893e7ceb4f7485f1708e70264b34f600cf6820c100e14dcedb1a655ba5e012874ce8ea3b7f44776c6e8689dde03f8a8b84a03e65d454a0fd4a19aa0ab8a2508a8a1b36621e4506229763148d28a18f219f3f7d33455f69d1a10c6664b9186afa13e541229deaa817a68b96ee2e322b73ffd52ecd7986d47450ff72",
+    "https://job-logs.eascdn.net/production/7869b0df-99c8-4284-af9c-9e2da14ad25b/1778904388828-41a3c4f0-3c3b-4bca-b94d-25f57b1ca5e6.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260516%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260516T041136Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=7bbec8b33adb8371090a9be37a41596af29b8676a40bb0a7dc43e80eed18bdea6d4858a69e1fff55d36a6ce63262d926de9447cb693742432d888a5701424a2c448b21610413fcdbf5adc1e29d1fc6a51ba4b02101b0b29c8fa658a7ceef8ac67768ada98dff3cc6a456557a18e182004a16589037c1c7051c7b28a69e2a048c81c30f0b96cd57d8f4ea89c3edabb44f4293c4e68ec4d24b1c9fad4af54becc5f8f2dd6b3a3122b752bec6fba386ae2fe2f262039bbf4b0cd7cf7d417d1b7d7849ce2609267e6a6b53e36d5ef4e0e1134cd94e30ea5b50aabe4f228cbdd15f73a163627eddb25c335dd222d18bbf58e382e45543a8cb9979b12a39739494edef"
+  ],
+  "project": {
+    "id": "b6819995-0c3d-4bbf-b5e8-9f1cb834a0ea",
+    "name": "wave-mobile",
+    "slug": "wave-mobile",
+    "ownerAccount": {
+      "id": "649d188b-3734-4e73-9980-fa5745a2d862",
+      "name": "billzhangsc"
+    }
+  },
+  "distribution": "INTERNAL",
+  "buildProfile": "development",
+  "sdkVersion": "54.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "1",
+  "gitCommitHash": "d7082229dfa84220bc73e252944e8762b8272fde",
+  "gitCommitMessage": "Unified model cache + Kokoro bundled-asset path\n\nAdds src/runtime/model-cache.ts as the single registry for all downloaded\nmodel artifacts. Each entry has a manifest (URL, filename, expected/minimum\nsize); ensureModel(id) is idempotent — returns cached path on hit, downloads\non miss. Cache lives at documentDirectory/wave-models/<id>/. Pulls\nLiteRT 4.7 GB out of the wrapper's hidden Library/Caches/litert_models/\ndir into the unified location so the cache panel can see it.\n\nTest pages rewired:\n  - LiteRT smoke now calls ensureModel('litert-wave'), then passes the local\n    path to wrapper.loadModel() (bypassing the wrapper's auto-download).\n  - Whisper smoke calls ensureModel('whisper-tiny-en') instead of doing its\n    own FileSystem.createDownloadResumable.\n  - Both surface unified progress + error semantics.\n\nCache panel (src/screens/CachePanel.tsx) embedded at the bottom of the\ndev menu home screen. Shows each model with cached/missing badge, on-disk\nsize vs expected, and per-row Download / Re-download / Clear buttons plus\na \"Clear all caches\" footer. Polls inspectCache() after every action.\n\nKokoro switched to bundled-asset path 2:\n  - scripts/download-kokoro.sh fetches sherpa-onnx/releases/.../kokoro-en-\n    v0.19.tar.bz2 (~330 MB) and unpacks into mobile/assets/kokoro/.\n  - mobile/.gitignore excludes /assets/kokoro/ (and /assets/whisper-coreml/\n    for the same pattern when we add CoreML).\n  - KokoroTestScreen.tsx now loads via sherpa-onnx createTTS({ modelPath:\n    { type: 'asset', path: 'kokoro' } }) and routes missing-file errors to a\n    \"run scripts/download-kokoro.sh\" guidance panel.\n  - sherpa-onnx's TTS surface is under react-native-sherpa-onnx/tts per the\n    package's exports map; root re-export is limited.\n\nPolish item documented in model-cache.ts: documentDirectory is iCloud-\nbacked; for a 4.7 GB LiteRT bundle that's wasteful. Move to\nLibrary/Application Support/ or set NSURLIsExcludedFromBackupKey when the\nexpo-file-system version we're on exposes the flag.\n\nType-check: tsc --noEmit exits 0.\n\nCo-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>",
+  "priority": "NORMAL_PLUS",
+  "createdAt": "2026-05-16T04:06:26.200Z",
+  "updatedAt": "2026-05-16T04:07:37.033Z",
+  "completedAt": "2026-05-16T04:07:30.284Z",
+  "expirationDate": "2026-05-30T04:06:26.227Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 106,
+    "buildQueueTime": 42623,
+    "buildDuration": 17177
+  }
+}

@@ -36,8 +36,8 @@ const TEST_ENTRIES: Entry[] = [
   {
     href: "/tests/combined",
     title: "Combined voice loop",
-    blurb: "VAD + STT + LiteRT + Kokoro wired end-to-end with barge-in.",
-    status: "stub",
+    blurb: "Push-to-talk: record → Whisper → LiteRT → Kokoro → play. VAD + barge-in pending.",
+    status: "wip",
   },
 ];
 
