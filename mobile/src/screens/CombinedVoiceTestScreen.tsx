@@ -213,6 +213,18 @@ export default function CombinedVoiceTestScreen() {
   const speakingStartedAtRef = useRef(0);
   const mountedRef = useRef(true);
 
+  // Barge-in / duplex mode. Full-duplex (true) keeps the mic live during
+  // TTS so you can talk over the reply — requires the native AEC patch or
+  // headphones, else the speaker self-triggers. Half-duplex (false) mutes
+  // the mic while speaking: no barge-in, but bulletproof on an open
+  // speaker. The demo's guaranteed-safe fallback.
+  const [bargeIn, setBargeInState] = useState(true);
+  const bargeInRef = useRef(true);
+  const setBargeIn = useCallback((v: boolean) => {
+    bargeInRef.current = v;
+    setBargeInState(v);
+  }, []);
+
   useEffect(() => {
     setAudioModeAsync({
       playsInSilentMode: true,
@@ -385,7 +397,10 @@ export default function CombinedVoiceTestScreen() {
         if (epochRef.current !== myEpoch) return;
 
         // ── TTS ──────────────────────────────────────────────────────
-        endpointerRef.current?.setMuted(false); // live for barge-in
+        // Full-duplex: unmute so VAD can barge-in over playback.
+        // Half-duplex: keep the mic muted through TTS (speaker-safe) —
+        // it's re-enabled in finally once the reply finishes.
+        if (bargeInRef.current) endpointerRef.current?.setMuted(false);
         await speak(reply, myEpoch);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -405,6 +420,7 @@ export default function CombinedVoiceTestScreen() {
   );
 
   const onSpeechStart = useCallback(() => {
+    if (!bargeInRef.current) return; // half-duplex: no acoustic barge-in
     if (phaseRef.current !== "speaking") return;
     if (Date.now() - speakingStartedAtRef.current < BARGE_GRACE_MS) return;
     // Barge-in: invalidate the current spoken turn, kill audio, re-listen.
@@ -639,12 +655,30 @@ export default function CombinedVoiceTestScreen() {
           <Text style={styles.kv}>
             {endpointer.listening
               ? phase === "speaking"
-                ? "Speaking — talk to interrupt"
+                ? bargeIn
+                  ? "Speaking — talk to interrupt"
+                  : "Speaking — please wait"
                 : phase === "listening"
                   ? "Listening — just talk"
                   : phase
               : "Stopped"}
           </Text>
+          <Pressable
+            style={[styles.smallButton, { alignSelf: "stretch" }]}
+            onPress={() => setBargeIn(!bargeIn)}
+          >
+            <Text style={styles.smallButtonText}>
+              Mode: {bargeIn ? "Full-duplex (barge-in)" : "Half-duplex (speaker-safe)"}
+              {"  ›  tap to switch"}
+            </Text>
+          </Pressable>
+          {bargeIn && (
+            <Text style={[styles.kv, { color: "#FBBF24" }]}>
+              ⚠ Open-speaker barge-in needs the native AEC build or
+              headphones, else the reply self-interrupts. Switch to
+              half-duplex for a guaranteed open-speaker demo.
+            </Text>
+          )}
           <View style={styles.buttonRow}>
             {endpointer.listening ? (
               <Pressable
