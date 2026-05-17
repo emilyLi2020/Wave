@@ -1,22 +1,19 @@
-// Stock Gemma 4 on LiteRT-LM — sibling to LiteRTSmokeScreen.
+// Stock Gemma 4 on LiteRT-LM — prize demo, three real WAVE surfaces.
 //
-// Why this exists alongside LiteRTSmokeScreen.tsx: the WAVE fine-tune bundle
-// path is blocked behind the wrapper version-skew issue tracked in #13. Stock
-// `litert-community/gemma-4-E2B-it.litertlm` *does* load on the bundled
-// react-native-litert-lm@0.3.6 framework, so this page is the prize-eligible
-// "we shipped on LiteRT" demo while the fine-tune path stays parked. WAVE
-// system prompts run as user-message preamble so output stays on-brand even
-// without the LoRA fine-tune.
+// Loads the unmodified `litert-community/gemma-4-E2B-it.litertlm` on the
+// react-native-litert-lm-wave fork and runs the three production WAVE
+// surfaces back-to-back, each with its own metrics:
+//   1. Phase narration  — buildChunkPrompt (chunk 3, post-corner-cut)
+//   2. Check-in          — 3-turn exchange ending in the endConversation
+//                          tool call (the WAVE readiness signal)
+//   3. Reflection        — buildReflectionPrompt
 //
-// Goals:
-//   1. Download gemma-4-E2B-it.litertlm from litert-community (~2.59 GB,
-//      first-launch only) via the unified cache layer.
-//   2. Load it on the GPU backend with the increased-memory entitlement.
-//   3. Run a short WAVE-flavored prompt that fits the bundle's 1024-token
-//      total budget (the full chunk-1 prompt is ~1.8 K tokens, too big).
-//   4. Report RSS, tok/s, TTFT live.
+// Config = the Wave#15-verified envelope: eng2048 / out512 / gpu, with
+// the chunk-generator corner-cuts already in place. systemPrompt goes in
+// LLMConfig (production-faithful; the system-in-message path hangs — see
+// Wave#15). One model load per surface (systemPrompt is load-time).
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -28,85 +25,118 @@ import {
 
 import { File } from "expo-file-system";
 
+import { buildChunkPrompt } from "@/prompts/chunk-generator";
+import { buildCheckInPrompt } from "@/prompts/check-in";
+import { buildReflectionPrompt } from "@/prompts/reflection";
+import type {
+  ChunkGenerationContextPayload,
+  CheckInContextPayload,
+  ReflectionContext,
+  SessionHistoryEntry,
+} from "@/prompts/schemas";
 import { ensureModel, getModelDir } from "@/runtime/model-cache";
 import { createLLM, type LiteRTLMInstance } from "react-native-litert-lm";
 
-// Wave#17 Phase 0: we request GPU but the wrapper silently falls back to CPU
-// with no JS-visible signal, and ~1.9 tok/s looks the same whether it's a
-// CPU fallback or a cold MLDrift GPU kernel JIT. The native engine writes its
-// MLDrift program cache next to the model file; presence + growth of those
-// files across runs is the no-native-rebuild tell that GPU actually ran.
 const REQUESTED_BACKEND = "gpu" as const;
+const ENGINE_MAX_TOKENS = 2048;
+const OUTPUT_MAX_TOKENS = 512;
 
-type Phase =
-  | "idle"
-  | "downloading"
-  | "loading"
-  | "ready"
-  | "generating"
-  | "valid"
-  | "invalid"
-  | "error";
+const TOOL_OBSTACLES =
+  "none, cannot_visualize, mind_wandering, urge_overwhelming, breath_tight, breath_anxiety, gave_in, guilt_failure, physical_discomfort, sleepiness";
 
-interface Stats {
+const PROFILE: ChunkGenerationContextPayload["profile"] = {
+  matType: "buprenorphine",
+  medicationStatus: "on_time",
+  trigger: "stress",
+  triggerOther: null,
+  usedSubstanceToday: false,
+};
+
+// One realistic prior check-in. Post-corner-cut, chunk-generator's
+// renderHistoryBlock only reads the most recent check-in entry.
+const PRIOR_CHECKIN: SessionHistoryEntry = {
+  kind: "checkIn",
+  chunkNumber: 2,
+  cravingScore: 6,
+  obstacleCategory: null,
+  turns: [
+    { role: "agent", content: "Where is the craving on a scale of 1 to 10 right now?" },
+    { role: "patient", content: "About a six, it eased a little but it's still in my chest." },
+    { role: "agent", content: "A six, and you noticed it ease — that's worth naming. What was happening in your body during that last stretch?" },
+    { role: "patient", content: "My jaw was tight and I kept wanting to check my phone." },
+    { role: "agent", content: "That pull to distract is the wave working — and you stayed. Ready to keep going?" },
+    { role: "patient", content: "Yeah." },
+  ],
+};
+
+type Phase = "idle" | "downloading" | "running" | "done" | "error";
+
+interface SurfaceStats {
   ttftMs: number;
   totalMs: number;
   promptTokens: number;
   completionTokens: number;
   tokensPerSecond: number;
-}
-
-interface Memory {
   residentBytes: number;
-  nativeHeapBytes: number;
-  availableMemoryBytes: number;
-  isLowMemory: boolean;
 }
 
-interface MlDriftFile {
-  name: string;
-  size: number;
-  mtimeMs: number | null;
+interface SurfaceResult {
+  label: string;
+  text: string;
+  toolCall: string | null;
+  stats: SurfaceStats | null;
+  error: string | null;
 }
 
 function fmtBytes(b: number): string {
   if (!b || !Number.isFinite(b)) return "—";
-  const units = ["B", "KB", "MB", "GB"];
-  const i = Math.min(units.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
-  return `${(b / Math.pow(1024, i)).toFixed(i > 1 ? 2 : 0)} ${units[i]}`;
+  const u = ["B", "KB", "MB", "GB"];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+  return `${(b / Math.pow(1024, i)).toFixed(i > 1 ? 2 : 0)} ${u[i]}`;
+}
+
+/** Pull the endConversation tool call out of a check-in JSON reply. */
+function extractToolCall(raw: string): { reply: string; tool: string | null } {
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) return { reply: raw.trim(), tool: null };
+  try {
+    const o = JSON.parse(m[0]);
+    const reply = typeof o.reply === "string" ? o.reply : raw.trim();
+    const tool =
+      o.endConversation && typeof o.endConversation === "object"
+        ? `endConversation(cravingScore: ${o.endConversation.cravingScore}, obstacleCategory: ${o.endConversation.obstacleCategory})`
+        : null;
+    return { reply, tool };
+  } catch {
+    return { reply: raw.trim(), tool: null };
+  }
 }
 
 export default function LiteRTStockScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [downloadPct, setDownloadPct] = useState(0);
-  const [output, setOutput] = useState("");
+  const [results, setResults] = useState<SurfaceResult[]>([]);
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [memory, setMemory] = useState<Memory | null>(null);
-  const [mldrift, setMldrift] = useState<MlDriftFile[] | null>(null);
-  const memTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const llmRef = useRef<LiteRTLMInstance | null>(null);
+  const [mldrift, setMldrift] = useState<string | null>(null);
+  const modelPathRef = React.useRef<string | null>(null);
+  const busyRef = React.useRef(false);
 
-  useEffect(() => {
-    return () => {
-      if (memTimerRef.current) clearInterval(memTimerRef.current);
-    };
-  }, []);
-
-  const startMemoryPoll = (llm: LiteRTLMInstance) => {
-    if (memTimerRef.current) clearInterval(memTimerRef.current);
-    memTimerRef.current = setInterval(() => {
-      try {
-        setMemory(llm.getMemoryUsage());
-      } catch {
-        // ignore — wrapper may be torn down
-      }
-    }, 1000);
+  const ensurePath = async (): Promise<string> => {
+    if (modelPathRef.current) return modelPathRef.current;
+    setPhase("downloading");
+    const uri = await ensureModel("litert-stock-gemma4", {
+      onProgress: (p) => {
+        setDownloadPct(p);
+        if (p >= 1) setPhase("running");
+      },
+    });
+    const path = uri.replace(/^file:\/\//, "");
+    modelPathRef.current = path;
+    return path;
   };
 
-  // Probe the model directory for MLDrift GPU program-cache files. Empty
-  // after a generate run ⇒ GPU never compiled kernels (likely CPU fallback).
-  // Present and growing across runs ⇒ GPU ran; run-1 slowness was cold JIT.
+  // MLDrift GPU program-cache probe: present/growing ⇒ GPU actually ran.
   const probeMlDrift = () => {
     try {
       const entries = getModelDir("litert-stock-gemma4").list();
@@ -115,144 +145,181 @@ export default function LiteRTStockScreen() {
           (e): e is File =>
             e instanceof File && e.name.toLowerCase().includes("mldrift"),
         )
-        .map((f) => ({
-          name: f.name,
-          size: f.exists ? (f.size ?? 0) : 0,
-          mtimeMs: f.modificationTime,
-        }));
-      setMldrift(hits);
+        .map((f) => `${f.name} (${fmtBytes(f.exists ? (f.size ?? 0) : 0)})`);
+      setMldrift(hits.length ? hits.join(", ") : "none (likely CPU fallback)");
     } catch {
-      // Dir may not exist before first download — treat as no cache yet.
-      setMldrift([]);
+      setMldrift("none yet");
     }
   };
 
-  const onLoad = async () => {
-    setPhase("downloading");
-    setError(null);
-    setDownloadPct(0);
+  /** One surface = one fresh load (systemPrompt is load-time) + sends. */
+  const runSurface = async (
+    modelPath: string,
+    label: string,
+    systemPrompt: string,
+    userTurns: string[],
+  ): Promise<SurfaceResult> => {
+    let llm: LiteRTLMInstance | null = null;
     try {
-      const fileUri = await ensureModel("litert-stock-gemma4", {
-        onProgress: (p) => {
-          setDownloadPct(p);
-          if (p >= 1) setPhase("loading");
-        },
-      });
-      // Strip file:// — LiteRT-LM C++ wants raw POSIX paths (commit 2b6fdc6).
-      const nativePath = fileUri.replace(/^file:\/\//, "");
-      const llm = createLLM({ enableMemoryTracking: true });
-      await llm.loadModel(nativePath, {
-        backend: "gpu",
-        // Path A fix (react-native-litert-lm-wave fork): upstream collapsed
-        // the engine KV budget and the per-call decode cap into one
-        // `maxTokens`, so no single value could run the ~1846-token WAVE
-        // chunk-1 prompt. The fork splits them into engineMaxTokens
-        // (input+output KV budget) and outputMaxTokens (decode cap).
-        // NOTE: 2048 / 256 below are the litert-community *benchmark*
-        // values and a known-safe starting point — NOT proven hard caps.
-        // Context is runtime-settable; the real iOS ceiling is unverified
-        // for E2B/GPU (upstream LiteRT#6765 saw ~4096 on E4B/CPU only).
-        // The true usable envelope is being measured in Wave#15 Phase 0;
-        // raise these per that sweep's findings.
-        systemPrompt: "You are WAVE, a calm voice guiding someone through urge surfing. Reply in 1-2 short sentences.",
-        engineMaxTokens: 2048,
-        outputMaxTokens: 256,
+      llm = createLLM({ enableMemoryTracking: true });
+      await llm.loadModel(modelPath, {
+        backend: REQUESTED_BACKEND,
+        engineMaxTokens: ENGINE_MAX_TOKENS,
+        outputMaxTokens: OUTPUT_MAX_TOKENS,
+        systemPrompt,
         temperature: 0,
         topK: 1,
       });
-      llmRef.current = llm;
-      setMemory(llm.getMemoryUsage());
-      startMemoryPoll(llm);
-      probeMlDrift();
-      setPhase("ready");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setPhase("error");
-    }
-  };
-
-  const onGenerate = async () => {
-    const llm = llmRef.current;
-    if (!llm) {
-      setError("Model not loaded — tap Download + Load first.");
-      setPhase("error");
-      return;
-    }
-    setPhase("generating");
-    setError(null);
-    setOutput("");
-    setStats(null);
-    try {
-      // Short demo prompt — the full WAVE chunk-1 prompt (~1800 tokens) is
-      // too long for the stock bundle's 1024 total-token budget. The
-      // system prompt at load time is the WAVE persona; here we just ask
-      // for a single urge-surfing cue. Demonstrates Gemma 4 running on
-      // LiteRT-LM end-to-end without overflowing the bundle's compiled
-      // context. Fine-tune would replace this with the full chunk
-      // contract; stock can't follow that schema.
-      const prompt =
-        "I'm feeling a 7-out-of-10 craving for buprenorphine right now. Give me one short urge-surfing cue to ride this out.";
-
-      llm.resetConversation();
-      let accumulated = "";
-      await new Promise<void>((resolve, reject) => {
-        try {
-          llm.sendMessageAsync(prompt, (token, done) => {
-            accumulated += token;
-            setOutput(accumulated);
-            if (done) resolve();
-          });
-        } catch (err) {
-          reject(err as Error);
-        }
-      });
-
-      const s = llm.getStats();
-      setStats({
-        ttftMs: s.timeToFirstToken,
-        totalMs: s.totalTime,
-        promptTokens: s.promptTokens,
-        completionTokens: s.completionTokens,
-        tokensPerSecond: s.tokensPerSecond,
-      });
-      setMemory(llm.getMemoryUsage());
-      probeMlDrift();
-
-      // No JSON validation — stock Gemma 4 generates prose for this prompt.
-      // The fine-tune is what shapes output into the chunk schema. For the
-      // prize demo, coherent prose is the win condition.
-      if (accumulated.trim().length > 0) {
-        setPhase("valid");
-      } else {
-        setError("Model returned empty output.");
-        setPhase("invalid");
+      let last = "";
+      for (const turn of userTurns) {
+        llm.resetConversation();
+        last = await llm.sendMessage(turn);
       }
+      const s = llm.getStats();
+      const mem = llm.getMemoryUsage();
+      const { reply, tool } = extractToolCall(last);
+      return {
+        label,
+        text: reply,
+        toolCall: tool,
+        stats: {
+          ttftMs: s.timeToFirstToken,
+          totalMs: s.totalTime,
+          promptTokens: s.promptTokens,
+          completionTokens: s.completionTokens,
+          tokensPerSecond: s.tokensPerSecond,
+          residentBytes: mem.residentBytes,
+        },
+        error: null,
+      };
+    } catch (e) {
+      return {
+        label,
+        text: "",
+        toolCall: null,
+        stats: null,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    } finally {
+      try {
+        llm?.close();
+      } catch {
+        /* best-effort */
+      }
+    }
+  };
+
+  const onRunDemo = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setError(null);
+    setResults([]);
+    try {
+      const modelPath = await ensurePath();
+      setPhase("running");
+      const acc: SurfaceResult[] = [];
+
+      // ── 1. Phase narration (chunk 3, post-corner-cut: 1 prior check-in)
+      setNote("1/3 · phase narration…");
+      const chunk = buildChunkPrompt({
+        chunkNumber: 3,
+        intakeIntensity: 7,
+        profile: PROFILE,
+        sessionHistory: [PRIOR_CHECKIN],
+      } satisfies ChunkGenerationContextPayload);
+      acc.push(
+        await runSurface(
+          modelPath,
+          "Phase narration (chunk 3)",
+          chunk.systemPrompt,
+          [chunk.userPrompt],
+        ),
+      );
+      setResults([...acc]);
+
+      // ── 2. Check-in — 3 turns, ending in the endConversation tool call
+      setNote("2/3 · check-in (3 turns + endConversation tool call)…");
+      const ci = buildCheckInPrompt(
+        {
+          chunkNumber: 3,
+          cravingScore: 6,
+          scoreHistory: [7, 6],
+          obstacleHint: null,
+          profile: PROFILE,
+          intakeIntensity: 7,
+          sessionHistory: [],
+          demoMode: false,
+        } satisfies CheckInContextPayload,
+        { agentTurnsInHistory: 3 },
+      );
+      const ciSystem = `${ci.systemPrompt}
+
+<output_contract>
+Respond with ONLY a JSON object matching this exact schema:
+
+{ "reply": "<patient-facing prose, 1-3 short sentences>", "endConversation": null | { "cravingScore": <integer 1-10>, "obstacleCategory": "<one of: ${TOOL_OBSTACLES}>" } }
+
+Rules:
+- "reply" is the visible patient-facing text. Plain prose, no markdown.
+- "endConversation" is null UNLESS the check-in is complete and the patient has clearly signalled they are ready to continue — then fill it in ("obstacleCategory" is "none" when no clear obstacle).
+- Emit nothing outside the JSON object.
+</output_contract>`;
+      // Three accumulating turns; by turn 3 the patient has answered the
+      // readiness question affirmatively, so the model must fire the
+      // endConversation tool call (per the <end_conversation_tool> block).
+      const ciTranscript = [
+        "Patient: 6",
+        "WAVE: A six — and you stayed with it through that whole stretch, that counts. What did you notice in your body while the wave moved?",
+        "Patient: My chest was tight but it loosened a bit near the end.",
+        "WAVE: That loosening is the wave cresting and starting to fall — you let it move without acting on it. Ready to continue with the next part and see if it helps?",
+        "Patient: Yeah, I'm ready, let's keep going.",
+      ];
+      const ciTurns = [1, 3, 5].map(
+        (n) =>
+          `${ci.contextBlock}\n\n${ciTranscript.slice(0, n).join("\n")}\n\nWAVE:`,
+      );
+      acc.push(
+        await runSurface(
+          modelPath,
+          "Check-in → endConversation",
+          ciSystem,
+          ciTurns,
+        ),
+      );
+      setResults([...acc]);
+
+      // ── 3. Reflection
+      setNote("3/3 · reflection…");
+      const refl = buildReflectionPrompt({
+        intakeIntensity: 7,
+        matType: "buprenorphine",
+        medicationStatus: "on_time",
+        trigger: "stress",
+        usedSubstanceToday: false,
+        bodyLocation: "chest",
+        currentIntensity: 4,
+        endingIntensity: 3,
+        durationSeconds: 600,
+      } satisfies ReflectionContext);
+      acc.push(
+        await runSurface(modelPath, "Reflection", refl.systemPrompt, [
+          refl.userPrompt,
+        ]),
+      );
+      setResults([...acc]);
+
+      probeMlDrift();
+      setNote("Done — 3 surfaces.");
+      setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
+    } finally {
+      busyRef.current = false;
     }
   };
 
-  const onUnload = async () => {
-    if (memTimerRef.current) {
-      clearInterval(memTimerRef.current);
-      memTimerRef.current = null;
-    }
-    try {
-      llmRef.current?.close();
-    } catch {
-      // best-effort
-    }
-    llmRef.current = null;
-    setMemory(null);
-    setStats(null);
-    setMldrift(null);
-    setOutput("");
-    setPhase("idle");
-  };
-
-  const isBusy =
-    phase === "downloading" || phase === "loading" || phase === "generating";
+  const busy = phase === "downloading" || phase === "running";
 
   return (
     <ScrollView
@@ -261,79 +328,23 @@ export default function LiteRTStockScreen() {
       contentInsetAdjustmentBehavior="automatic"
     >
       <Text style={styles.sub} selectable>
-        Loads the unmodified `litert-community/gemma-4-E2B-it.litertlm` bundle
-        on react-native-litert-lm@0.3.6 and runs a short WAVE urge-surfing
-        prompt (not the full chunk-1 contract — see note in onGenerate). Prize
-        demo: stock Gemma 4 running fully on-device via LiteRT-LM.
+        Stock Gemma 4 E2B on LiteRT-LM (fork) running the three real WAVE
+        surfaces — phase narration, a 3-turn check-in that fires the{" "}
+        <Text style={{ fontWeight: "700" }}>endConversation</Text> tool call,
+        and reflection — at the Wave#15-verified eng{ENGINE_MAX_TOKENS}/out
+        {OUTPUT_MAX_TOKENS} config. One model load per surface (~75 s each).
       </Text>
 
       <View style={styles.statusRow}>
         <Text style={styles.statusLabel}>Phase:</Text>
         <Text style={[styles.statusValue, phaseStyle(phase)]}>{phase}</Text>
-        {isBusy && <ActivityIndicator size="small" style={{ marginLeft: 8 }} />}
+        {busy && <ActivityIndicator size="small" style={{ marginLeft: 8 }} />}
       </View>
-
       {phase === "downloading" && (
-        <Text style={styles.kv}>
-          Download: {(downloadPct * 100).toFixed(1)}%
-        </Text>
+        <Text style={styles.kv}>Download: {(downloadPct * 100).toFixed(1)}%</Text>
       )}
-
-      {memory && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Memory (live)</Text>
-          <Text selectable style={styles.kv}>RSS: {fmtBytes(memory.residentBytes)}</Text>
-          <Text selectable style={styles.kv}>Native heap: {fmtBytes(memory.nativeHeapBytes)}</Text>
-          <Text selectable style={styles.kv}>Available: {fmtBytes(memory.availableMemoryBytes)}</Text>
-          {memory.isLowMemory && (
-            <Text style={[styles.kv, { color: "#F87171" }]}>
-              ⚠ System reports low memory
-            </Text>
-          )}
-        </View>
-      )}
-
-      {mldrift !== null && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Backend (Wave#17 Phase 0)</Text>
-          <Text selectable style={styles.kv}>
-            Requested: {REQUESTED_BACKEND} — active backend NOT verifiable
-            from JS (wrapper falls back to CPU silently)
-          </Text>
-          <Text selectable style={styles.kv}>
-            MLDrift GPU program cache:{" "}
-            {mldrift.length === 0
-              ? "none — GPU kernels never compiled (likely CPU fallback)"
-              : `${mldrift.length} file(s)`}
-          </Text>
-          {mldrift.map((f) => (
-            <Text key={f.name} selectable style={styles.kv}>
-              • {f.name} — {fmtBytes(f.size)}
-              {f.mtimeMs
-                ? ` @ ${new Date(f.mtimeMs).toLocaleTimeString()}`
-                : ""}
-            </Text>
-          ))}
-          <Text selectable style={[styles.kv, { color: "#6B7280" }]}>
-            growing across runs ⇒ GPU ran (run-1 = cold JIT); stays empty ⇒
-            CPU fallback
-          </Text>
-        </View>
-      )}
-
-      {stats && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Generation stats</Text>
-          <Text selectable style={styles.kv}>TTFT: {stats.ttftMs.toFixed(0)} ms</Text>
-          <Text selectable style={styles.kv}>Total: {stats.totalMs.toFixed(0)} ms</Text>
-          <Text selectable style={styles.kv}>
-            Tokens: {stats.promptTokens} in / {stats.completionTokens} out
-          </Text>
-          <Text selectable style={styles.kv}>
-            Decode: {stats.tokensPerSecond.toFixed(1)} tok/s
-          </Text>
-        </View>
-      )}
+      {!!note && <Text style={styles.noteText}>{note}</Text>}
+      {mldrift && <Text style={styles.kv}>MLDrift GPU cache: {mldrift}</Text>}
 
       {error && (
         <View style={[styles.panel, styles.errorPanel]}>
@@ -344,57 +355,55 @@ export default function LiteRTStockScreen() {
 
       <View style={styles.buttonRow}>
         <Pressable
-          style={[styles.button, isBusy && styles.buttonDisabled]}
-          disabled={isBusy}
-          onPress={onLoad}
+          style={[styles.button, busy && styles.buttonDisabled]}
+          disabled={busy}
+          onPress={onRunDemo}
         >
-          <Text style={styles.buttonText}>1. Download + Load</Text>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.button,
-            phase !== "ready" &&
-              phase !== "valid" &&
-              phase !== "invalid" &&
-              styles.buttonDisabled,
-          ]}
-          disabled={
-            phase !== "ready" && phase !== "valid" && phase !== "invalid"
-          }
-          onPress={onGenerate}
-        >
-          <Text style={styles.buttonText}>2. Generate</Text>
-        </Pressable>
-
-        <Pressable style={styles.buttonSecondary} onPress={onUnload}>
-          <Text style={styles.buttonSecondaryText}>Unload</Text>
+          <Text style={styles.buttonText}>
+            {phase === "done" || phase === "error"
+              ? "Re-run 3-surface demo"
+              : "Run 3-surface demo"}
+          </Text>
         </Pressable>
       </View>
 
-      {output.length > 0 && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Streaming output</Text>
-          <Text selectable style={styles.outputText}>
-            {output}
-          </Text>
+      {results.map((r, i) => (
+        <View key={i} style={styles.panel}>
+          <Text style={styles.panelHead}>{r.label}</Text>
+          {r.error ? (
+            <Text selectable style={styles.errorText}>{r.error}</Text>
+          ) : (
+            <>
+              {r.toolCall && (
+                <Text selectable style={styles.toolCall}>
+                  🛠 {r.toolCall}
+                </Text>
+              )}
+              <Text selectable style={styles.outputText}>{r.text}</Text>
+              {r.stats && (
+                <Text selectable style={styles.metrics}>
+                  {r.stats.completionTokens} tok ·{" "}
+                  {r.stats.tokensPerSecond.toFixed(1)} tok/s · TTFT{" "}
+                  {r.stats.ttftMs.toFixed(0)} ms · total{" "}
+                  {(r.stats.totalMs / 1000).toFixed(1)} s · RSS{" "}
+                  {fmtBytes(r.stats.residentBytes)}
+                </Text>
+              )}
+            </>
+          )}
         </View>
-      )}
+      ))}
     </ScrollView>
   );
 }
 
 function phaseStyle(p: Phase) {
   switch (p) {
-    case "valid":
+    case "done":
       return { color: "#34D399" };
-    case "invalid":
     case "error":
       return { color: "#F87171" };
-    case "ready":
-      return { color: "#22D3EE" };
-    case "generating":
-    case "loading":
+    case "running":
     case "downloading":
       return { color: "#FBBF24" };
     default:
@@ -405,10 +414,11 @@ function phaseStyle(p: Phase) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
-  sub: { color: "#9CA3AF", fontSize: 13 },
+  sub: { color: "#9CA3AF", fontSize: 13, lineHeight: 18 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusLabel: { color: "#9CA3AF", fontSize: 14 },
   statusValue: { fontSize: 14, fontWeight: "600" },
+  noteText: { color: "#58A6FF", fontSize: 13, fontWeight: "600" },
   panel: {
     backgroundColor: "#16161F",
     padding: 12,
@@ -416,7 +426,7 @@ const styles = StyleSheet.create({
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
-    gap: 4,
+    gap: 6,
   },
   errorPanel: { borderColor: "#7F1D1D" },
   panelHead: {
@@ -425,10 +435,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 4,
   },
   kv: { color: "#F1F1F4", fontSize: 13, fontFamily: "Menlo" },
-  outputText: { color: "#F1F1F4", fontSize: 13, fontFamily: "Menlo", lineHeight: 18 },
+  outputText: { color: "#F1F1F4", fontSize: 13, lineHeight: 18 },
+  toolCall: {
+    color: "#34D399",
+    fontSize: 13,
+    fontFamily: "Menlo",
+    fontWeight: "700",
+  },
+  metrics: { color: "#9CA3AF", fontSize: 11, fontFamily: "Menlo", marginTop: 4 },
   errorText: { color: "#F87171", fontSize: 13, fontFamily: "Menlo" },
   buttonRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   button: {
@@ -440,13 +456,4 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 13 },
-  buttonSecondary: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: "#3F3F50",
-  },
-  buttonSecondaryText: { color: "#9CA3AF", fontWeight: "600", fontSize: 13 },
 });
