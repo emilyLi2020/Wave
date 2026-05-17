@@ -28,6 +28,12 @@ const TEST_ENTRIES: Entry[] = [
     status: "ready",
   },
   {
+    href: "/tests/litert-sweep",
+    title: "LiteRT context sweep (Wave#15 Phase 0)",
+    blurb: "Sweeps engineMaxTokens × outputMaxTokens × backend × prompt-variant × WAVE surface on the stock bundle. Measures the real envelope (tokens, JSON validity, RAM, hangs).",
+    status: "wip",
+  },
+  {
     href: "/tests/whisper",
     title: "Whisper STT",
     blurb: "Record audio with mic → whisper.rn (CoreML encoder) → transcript.",

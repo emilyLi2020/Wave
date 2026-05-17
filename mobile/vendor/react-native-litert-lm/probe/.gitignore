@@ -1,0 +1,9 @@
+# Downloaded WAVE v3 bundle (~2.56 GB), if --download used
+.cache/
+# Copied-in canonical fixtures + resolved model path (written by run-probe.sh)
+PhoneClawProbe/Tests/PhoneClawProbeTests/Resources/
+# SwiftPM / xcodebuild artifacts
+PhoneClawProbe/.build/
+PhoneClawProbe/.swiftpm/
+.probe-result.xcresult/
+.probe-xcodebuild.log

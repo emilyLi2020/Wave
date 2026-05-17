@@ -147,27 +147,20 @@ export function buildChunkPrompt(
   const intakeBlock = renderIntakeBlock(context);
   const historyBlock = renderHistoryBlock(context.sessionHistory);
 
+  // DEMO CORNER-CUT (Wave#15): this appended block was trimmed ~half
+  // (~280 -> ~140 tok) to fit the stock-LiteRT 2048 budget. Canonical
+  // WAVE_SYSTEM_PROMPT above is clinically gated and left verbatim; only
+  // the redundant formatting verbosity here was condensed (the userPrompt
+  // <task> block still restates the format rules). All safety lines
+  // (never prescribe / dose / crisis) and the one-beat-per-element / JSON
+  // constraints are preserved. Documented in
+  // docs/runbooks/stock-litert-working-config.md and Wave#15.
   const systemPrompt = `${WAVE_SYSTEM_PROMPT}
 
 CHUNK NARRATION OUTPUT
-You are now generating the SCRIPTED narration for one meditation chunk in the session
-(not a check-in conversation). Output JSON with exactly the requested number of plain-text
-lines. Each line is ONE beat of narration the patient will hear, followed by a short
-silent pause before the next beat. Stay in second person. Never prescribe. Never recommend
-dose changes. Never offer crisis routing — that is rule-based and lives outside the model.
-Return only strict JSON matching the output schema requested in the user prompt.
-No markdown, no analysis, no clinical note, no extra keys.
+You are generating the scripted narration for one meditation chunk (not a check-in). Stay in second person. Never prescribe, never recommend dose changes, never offer crisis routing (rule-based, outside the model). Return only strict JSON matching the requested schema — no markdown, analysis, clinical note, or extra keys.
 
-Hard formatting rules for the \`lines\` array:
-- Exactly one beat per array element. Never combine multiple beats into one element
-  using any delimiter (no " / ", no " — ", no " | ", no semicolons-as-separators, no
-  CJK quotation marks like 「」 or 」「, no ASCII art, no line breaks inside an element).
-- Each element is one to three short sentences of plain prose. No bullets, no numbering,
-  no markdown, no square brackets, no stage directions ("(pause)", "[breathe]"), no announcements of the
-  chunk number, and no announcements of "chunk complete" — the next surface mounts
-  seamlessly.
-- If you find yourself wanting to write three sentences separated by a slash, that is a
-  signal you have three beats and need three array elements.`;
+Each element of \`lines\` is ONE beat: one to three short plain-prose sentences. Never merge beats with a delimiter (" / ", " — ", " | ", semicolons, brackets, stage directions, ASCII art) or with line breaks inside an element. No bullets, numbering, or chunk-number / "complete" announcements — the next surface mounts seamlessly.`;
 
   const userPrompt = `<chunk>
 Number ${context.chunkNumber} of 5 — ${brief.title}.
@@ -227,37 +220,46 @@ Used substance today: ${usedToday}
 </patient_context>`;
 }
 
-const MAX_HISTORY_ENTRIES = 10;
-
+// DEMO CORNER-CUT (Wave#15): on stock LiteRT the 2048-token budget can't
+// hold the canonical system prompt + a full accumulating session history.
+// So phase narration uses ONLY the single immediately-preceding check-in
+// (the check-in that followed chunk N-1) — no chunk-narration history, no
+// older check-ins. Chunk 1 has no prior check-in, so it uses nothing.
+// This caps the history block at ~one short check-in transcript instead
+// of growing unbounded with the session. Documented in
+// docs/runbooks/stock-litert-working-config.md and Wave#15.
+// Trade-off: later chunks lose long-range continuity (earlier obstacles /
+// score arc) and only react to the most recent check-in. Acceptable for
+// the phone demo; revisit if a larger-context bundle ships.
 function renderHistoryBlock(
   history: ChunkGenerationContextPayload["sessionHistory"],
 ): string {
-  if (history.length === 0) {
-    return "<session_history>\n(no prior chunks or check-ins yet — this is the first chunk)\n</session_history>";
-  }
-
-  const recent = history.slice(-MAX_HISTORY_ENTRIES);
-  const renderedEntries: string[] = [];
-
-  for (const entry of recent) {
-    if (entry.kind === "chunk") {
-      renderedEntries.push(
-        `[chunk ${entry.chunkNumber} narration] ${entry.lines.join(" / ")}`,
-      );
-    } else {
-      const transcript = entry.turns
-        .map((turn) => `${turn.role === "agent" ? "WAVE" : "patient"}: ${turn.content}`)
-        .join("\n");
-      const obstacle = entry.obstacleCategory
-        ? ` (obstacle: ${entry.obstacleCategory})`
-        : "";
-      renderedEntries.push(
-        `[check-in ${entry.chunkNumber}, score ${entry.cravingScore}/10${obstacle}]\n${transcript}`,
-      );
+  // Most recent check-in only (chunk N sees the check-in after chunk N-1).
+  let lastCheckIn: Extract<
+    ChunkGenerationContextPayload["sessionHistory"][number],
+    { kind: "checkIn" }
+  > | null = null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (entry.kind === "checkIn") {
+      lastCheckIn = entry;
+      break;
     }
   }
 
+  if (!lastCheckIn) {
+    return "<session_history>\n(no prior check-in yet — this is the first chunk)\n</session_history>";
+  }
+
+  const transcript = lastCheckIn.turns
+    .map((turn) => `${turn.role === "agent" ? "WAVE" : "patient"}: ${turn.content}`)
+    .join("\n");
+  const obstacle = lastCheckIn.obstacleCategory
+    ? ` (obstacle: ${lastCheckIn.obstacleCategory})`
+    : "";
+
   return `<session_history>
-${renderedEntries.join("\n\n")}
+[check-in ${lastCheckIn.chunkNumber}, score ${lastCheckIn.cravingScore}/10${obstacle}]
+${transcript}
 </session_history>`;
 }

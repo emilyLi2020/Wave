@@ -1,22 +1,19 @@
-// Stock Gemma 4 on LiteRT-LM — sibling to LiteRTSmokeScreen.
+// Stock Gemma 4 on LiteRT-LM — prize demo, three real WAVE surfaces.
 //
-// Why this exists alongside LiteRTSmokeScreen.tsx: the WAVE fine-tune bundle
-// path is blocked behind the wrapper version-skew issue tracked in #13. Stock
-// `litert-community/gemma-4-E2B-it.litertlm` *does* load on the bundled
-// react-native-litert-lm@0.3.6 framework, so this page is the prize-eligible
-// "we shipped on LiteRT" demo while the fine-tune path stays parked. WAVE
-// system prompts run as user-message preamble so output stays on-brand even
-// without the LoRA fine-tune.
+// Loads the unmodified `litert-community/gemma-4-E2B-it.litertlm` on the
+// react-native-litert-lm-wave fork and runs the three production WAVE
+// surfaces back-to-back, each with its own metrics:
+//   1. Phase narration  — buildChunkPrompt (chunk 3, post-corner-cut)
+//   2. Check-in          — 3-turn exchange ending in the endConversation
+//                          tool call (the WAVE readiness signal)
+//   3. Reflection        — buildReflectionPrompt
 //
-// Goals:
-//   1. Download gemma-4-E2B-it.litertlm from litert-community (~2.59 GB,
-//      first-launch only) via the unified cache layer.
-//   2. Load it on the GPU backend with the increased-memory entitlement.
-//   3. Run a short WAVE-flavored prompt that fits the bundle's 1024-token
-//      total budget (the full chunk-1 prompt is ~1.8 K tokens, too big).
-//   4. Report RSS, tok/s, TTFT live.
+// Config = the Wave#15-verified envelope: eng2048 / out512 / gpu, with
+// the chunk-generator corner-cuts already in place. systemPrompt goes in
+// LLMConfig (production-faithful; the system-in-message path hangs — see
+// Wave#15). One model load per surface (systemPrompt is load-time).
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -26,188 +23,288 @@ import {
   View,
 } from "react-native";
 
-import { ensureModel } from "@/runtime/model-cache";
+import { File } from "expo-file-system";
+
+import { buildChunkPrompt } from "@/prompts/chunk-generator";
+import { buildReflectionPrompt } from "@/prompts/reflection";
+import type {
+  ChunkGenerationContextPayload,
+  ReflectionContext,
+  SessionHistoryEntry,
+} from "@/prompts/schemas";
+import { WAVE_SYSTEM_PROMPT_STOCK_COMPACT } from "@/prompts/wave-system";
+import { ensureModel, getModelDir } from "@/runtime/model-cache";
 import { createLLM, type LiteRTLMInstance } from "react-native-litert-lm";
 
-type Phase =
-  | "idle"
-  | "downloading"
-  | "loading"
-  | "ready"
-  | "generating"
-  | "valid"
-  | "invalid"
-  | "error";
+const REQUESTED_BACKEND = "gpu" as const;
+const ENGINE_MAX_TOKENS = 2048;
+const OUTPUT_MAX_TOKENS = 512;
 
-interface Stats {
+const TOOL_OBSTACLES =
+  "none, cannot_visualize, mind_wandering, urge_overwhelming, breath_tight, breath_anxiety, gave_in, guilt_failure, physical_discomfort, sleepiness";
+
+const PROFILE: ChunkGenerationContextPayload["profile"] = {
+  matType: "buprenorphine",
+  medicationStatus: "on_time",
+  trigger: "stress",
+  triggerOther: null,
+  usedSubstanceToday: false,
+};
+
+// One realistic prior check-in. Post-corner-cut, chunk-generator's
+// renderHistoryBlock only reads the most recent check-in entry.
+const PRIOR_CHECKIN: SessionHistoryEntry = {
+  kind: "checkIn",
+  chunkNumber: 2,
+  cravingScore: 6,
+  obstacleCategory: null,
+  turns: [
+    { role: "agent", content: "Where is the craving on a scale of 1 to 10 right now?" },
+    { role: "patient", content: "About a six, it eased a little but it's still in my chest." },
+    { role: "agent", content: "A six, and you noticed it ease — that's worth naming. What was happening in your body during that last stretch?" },
+    { role: "patient", content: "My jaw was tight and I kept wanting to check my phone." },
+    { role: "agent", content: "That pull to distract is the wave working — and you stayed. Ready to keep going?" },
+    { role: "patient", content: "Yeah." },
+  ],
+};
+
+type Phase = "idle" | "downloading" | "running" | "done" | "error";
+
+interface SurfaceStats {
   ttftMs: number;
   totalMs: number;
   promptTokens: number;
   completionTokens: number;
   tokensPerSecond: number;
+  residentBytes: number;
 }
 
-interface Memory {
-  residentBytes: number;
-  nativeHeapBytes: number;
-  availableMemoryBytes: number;
-  isLowMemory: boolean;
+interface SurfaceResult {
+  label: string;
+  text: string;
+  toolCall: string | null;
+  stats: SurfaceStats | null;
+  error: string | null;
 }
 
 function fmtBytes(b: number): string {
   if (!b || !Number.isFinite(b)) return "—";
-  const units = ["B", "KB", "MB", "GB"];
-  const i = Math.min(units.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
-  return `${(b / Math.pow(1024, i)).toFixed(i > 1 ? 2 : 0)} ${units[i]}`;
+  const u = ["B", "KB", "MB", "GB"];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+  return `${(b / Math.pow(1024, i)).toFixed(i > 1 ? 2 : 0)} ${u[i]}`;
+}
+
+/**
+ * Parse the native Gemma-4 tool-call shape (the fine-tune-dataset shape,
+ * base-reliable): a plain reply followed by a literal
+ * `endConversation{cravingScore:N,obstacleCategory:CAT}`. Reply = the text
+ * with that literal stripped. No JSON wrapper.
+ */
+function extractToolCall(raw: string): { reply: string; tool: string | null } {
+  const m = raw.match(/endConversation\s*\{([^}]*)\}/i);
+  if (!m) return { reply: raw.trim(), tool: null };
+  const args = m[1];
+  const score = args.match(/cravingScore\s*[:=]\s*(\d+)/i)?.[1] ?? "?";
+  const obst =
+    args.match(/obstacleCategory\s*[:=]\s*"?([a-zA-Z_]+)"?/i)?.[1] ?? "none";
+  return {
+    reply: raw.replace(m[0], "").trim(),
+    tool: `endConversation{cravingScore:${score},obstacleCategory:${obst}}`,
+  };
 }
 
 export default function LiteRTStockScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [downloadPct, setDownloadPct] = useState(0);
-  const [output, setOutput] = useState("");
+  const [results, setResults] = useState<SurfaceResult[]>([]);
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [memory, setMemory] = useState<Memory | null>(null);
-  const memTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const llmRef = useRef<LiteRTLMInstance | null>(null);
+  const [mldrift, setMldrift] = useState<string | null>(null);
+  const modelPathRef = React.useRef<string | null>(null);
+  const busyRef = React.useRef(false);
 
-  useEffect(() => {
-    return () => {
-      if (memTimerRef.current) clearInterval(memTimerRef.current);
-    };
-  }, []);
-
-  const startMemoryPoll = (llm: LiteRTLMInstance) => {
-    if (memTimerRef.current) clearInterval(memTimerRef.current);
-    memTimerRef.current = setInterval(() => {
-      try {
-        setMemory(llm.getMemoryUsage());
-      } catch {
-        // ignore — wrapper may be torn down
-      }
-    }, 1000);
+  const ensurePath = async (): Promise<string> => {
+    if (modelPathRef.current) return modelPathRef.current;
+    setPhase("downloading");
+    const uri = await ensureModel("litert-stock-gemma4", {
+      onProgress: (p) => {
+        setDownloadPct(p);
+        if (p >= 1) setPhase("running");
+      },
+    });
+    const path = uri.replace(/^file:\/\//, "");
+    modelPathRef.current = path;
+    return path;
   };
 
-  const onLoad = async () => {
-    setPhase("downloading");
-    setError(null);
-    setDownloadPct(0);
+  // MLDrift GPU program-cache probe: present/growing ⇒ GPU actually ran.
+  const probeMlDrift = () => {
     try {
-      const fileUri = await ensureModel("litert-stock-gemma4", {
-        onProgress: (p) => {
-          setDownloadPct(p);
-          if (p >= 1) setPhase("loading");
-        },
-      });
-      // Strip file:// — LiteRT-LM C++ wants raw POSIX paths (commit 2b6fdc6).
-      const nativePath = fileUri.replace(/^file:\/\//, "");
-      const llm = createLLM({ enableMemoryTracking: true });
-      await llm.loadModel(nativePath, {
-        backend: "gpu",
-        // maxTokens is effectively the **total token budget** (input +
-        // output) in this wrapper despite the TS comment saying "to
-        // generate". With maxTokens=256 we got "input too long, 1846 > 256"
-        // when sending the full WAVE chunk-1 prompt; with maxTokens=2048
-        // we got "failed to invoke compiled model" (bundle prefill shapes
-        // don't accept arbitrary lengths). 1024 matches the maintainer's
-        // example app and is the sweet spot that the bundle's compiled
-        // graph accepts. Input prompts must stay short enough to leave
-        // room for output within 1024.
-        systemPrompt: "You are WAVE, a calm voice guiding someone through urge surfing. Reply in 1-2 short sentences.",
-        maxTokens: 1024,
+      const entries = getModelDir("litert-stock-gemma4").list();
+      const hits = entries
+        .filter(
+          (e): e is File =>
+            e instanceof File && e.name.toLowerCase().includes("mldrift"),
+        )
+        .map((f) => `${f.name} (${fmtBytes(f.exists ? (f.size ?? 0) : 0)})`);
+      setMldrift(hits.length ? hits.join(", ") : "none (likely CPU fallback)");
+    } catch {
+      setMldrift("none yet");
+    }
+  };
+
+  /** One surface = one fresh load (systemPrompt is load-time) + sends. */
+  const runSurface = async (
+    modelPath: string,
+    label: string,
+    systemPrompt: string,
+    userTurns: string[],
+  ): Promise<SurfaceResult> => {
+    let llm: LiteRTLMInstance | null = null;
+    try {
+      llm = createLLM({ enableMemoryTracking: true });
+      await llm.loadModel(modelPath, {
+        backend: REQUESTED_BACKEND,
+        engineMaxTokens: ENGINE_MAX_TOKENS,
+        outputMaxTokens: OUTPUT_MAX_TOKENS,
+        systemPrompt,
         temperature: 0,
         topK: 1,
       });
-      llmRef.current = llm;
-      setMemory(llm.getMemoryUsage());
-      startMemoryPoll(llm);
-      setPhase("ready");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setPhase("error");
-    }
-  };
-
-  const onGenerate = async () => {
-    const llm = llmRef.current;
-    if (!llm) {
-      setError("Model not loaded — tap Download + Load first.");
-      setPhase("error");
-      return;
-    }
-    setPhase("generating");
-    setError(null);
-    setOutput("");
-    setStats(null);
-    try {
-      // Short demo prompt — the full WAVE chunk-1 prompt (~1800 tokens) is
-      // too long for the stock bundle's 1024 total-token budget. The
-      // system prompt at load time is the WAVE persona; here we just ask
-      // for a single urge-surfing cue. Demonstrates Gemma 4 running on
-      // LiteRT-LM end-to-end without overflowing the bundle's compiled
-      // context. Fine-tune would replace this with the full chunk
-      // contract; stock can't follow that schema.
-      const prompt =
-        "I'm feeling a 7-out-of-10 craving for buprenorphine right now. Give me one short urge-surfing cue to ride this out.";
-
+      // Reset ONCE, then send each turn as a real user message so the
+      // wrapper's chat template manages user/assistant turns. (Per-turn
+      // resetConversation made every turn a fresh conversation with a
+      // forged transcript — that's what collapsed the check-in into a
+      // stray </start_of_turn>.) Single-turn surfaces are unaffected.
+      let last = "";
       llm.resetConversation();
-      let accumulated = "";
-      await new Promise<void>((resolve, reject) => {
-        try {
-          llm.sendMessageAsync(prompt, (token, done) => {
-            accumulated += token;
-            setOutput(accumulated);
-            if (done) resolve();
-          });
-        } catch (err) {
-          reject(err as Error);
-        }
-      });
-
-      const s = llm.getStats();
-      setStats({
-        ttftMs: s.timeToFirstToken,
-        totalMs: s.totalTime,
-        promptTokens: s.promptTokens,
-        completionTokens: s.completionTokens,
-        tokensPerSecond: s.tokensPerSecond,
-      });
-      setMemory(llm.getMemoryUsage());
-
-      // No JSON validation — stock Gemma 4 generates prose for this prompt.
-      // The fine-tune is what shapes output into the chunk schema. For the
-      // prize demo, coherent prose is the win condition.
-      if (accumulated.trim().length > 0) {
-        setPhase("valid");
-      } else {
-        setError("Model returned empty output.");
-        setPhase("invalid");
+      for (const turn of userTurns) {
+        last = await llm.sendMessage(turn);
       }
+      const s = llm.getStats();
+      const mem = llm.getMemoryUsage();
+      const { reply, tool } = extractToolCall(last);
+      return {
+        label,
+        text: reply,
+        toolCall: tool,
+        stats: {
+          ttftMs: s.timeToFirstToken,
+          totalMs: s.totalTime,
+          promptTokens: s.promptTokens,
+          completionTokens: s.completionTokens,
+          tokensPerSecond: s.tokensPerSecond,
+          residentBytes: mem.residentBytes,
+        },
+        error: null,
+      };
+    } catch (e) {
+      return {
+        label,
+        text: "",
+        toolCall: null,
+        stats: null,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    } finally {
+      try {
+        llm?.close();
+      } catch {
+        /* best-effort */
+      }
+    }
+  };
+
+  const onRunDemo = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setError(null);
+    setResults([]);
+    try {
+      const modelPath = await ensurePath();
+      setPhase("running");
+      const acc: SurfaceResult[] = [];
+
+      // ── 1. Phase narration (chunk 3, post-corner-cut: 1 prior check-in)
+      setNote("1/3 · phase narration…");
+      const chunk = buildChunkPrompt({
+        chunkNumber: 3,
+        intakeIntensity: 7,
+        profile: PROFILE,
+        sessionHistory: [PRIOR_CHECKIN],
+      } satisfies ChunkGenerationContextPayload);
+      acc.push(
+        await runSurface(
+          modelPath,
+          "Phase narration (chunk 3)",
+          chunk.systemPrompt,
+          [chunk.userPrompt],
+        ),
+      );
+      setResults([...acc]);
+
+      // ── 2. Check-in — real user/assistant multi-turn ending in the
+      // native endConversation tool call. Compact WAVE persona +
+      // native-tool-call instruction (no JSON wrapper, no forged
+      // transcript). The 3 user messages are just the patient's words;
+      // the wrapper's chat template produces each assistant turn, and the
+      // conversation is preserved across sends (runSurface resets once).
+      setNote("2/3 · check-in (3 turns + endConversation tool call)…");
+      const ciSystem = `${WAVE_SYSTEM_PROMPT_STOCK_COMPACT}
+
+You are running a post-chunk check-in with the patient. The patient's first message is their craving score (1-10). Reply naturally in 1-3 short plain sentences each turn — validate, then one question — no markdown.
+
+Once the patient has clearly said they are ready to continue, give a brief warm closing line with NO question, then on its OWN final line emit exactly:
+endConversation{cravingScore:N,obstacleCategory:CAT}
+where N is their latest score and CAT is one of: ${TOOL_OBSTACLES} (use none if no clear obstacle). Do NOT emit endConversation before the patient is ready, and emit it at most once.`;
+      // Real multi-turn: just the patient utterances, sent sequentially.
+      const ciTurns = [
+        "6",
+        "My chest was tight but it loosened a bit near the end.",
+        "Yeah, I'm ready, let's keep going.",
+      ];
+      acc.push(
+        await runSurface(
+          modelPath,
+          "Check-in → endConversation",
+          ciSystem,
+          ciTurns,
+        ),
+      );
+      setResults([...acc]);
+
+      // ── 3. Reflection
+      setNote("3/3 · reflection…");
+      const refl = buildReflectionPrompt({
+        intakeIntensity: 7,
+        matType: "buprenorphine",
+        medicationStatus: "on_time",
+        trigger: "stress",
+        usedSubstanceToday: false,
+        bodyLocation: "chest",
+        currentIntensity: 4,
+        endingIntensity: 3,
+        durationSeconds: 600,
+      } satisfies ReflectionContext);
+      acc.push(
+        await runSurface(modelPath, "Reflection", refl.systemPrompt, [
+          refl.userPrompt,
+        ]),
+      );
+      setResults([...acc]);
+
+      probeMlDrift();
+      setNote("Done — 3 surfaces.");
+      setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
+    } finally {
+      busyRef.current = false;
     }
   };
 
-  const onUnload = async () => {
-    if (memTimerRef.current) {
-      clearInterval(memTimerRef.current);
-      memTimerRef.current = null;
-    }
-    try {
-      llmRef.current?.close();
-    } catch {
-      // best-effort
-    }
-    llmRef.current = null;
-    setMemory(null);
-    setStats(null);
-    setOutput("");
-    setPhase("idle");
-  };
-
-  const isBusy =
-    phase === "downloading" || phase === "loading" || phase === "generating";
+  const busy = phase === "downloading" || phase === "running";
 
   return (
     <ScrollView
@@ -216,50 +313,23 @@ export default function LiteRTStockScreen() {
       contentInsetAdjustmentBehavior="automatic"
     >
       <Text style={styles.sub} selectable>
-        Loads the unmodified `litert-community/gemma-4-E2B-it.litertlm` bundle
-        on react-native-litert-lm@0.3.6 and runs a WAVE chunk-1 prompt. Prize
-        demo: stock Gemma 4 running fully on-device via LiteRT-LM.
+        Stock Gemma 4 E2B on LiteRT-LM (fork) running the three real WAVE
+        surfaces — phase narration, a 3-turn check-in that fires the{" "}
+        <Text style={{ fontWeight: "700" }}>endConversation</Text> tool call,
+        and reflection — at the Wave#15-verified eng{ENGINE_MAX_TOKENS}/out
+        {OUTPUT_MAX_TOKENS} config. One model load per surface (~75 s each).
       </Text>
 
       <View style={styles.statusRow}>
         <Text style={styles.statusLabel}>Phase:</Text>
         <Text style={[styles.statusValue, phaseStyle(phase)]}>{phase}</Text>
-        {isBusy && <ActivityIndicator size="small" style={{ marginLeft: 8 }} />}
+        {busy && <ActivityIndicator size="small" style={{ marginLeft: 8 }} />}
       </View>
-
       {phase === "downloading" && (
-        <Text style={styles.kv}>
-          Download: {(downloadPct * 100).toFixed(1)}%
-        </Text>
+        <Text style={styles.kv}>Download: {(downloadPct * 100).toFixed(1)}%</Text>
       )}
-
-      {memory && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Memory (live)</Text>
-          <Text selectable style={styles.kv}>RSS: {fmtBytes(memory.residentBytes)}</Text>
-          <Text selectable style={styles.kv}>Native heap: {fmtBytes(memory.nativeHeapBytes)}</Text>
-          <Text selectable style={styles.kv}>Available: {fmtBytes(memory.availableMemoryBytes)}</Text>
-          {memory.isLowMemory && (
-            <Text style={[styles.kv, { color: "#F87171" }]}>
-              ⚠ System reports low memory
-            </Text>
-          )}
-        </View>
-      )}
-
-      {stats && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Generation stats</Text>
-          <Text selectable style={styles.kv}>TTFT: {stats.ttftMs.toFixed(0)} ms</Text>
-          <Text selectable style={styles.kv}>Total: {stats.totalMs.toFixed(0)} ms</Text>
-          <Text selectable style={styles.kv}>
-            Tokens: {stats.promptTokens} in / {stats.completionTokens} out
-          </Text>
-          <Text selectable style={styles.kv}>
-            Decode: {stats.tokensPerSecond.toFixed(1)} tok/s
-          </Text>
-        </View>
-      )}
+      {!!note && <Text style={styles.noteText}>{note}</Text>}
+      {mldrift && <Text style={styles.kv}>MLDrift GPU cache: {mldrift}</Text>}
 
       {error && (
         <View style={[styles.panel, styles.errorPanel]}>
@@ -270,57 +340,55 @@ export default function LiteRTStockScreen() {
 
       <View style={styles.buttonRow}>
         <Pressable
-          style={[styles.button, isBusy && styles.buttonDisabled]}
-          disabled={isBusy}
-          onPress={onLoad}
+          style={[styles.button, busy && styles.buttonDisabled]}
+          disabled={busy}
+          onPress={onRunDemo}
         >
-          <Text style={styles.buttonText}>1. Download + Load</Text>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.button,
-            phase !== "ready" &&
-              phase !== "valid" &&
-              phase !== "invalid" &&
-              styles.buttonDisabled,
-          ]}
-          disabled={
-            phase !== "ready" && phase !== "valid" && phase !== "invalid"
-          }
-          onPress={onGenerate}
-        >
-          <Text style={styles.buttonText}>2. Generate Chunk 1</Text>
-        </Pressable>
-
-        <Pressable style={styles.buttonSecondary} onPress={onUnload}>
-          <Text style={styles.buttonSecondaryText}>Unload</Text>
+          <Text style={styles.buttonText}>
+            {phase === "done" || phase === "error"
+              ? "Re-run 3-surface demo"
+              : "Run 3-surface demo"}
+          </Text>
         </Pressable>
       </View>
 
-      {output.length > 0 && (
-        <View style={styles.panel}>
-          <Text style={styles.panelHead}>Streaming output</Text>
-          <Text selectable style={styles.outputText}>
-            {output}
-          </Text>
+      {results.map((r, i) => (
+        <View key={i} style={styles.panel}>
+          <Text style={styles.panelHead}>{r.label}</Text>
+          {r.error ? (
+            <Text selectable style={styles.errorText}>{r.error}</Text>
+          ) : (
+            <>
+              {r.toolCall && (
+                <Text selectable style={styles.toolCall}>
+                  🛠 {r.toolCall}
+                </Text>
+              )}
+              <Text selectable style={styles.outputText}>{r.text}</Text>
+              {r.stats && (
+                <Text selectable style={styles.metrics}>
+                  {r.stats.completionTokens} tok ·{" "}
+                  {r.stats.tokensPerSecond.toFixed(1)} tok/s · TTFT{" "}
+                  {r.stats.ttftMs.toFixed(0)} ms · total{" "}
+                  {(r.stats.totalMs / 1000).toFixed(1)} s · RSS{" "}
+                  {fmtBytes(r.stats.residentBytes)}
+                </Text>
+              )}
+            </>
+          )}
         </View>
-      )}
+      ))}
     </ScrollView>
   );
 }
 
 function phaseStyle(p: Phase) {
   switch (p) {
-    case "valid":
+    case "done":
       return { color: "#34D399" };
-    case "invalid":
     case "error":
       return { color: "#F87171" };
-    case "ready":
-      return { color: "#22D3EE" };
-    case "generating":
-    case "loading":
+    case "running":
     case "downloading":
       return { color: "#FBBF24" };
     default:
@@ -331,10 +399,11 @@ function phaseStyle(p: Phase) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#08080C" },
   content: { padding: 16, gap: 12 },
-  sub: { color: "#9CA3AF", fontSize: 13 },
+  sub: { color: "#9CA3AF", fontSize: 13, lineHeight: 18 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusLabel: { color: "#9CA3AF", fontSize: 14 },
   statusValue: { fontSize: 14, fontWeight: "600" },
+  noteText: { color: "#58A6FF", fontSize: 13, fontWeight: "600" },
   panel: {
     backgroundColor: "#16161F",
     padding: 12,
@@ -342,7 +411,7 @@ const styles = StyleSheet.create({
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#23232F",
-    gap: 4,
+    gap: 6,
   },
   errorPanel: { borderColor: "#7F1D1D" },
   panelHead: {
@@ -351,10 +420,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 4,
   },
   kv: { color: "#F1F1F4", fontSize: 13, fontFamily: "Menlo" },
-  outputText: { color: "#F1F1F4", fontSize: 13, fontFamily: "Menlo", lineHeight: 18 },
+  outputText: { color: "#F1F1F4", fontSize: 13, lineHeight: 18 },
+  toolCall: {
+    color: "#34D399",
+    fontSize: 13,
+    fontFamily: "Menlo",
+    fontWeight: "700",
+  },
+  metrics: { color: "#9CA3AF", fontSize: 11, fontFamily: "Menlo", marginTop: 4 },
   errorText: { color: "#F87171", fontSize: 13, fontFamily: "Menlo" },
   buttonRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   button: {
@@ -366,13 +441,4 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: "#3F3F50", opacity: 0.5 },
   buttonText: { color: "#F1F1F4", fontWeight: "600", fontSize: 13 },
-  buttonSecondary: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: "#3F3F50",
-  },
-  buttonSecondaryText: { color: "#9CA3AF", fontWeight: "600", fontSize: 13 },
 });

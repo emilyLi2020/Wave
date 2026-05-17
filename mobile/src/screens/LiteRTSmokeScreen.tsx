@@ -193,7 +193,18 @@ export default function LiteRTSmokeScreen() {
       // layer entirely, which is fine for a one-off diagnostic.
       await llm.loadModel(
         STOCK_GEMMA4_URL,
-        { backend: "gpu", maxTokens: 256, temperature: 0, topK: 1 },
+        // Fork (react-native-litert-lm-wave): split knobs — engine KV
+        // budget vs per-call decode cap. 2048 / 256 are the litert-
+        // community *benchmark* values (known-safe), NOT proven hard
+        // caps — context is runtime-settable; real envelope under
+        // measurement in Wave#15 Phase 0.
+        {
+          backend: "gpu",
+          engineMaxTokens: 2048,
+          outputMaxTokens: 256,
+          temperature: 0,
+          topK: 1,
+        },
         (p) => {
           setDownloadPct(p);
           if (p >= 1) setPhase("loading");

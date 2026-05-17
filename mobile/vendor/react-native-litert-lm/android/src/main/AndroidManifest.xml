@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- ContentProvider for initializing application context at startup -->
+        <provider
+            android:name="dev.litert.litertlm.LiteRTLMInitProvider"
+            android:authorities="${applicationId}.litertlm.init"
+            android:exported="false"
+            android:initOrder="100" />
+    </application>
+</manifest>

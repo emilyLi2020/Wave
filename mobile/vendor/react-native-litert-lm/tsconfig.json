@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["esnext"],
+    "declaration": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "moduleResolution": "node",
+    "jsx": "react",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "lib",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "react-native": ["example/node_modules/react-native"],
+      "react-native-nitro-modules": ["example/node_modules/react-native-nitro-modules"],
+      "react": ["example/node_modules/@types/react", "example/node_modules/react"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "lib", "android", "ios", "nitrogen"]
+}

@@ -1,0 +1,26 @@
+# Build artifacts
+android/build/**
+ios/build/**
+lib/
+!lib/index.js
+!lib/index.d.ts
+!lib/**/*.d.ts
+!lib/**/*.js
+*.tsbuildinfo
+
+# Generated code (keep nitrogen/generated as they are source for library users?)
+# Actually nitrogen/generated IS required for the library to link.
+
+# IDE
+.vscode
+.idea
+*.iml
+.DS_Store
+
+# Deps
+node_modules
+
+# Misc
+.git
+.gitignore
+*.litertlm

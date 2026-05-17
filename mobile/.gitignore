@@ -50,3 +50,7 @@ app-example
 _build.json
 _logs.txt
 _build/
+
+# EAS-synced signing secrets (do NOT commit)
+credentials.json
+credentials/

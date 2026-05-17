@@ -1,0 +1,32 @@
+{
+  "name": "llmtest",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "prebuild": "expo prebuild --clean",
+    "android": "expo run:android",
+    "android:device": "expo run:android --device",
+    "ios": "expo run:ios",
+    "ios:device": "expo run:ios --device",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~55.0.19",
+    "expo-build-properties": "~55.0.13",
+    "expo-status-bar": "~55.0.5",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-litert-lm": "file:..",
+    "react-native-nitro-modules": "^0.35.4",
+    "react-native-safe-area-context": "~5.6.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.10",
+    "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "hermes-compiler": "250829098.0.4"
+  },
+  "private": true
+}

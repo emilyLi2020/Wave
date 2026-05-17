@@ -12,7 +12,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.wave.mobile",
       "entitlements": {
-        "com.apple.developer.kernel.increased-memory-limit": true
+        "com.apple.developer.kernel.increased-memory-limit": true,
+        "com.apple.developer.kernel.extended-virtual-addressing": true
       },
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Wave uses your microphone to listen for your voice during guided check-ins. Audio is processed entirely on this device and is never sent off the phone.",

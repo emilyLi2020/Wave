@@ -10,6 +10,26 @@
 > "input token ids are too long" errors on this stack with prompts >~200
 > tokens. Stack-trace pattern recognition for the next person who hits this.
 
+> **⚠️ CORRECTION (2026-05-16, added after Path A verified).** This
+> document repeatedly states the stock bundle is hard-capped at **2048
+> total / 256 decode**. That is **wrong / over-stated** — it was an
+> artifact of the old wrapper's `maxTokens` conflation (failures above 256
+> were always the *decode* side, never the engine cache). Context is in
+> fact **runtime-settable, not bundle-fixed**: the HF card says "up to
+> 32k"; [LiteRT #6765] shows the official bundle's `LlmMetadata` doesn't
+> set `max_num_tokens` and 4096 works on iOS (>4096 SIGSEGV); [LiteRT-LM
+> #2202] ran E2B at 8192 on Android. The genuine ceiling is
+> **platform-runtime ≈ 4096 on iOS arm64**, and the 256-decode cap is
+> likewise unverified post-fork. Treat the "2048/256 hard limit" claims
+> below as historical. Live plan: `docs/plans/litert-cache-reexport-plan.md`.
+>
+> **✅ RESOLVED 2026-05-16:** the full WAVE session runs on stock Gemma 4
+> LiteRT at **eng2048/out256** after two demo corner-cuts (phase narration
+> → only the prior check-in; chunk system block trimmed ~half). 8/8
+> on-device probes valid, no hangs/crashes, ~3–4 tok/s. No re-export, no
+> bigger bundle. Canonical resolution + numbers:
+> `docs/runbooks/stock-litert-working-config.md`; ticket Wave#15.
+
 ## TL;DR
 
 | Use case | Stock bundle + `react-native-litert-lm@0.3.6` |
@@ -158,6 +178,115 @@ constrained by the bundle's compiled cache_length=2048, but usable.
 
 To open a PR upstream or fork, the wrapper is single-file: `cpp/HybridLiteRTLM.cpp`.
 
+#### ✅ Outcome — Path A VERIFIED ON A PHYSICAL iPhone (2026-05-16)
+
+> **🏆 IMPORTANT — DO NOT DELETE THIS SECTION.** This documents the first
+> time a WAVE-relevant Gemma 4 LiteRT path was proven working end-to-end
+> on real hardware. It is the resolution of the central blocker tracked
+> across every runtime postmortem in this directory. Keep it.
+>
+> **Result:** stock Gemma 4 E2B, via the forked `react-native-litert-lm`,
+> running on a **physical iPhone 17 Pro**, **generated streamed JSON output
+> for the full ~1846-token WAVE chunk-1 prompt** — the exact prompt that
+> was structurally impossible on the un-forked wrapper. The maxTokens
+> conflation bug is dead. Path A works.
+
+Path A was taken, corrected, and **verified live on device**. Fork at
+[`IdkwhatImD0ing/react-native-litert-lm-wave`](https://github.com/IdkwhatImD0ing/react-native-litert-lm-wave)
+(branch `wave/maxtokens-decouple`, commit **`f9dbf28`** — *pristine npm
+`0.3.6` + only the maxTokens decouple patch*; the earlier `d35ba92` that
+bundled the rebuilt `main` framework was abandoned because its `main` C
+header broke the 0.3.6 C++ bridge compile — see "Correction" below),
+consumed by `mobile/package.json` as a pinned git dependency.
+
+What changed in the fork vs upstream `0.3.6`:
+
+- **`cpp/HybridLiteRTLM.{hpp,cpp}`** — added `engineMaxTokens_` (default
+  2048) and `outputMaxTokens_` (default 256) members. Config parsing now
+  resolves: explicit knob → legacy `maxTokens` → default. Line 334 feeds
+  `engineMaxTokens_` to `litert_lm_engine_settings_set_max_num_tokens`;
+  line 391 feeds `outputMaxTokens_` to
+  `litert_lm_session_config_set_max_output_tokens`. The two knobs are no
+  longer the same value.
+- **`nitrogen/generated/shared/c++/LLMConfig.hpp`** — the Nitro struct is
+  codegen'd, so it was hand-extended: two `std::optional<double>` members,
+  constructor params given `= std::nullopt` defaults (so the Android
+  `JLLMConfig` 6-arg call site still compiles untouched), and
+  `fromJSI` / `toJSI` / `canConvert` updated.
+- **`src/specs/LiteRTLM.nitro.ts` + `lib/specs/LiteRTLM.nitro.d.ts`** —
+  typed `engineMaxTokens?` / `outputMaxTokens?`; `maxTokens` marked
+  `@deprecated` (kept as the back-compat fallback for both).
+- **`scripts/postinstall.js`, `cpp/include/litert_lm_engine.h`, the
+  `litertLm` pin — all left PRISTINE.** The fork downloads upstream's
+  **v0.10.2** prebuilt framework exactly as stock `0.3.6` does. This is the
+  whole point of the correction below: the 0.3.6 C++ bridge only compiles
+  against the v0.10.2 C header.
+
+WAVE call sites updated to the split knobs:
+
+- `src/screens/LiteRTStockScreen.tsx` (the prize-eligible stock demo):
+  `engineMaxTokens: 2048, outputMaxTokens: 256` — the 1846-token chunk-1
+  prompt runs. (Initially set to `200`; corrected to `256` = the bundle's
+  *true* compiled decode-chunk cap. `200` silently truncated any surface
+  whose output ran 200–256, e.g. a long reflection. Note: for chunk-1 the
+  binding limit is still `2048 − 1846 ≈ 202`, not this knob.)
+- `src/screens/LiteRTSmokeScreen.tsx`: same 2048 / 256.
+- `src/runtime/litert-generators.ts` (parked fine-tune path): `4096 / 256`
+  to match that bundle's `--cache_length=4096` export.
+
+**Correction (the `d35ba92` → `f9dbf28` pivot).** The first fork attempt
+bundled the rebuilt `main-2f70ce8` LiteRT-LM framework (to also serve the
+parked fine-tune path). That was wrong for Path A: the rebuilt framework
+ships LiteRT-LM `main`'s C header, where `litert_lm_conversation_config_create`
+takes **no args** and `kTopP` is gone, but the `0.3.6` `HybridLiteRTLM.cpp`
+bridge calls them the **v0.10.2** way. The EAS Xcode build failed with
+`no matching function for call to 'litert_lm_conversation_config_create'`
+and `use of undeclared identifier 'kTopP'` — exactly the "porting the
+bridge to the new C API is a separate multi-day project" gap flagged in
+[`litert-lm-mobile-finetune.md`](./litert-lm-mobile-finetune.md). Path A
+does **not** need the rebuilt framework (it is stock Gemma 4, which loads
+on vanilla `0.3.6` + v0.10.2). The fork was rebuilt from **pristine npm
+`0.3.6` + only the 5-file maxTokens patch** (`f9dbf28`); the bridge then
+compiled clean.
+
+**Verification — done, on a physical iPhone 17 Pro (not EAS):** EAS was
+abandoned mid-effort (out of credits) and the build was done **locally**.
+Sequence that worked:
+
+1. `expo prebuild` + `pod install` (the `react-native-litert-lm` config
+   plugin integrates the v0.10.2 `LiteRTLM.xcframework`). Also surfaced and
+   fixed a pre-existing, Path-A-unrelated bug: `react-native-sherpa-onnx`
+   requires the peer dep `@dr.pogodin/react-native-fs`, never installed —
+   it had been masked because every prior build was a dev-client build
+   that skips JS bundling. Added `@dr.pogodin/react-native-fs@^2.38.2`.
+2. `xcodebuild` (generic iOS, `CODE_SIGNING_ALLOWED=NO`) → **`** BUILD
+   SUCCEEDED **`**, zero errors. `HybridLiteRTLM.cpp` + extended
+   `LLMConfig.hpp` compiled & linked against the v0.10.2 framework — the
+   recurring native blocker is resolved.
+3. Signing: `expo run:ios`'s device layer is broken by an Xcode 26.5 ↔
+   expo 54 `devicectl` JSON mismatch; bypassed with direct `xcodebuild`.
+   xcodebuild CLI couldn't see the Xcode-GUI account, and the existing
+   AdHoc profile was bound to EAS's distribution cert. Resolved by
+   `eas credentials -p ios` → *Download credentials from EAS to
+   credentials.json* (free, no build credits), importing EAS's
+   distribution `.p12` + its matched AdHoc profile (UUID
+   `a7801d9d-…`, team `8TADX8KSDK`, device included), then manual-signing.
+   (`credentials.json` + `credentials/` are git-ignored — they hold the
+   private key.)
+4. `xcrun devicectl device install app` → installed on "Bills iphone 17
+   pro"; Metro started; app launched.
+5. **`/tests/litert-stock` with the full ~1846-token WAVE chunk-1 prompt
+   → stock Gemma 4 E2B streamed coherent JSON output.** ✅
+
+This is the decisive proof: a prompt that returned
+`input token ids are too long, 1846 > 256` (or `failed to invoke the
+compiled model`) on the un-forked wrapper now generates, because
+`engineMaxTokens: 2048` and `outputMaxTokens: 256` are finally independent
+knobs. **Path A is complete and the prize-eligible stock LiteRT demo runs
+the real WAVE prompt.** (Caveat carried forward: stock's compiled
+2048-total / 256-decode ceilings mean reflection + check-in + chunk-1 fit,
+but chunks 2–5 and any >256-token output do not — see Wave#14.)
+
 ### Path B: Use a different bundle with a larger compiled cache
 
 The litert-community org publishes only `gemma-4-E2B-it.litertlm` and
@@ -230,7 +359,13 @@ non-trivial native development.
 
 ## What ships now
 
-- **Stock Gemma 4 LiteRT page** (`/tests/litert-stock`) — needs the prompt slimmed to ≤~1700 tokens (cache_length=2048 minus a buffer) OR needs Path A's wrapper fix. Current commit `8389c8e` uses a short demo prompt that fits; that's the working state until either change ships.
+- **Stock Gemma 4 LiteRT page** (`/tests/litert-stock`) — ✅ **SHIPPING,
+  VERIFIED ON A PHYSICAL iPhone 17 Pro on 2026-05-16** (see the Path A
+  Outcome section above — *do not delete it*). The fork's split
+  `engineMaxTokens: 2048` / `outputMaxTokens: 256` removed the conflation;
+  the full ~1846-token chunk-1 prompt generated streamed JSON on device.
+  Fork pinned at `f9dbf28` (pristine `0.3.6` + maxTokens patch). This is
+  the prize-eligible "uses LiteRT" demo and it runs the real WAVE prompt.
 - **Existing `/tests/litert`** (fine-tune target) — stays parked behind issue #13 / #11.
 
 The deeper research run from parallel-cli is saved at

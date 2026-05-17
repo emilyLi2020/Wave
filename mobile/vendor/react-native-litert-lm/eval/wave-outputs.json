@@ -1,0 +1,26 @@
+[
+  {
+    "key": "phase",
+    "input_tokens": 1850,
+    "output_tokens": 223,
+    "elapsed_seconds": 17.465890884399414,
+    "tokens_per_second": 12.767742652004328,
+    "output": "You are moving your attention upward from the top of your head. Notice the space around your eyes and forehead. Let your gaze soften slightly as you move toward your mouth and jaw. Feel the muscles around your mouth and the space beneath them.\n\nNow bring awareness to your throat and the area just above your collarbone. Notice any tightness or looseness there. Let the breath move through that space without forcing anything.\n\nShift your attention to your chest and stomach area. Notice any tension, hollowness, or movement. If the urge has a location, see if it has a shape or a temperature.\n\nMove your awareness down to your hands and fingers. Notice how they rest or clench. Let them be soft or firm. Then move slowly down your arms and into your legs and feet.\n\nRest your awareness at your feet for a moment. Feel the contact with the floor or the surface beneath you. This is where you can simply notice steadiness.\n\nWhen you are ready, let your breath return to its natural rhythm. We will check in now about how this body scan felt for you."
+  },
+  {
+    "key": "checkin",
+    "input_tokens": 3246,
+    "output_tokens": 73,
+    "elapsed_seconds": 7.531512260437012,
+    "tokens_per_second": 9.692608532746943,
+    "output": "Thank you for sharing your craving score of 7 out of 10. That is the same intensity as when you started, which tells us the urge is still quite strong. Stress or strong emotions are common triggers, and you took your medication on time today. With that context, what is one thing that stands out to you about how this chunk felt?"
+  },
+  {
+    "key": "reflection",
+    "input_tokens": 624,
+    "output_tokens": 112,
+    "elapsed_seconds": 5.440901279449463,
+    "tokens_per_second": 20.584824875067888,
+    "output": "{\n\"insight\":\"You navigated a very intense urge, moving from a 7 down to a 3 over ten minutes. That drop shows that staying with the feeling allowed it to change shape and size.\",\"journalPromptQuestion\":\"What did you notice in your chest when the intensity first began to shift?\",\"nextSteps\":{\"one\":\"Drink a full glass of water\",\"two\":\"Stretch your arms overhead slowly\",\"three\":\"Text a trusted person a short check-in\",\"four\":\"Lie down for 10 minutes without trying to sleep\"\n}"
+  }
+]

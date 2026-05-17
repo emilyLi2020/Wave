@@ -1,0 +1,103 @@
+{
+  "name": "react-native-litert-lm",
+  "version": "0.3.7",
+  "litertLm": {
+    "version": "0.11.0",
+    "androidMavenVersion": "0.11.0",
+    "iosGitTag": "v0.11.0",
+    "engineSource": "PREBUILT — PhoneClaw CLiteRTLM v0.11.0 (kellyvv/PhoneClaw, git-lfs), renamed CLiteRTLM->LiteRTLM. NOT from-source: the Bazel //c:engine path compiles XNNPACK aarch64-NEON microkernels empty for ios_arm64. Vendored prebuilt in ios/Frameworks/*.xcframework on branch wave/clitertlm-v0110-gpu. VERIFIED ~50 tok/s GPU on iPhone 17 Pro (stock Gemma 4 E2B); engine model-agnostic so runs fine-tuned .litertlm. Recipe: docs/CLITERTLM-GPU-RECIPE.md"
+  },
+  "description": "High-performance LLM inference for React Native using LiteRT-LM. Optimized for Gemma 4 and other on-device language models.",
+  "license": "MIT",
+  "author": "Hugh Chen (https://github.com/hung-yueh)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hung-yueh/react-native-litert-lm.git"
+  },
+  "homepage": "https://github.com/hung-yueh/react-native-litert-lm#readme",
+  "bugs": {
+    "url": "https://github.com/hung-yueh/react-native-litert-lm/issues"
+  },
+  "keywords": [
+    "react-native",
+    "nitro",
+    "litert",
+    "litert-lm",
+    "llm",
+    "gemma",
+    "gemma-4",
+    "gemma-3n",
+    "ai",
+    "machine-learning",
+    "on-device",
+    "inference",
+    "expo"
+  ],
+  "main": "lib/index",
+  "module": "lib/index",
+  "types": "lib/index.d.ts",
+  "react-native": "src/index",
+  "source": "src/index",
+  "files": [
+    "src",
+    "lib",
+    "android/src",
+    "android/build.gradle",
+    "android/CMakeLists.txt",
+    "ios/*.mm",
+    "ios/*.m",
+    "cpp",
+    "nitrogen/generated",
+    "scripts/postinstall.js",
+    "scripts/download-ios-frameworks.sh",
+    "scripts/build-ios-engine.sh",
+    "scripts/stubs",
+    "react-native.config.js",
+    "react-native-litert-lm.podspec",
+    "app.plugin.js",
+    "README.md",
+    "ios/Frameworks"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"**/*.{js,ts,tsx}\" --fix",
+    "prepack": "npm run build",
+    "specs": "npx nitrogen",
+    "clean": "rm -rf lib android/build ios/build ios/Frameworks nitrogen/generated",
+    "download-frameworks": "scripts/download-ios-frameworks.sh",
+    "android": "expo run:android",
+    "android:clean": "cd android && ./gradlew clean",
+    "ios": "expo run:ios",
+    "release": "release-it"
+  },
+  "devDependencies": {
+    "@expo/config-plugins": "~55.0.0",
+    "@types/react": "~19.2.10",
+    "react-native-nitro-modules": "^0.35.4",
+    "release-it": "^19.2.4",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "expo": ">=55.0.0",
+    "react": "*",
+    "react-native": "*",
+    "react-native-nitro-modules": "^0.35.4"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
+  }
+}

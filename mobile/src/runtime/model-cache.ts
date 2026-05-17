@@ -85,7 +85,11 @@ export const MODELS: Record<ModelId, ModelManifest> = {
 // Path helpers
 // ────────────────────────────────────────────────────────────────────────
 
-function getModelDir(id: ModelId): Directory {
+// Exported: LiteRT writes its MLDrift GPU program cache into the model
+// file's directory (HybridLiteRTLM.cpp sets cache_dir = dirname(modelPath)).
+// The stock screen probes this dir to tell cold-JIT vs. CPU fallback apart
+// (Wave#17 Phase 0). Not part of the download path's public surface.
+export function getModelDir(id: ModelId): Directory {
   return new Directory(Paths.document, "wave-models", id);
 }
 
