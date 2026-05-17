@@ -346,6 +346,38 @@ export function SessionMachine() {
     state.phase === "chunk" ||
     state.phase === "checkIn";
 
+  // Footer "Skip ahead" — only meaningful during the chunk player and
+  // the voice check-in (intake & safety stay required; loading has
+  // nothing to skip). Chunk → jump to the check-in. Check-in → close
+  // it with the score we already have for this chunk (last reported
+  // score, or intake intensity before the first check-in) and no
+  // obstacle, so session history, scoring and the reflection all stay
+  // valid without holding the patient in the conversation.
+  const canSkipAhead =
+    state.phase === "chunk" || state.phase === "checkIn";
+
+  const handleSkipAhead = () => {
+    if (state.phase === "chunk") {
+      dispatch({ type: "chunkCompleted" });
+      return;
+    }
+    if (state.phase === "checkIn") {
+      const now = Date.now();
+      dispatch({
+        type: "checkInCompleted",
+        checkIn: {
+          chunkNumber: state.currentChunk,
+          cravingScore: currentIntensity,
+          turns: [],
+          obstacleCategory: null,
+          readyToContinue: state.currentChunk === 5 ? null : true,
+          startedAt: now,
+          endedAt: now,
+        },
+      });
+    }
+  };
+
   const reflectionContext: ReflectionContext | null = useMemo(() => {
     if (!profile || !state.intake || state.checkIns.length < 5) return null;
     const finalCheckIn = state.checkIns[state.checkIns.length - 1];
@@ -467,7 +499,11 @@ export function SessionMachine() {
         </article>
       ) : null}
 
-      <SessionFooter phase={state.phase} />
+      <SessionFooter
+        phase={state.phase}
+        canSkipAhead={canSkipAhead}
+        onSkipAhead={handleSkipAhead}
+      />
     </div>
   );
 }
@@ -639,15 +675,34 @@ function ReflectionPlanAndSuggestions({
   );
 }
 
-function SessionFooter({ phase }: { phase: Phase }) {
+function SessionFooter({
+  phase,
+  canSkipAhead,
+  onSkipAhead,
+}: {
+  phase: Phase;
+  canSkipAhead: boolean;
+  onSkipAhead: () => void;
+}) {
   if (phase === "done" || phase === "safetyHandoff") return null;
   return (
-    <div className="flex items-center justify-start pt-4">
+    <div className="flex items-center justify-between pt-4">
+      {canSkipAhead ? (
+        <button
+          type="button"
+          onClick={onSkipAhead}
+          className="text-sm text-foreground/60 transition hover:text-accent focus:text-accent focus:outline-none"
+        >
+          Skip ahead →
+        </button>
+      ) : (
+        <span />
+      )}
       <Link
         href="/"
         className="text-sm text-foreground/60 hover:text-accent"
       >
-        ← Leave session
+        Leave session →
       </Link>
     </div>
   );

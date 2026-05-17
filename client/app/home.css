@@ -1,0 +1,250 @@
+/* ───────────────────────────────────────────────
+   WAVE front page — ported from the Claude Design
+   handoff (wave-web/project/{screens.jsx,wave.jsx,
+   styles.css}). Sits BELOW the global site top bar;
+   content is centered for web.
+
+   Tokens are scoped under [data-wave-home] so they
+   shadow :root only on the front page and never leak
+   into the rest of the app (which uses
+   --background/--foreground, not --bg/--fg).
+   ─────────────────────────────────────────────── */
+
+[data-wave-home] {
+  --bg: #f5f8fb;
+  --fg: #0b1f33;
+  --fg-soft: color-mix(in oklab, var(--fg) 70%, transparent);
+  --fg-faint: color-mix(in oklab, var(--fg) 45%, transparent);
+  --surface: #ffffff;
+  --border: #d6e1ec;
+  --border-soft: color-mix(in oklab, var(--border) 60%, transparent);
+
+  --accent: #0e7490;
+  --accent-fg: #ffffff;
+  --accent-soft: #cffafe;
+
+  --wave-rise: #38bdf8;
+  --wave-peak: #0284c7;
+  --wave-fall: #67e8f9;
+
+  position: relative;
+  display: block;
+  color: var(--fg);
+}
+
+[data-wave-home][data-theme="dark"] {
+  --bg: #05131f;
+  --fg: #e6f1fa;
+  --fg-soft: color-mix(in oklab, var(--fg) 70%, transparent);
+  --fg-faint: color-mix(in oklab, var(--fg) 50%, transparent);
+  --surface: #0c1f30;
+  --border: #1e3a52;
+  --border-soft: color-mix(in oklab, var(--border) 55%, transparent);
+
+  --accent: #22d3ee;
+  --accent-fg: #05131f;
+  --accent-soft: #164e63;
+
+  --wave-rise: #38bdf8;
+  --wave-peak: #0ea5e9;
+  --wave-fall: #67e8f9;
+}
+
+[data-wave-home] * {
+  box-sizing: border-box;
+}
+
+/* ─── In-product theme toggle (ported from app.jsx) ─
+   Round pill pinned to the top-right of the screen,
+   just below the global site bar. */
+
+[data-wave-home] .home-corner {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 5;
+}
+
+[data-wave-home] .theme-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+  background: color-mix(in oklab, var(--accent-soft) 85%, var(--surface));
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease,
+    border-color 160ms ease, transform 160ms ease;
+  box-shadow: 0 1px 2px rgba(11, 31, 51, 0.08),
+    0 12px 28px -14px rgba(11, 31, 51, 0.32);
+  padding: 0;
+}
+[data-wave-home] .theme-toggle:hover {
+  transform: translateY(-1px);
+}
+[data-wave-home] .theme-toggle:active {
+  transform: translateY(0);
+}
+[data-wave-home] .theme-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+[data-wave-home][data-theme="dark"] .theme-toggle {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.4),
+    0 12px 28px -14px rgba(0, 0, 0, 0.7);
+}
+[data-wave-home][data-theme="dark"] .theme-toggle:hover {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  color: #ffffff;
+  border-color: color-mix(in oklab, var(--accent) 70%, transparent);
+}
+
+/* ─── Screen surface ──────────────────────────────
+   Fills the viewport minus the 4rem global top bar.
+   The wave background is full-bleed; the content
+   column floats on top, centered both axes. */
+
+[data-wave-home] .screen {
+  position: relative;
+  min-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+[data-wave-home] .home-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+[data-wave-home] .screen-body {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 22px;
+  padding: 48px 24px 64px;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* ─── Type ────────────────────────────────────── */
+
+[data-wave-home] .eyebrow {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+[data-wave-home] h1.display {
+  font-size: clamp(40px, 6.4vw, 76px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  margin: 0;
+  text-wrap: balance;
+  color: var(--fg);
+}
+
+[data-wave-home] p.lede {
+  margin: 0;
+  font-size: clamp(17px, 1.7vw, 22px);
+  line-height: 1.5;
+  color: var(--fg-soft);
+  max-width: 34ch;
+}
+
+[data-wave-home] .hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-faint);
+  margin-top: 6px;
+}
+
+/* ─── Actions ─────────────────────────────────── */
+
+[data-wave-home] .actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+[data-wave-home] .btn {
+  appearance: none;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 12px 22px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: transform 120ms ease, background 160ms ease,
+    border-color 160ms ease, filter 160ms ease;
+}
+
+[data-wave-home] .btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+[data-wave-home] .btn:active {
+  transform: scale(0.985);
+}
+
+[data-wave-home] .btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+  box-shadow: 0 10px 30px -10px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+[data-wave-home] .btn.primary:hover {
+  color: var(--accent-fg);
+  filter: brightness(1.06);
+}
+
+[data-wave-home] .btn.huge {
+  font-size: clamp(19px, 1.8vw, 24px);
+  padding: 22px 40px;
+  min-height: 72px;
+  border-radius: 26px;
+  letter-spacing: -0.01em;
+  min-width: min(420px, 80vw);
+}
+
+[data-wave-home] .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-soft);
+  font-size: 14px;
+}
+[data-wave-home] .btn.ghost:hover {
+  color: var(--accent);
+}

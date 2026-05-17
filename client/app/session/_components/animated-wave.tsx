@@ -3,46 +3,41 @@
 /**
  * Animated wave visualization for the session.
  *
- * Two modes:
+ * This is the ported Claude-design ocean wave. Per the design
+ * transcripts the wave is **bare**: no border, no background, no scrim
+ * or color band above or below it — only the waves, on transparency.
+ * Three layers (far / mid / front) drift the same left → right
+ * direction, each driven by requestAnimationFrame with proper
+ * dispersion (shorter wavelengths travel faster) so crests evolve
+ * continuously instead of looping verbatim like a CSS slide.
  *
- *   - `ambient` — a continuous slow ocean swell. Used during all
- *                 non-breath segments (text, pause) and during the
- *                 check-in chat. Two layered SVG sine paths slide
- *                 horizontally at different speeds.
+ * Two modes (public API unchanged — all session consumers keep working):
  *
- *   - `breath`  — synced to the active breath segment. Water level
- *                 eases over `breathDurationSec`:
- *                   inhale → rises from baseline to peak,
- *                   hold   → holds at peak,
- *                   exhale → recedes from peak to baseline.
- *                 The horizontal slide continues underneath so the
- *                 surface still feels alive at peak; only the level
- *                 is driven by the breath phase.
+ *   - `ambient` — water level mirrors the patient's craving score
+ *                 (1-10). Higher score → the water rises into view;
+ *                 the window size never changes, only the level floats.
  *
- * Smoothness notes
+ *   - `breath`  — synced to the active breath segment. Level eases over
+ *                 `breathDurationSec`: inhale → rises to peak, hold →
+ *                 holds at peak, exhale → recedes to baseline. The
+ *                 horizontal drift continues underneath so the surface
+ *                 still feels alive at peak.
  *
- * The water level is driven by `transform: translateY()` on a
- * `height: 100%` fill layer, not by animating `height` directly. Height
- * transitions force layout on every frame and jitter under load;
- * translateY is composited on the GPU and stays smooth.
- *
- * The horizontal slide uses CSS `@keyframes wave-slide` (defined in
- * globals.css as translateX 0 → -50%) on a 200%-wide strip containing
- * two identical SVG copies. This replaces SMIL `<animateTransform>`,
- * which has known jitter issues in Chromium and doesn't survive HMR
- * cleanly in dev.
- *
- * Intensity-driven fill level is available in ambient mode via the
- * optional `intensity` prop (1-10 craving score). Higher score → taller
- * wave — the visualization mirrors what the patient just reported on the
- * slider, so the wave is never disconnected from the rating the patient
- * owns. When `intensity` is omitted the ambient fill falls back to a flat
- * mid-level. Breath mode ignores intensity — level there is locked to
- * the inhale/hold/exhale phase so the wave stays in lockstep with the
- * count (PRD § Session Runtime Requirements rule 5).
+ * Smoothness: the water level is a `transform: translateY()` on a
+ * full-height layer (composited on the GPU), never an animated height
+ * (which forces layout every frame). The per-component phase is
+ * advanced in a ref-driven rAF loop so prop changes never tear down
+ * the loop or snap the path back to its t=0 shape (the flicker fix
+ * from the design transcripts).
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 
 interface AmbientProps {
   mode: "ambient";
@@ -65,61 +60,41 @@ interface BreathProps {
 
 type AnimatedWaveProps = AmbientProps | BreathProps;
 
-const VIEWBOX_WIDTH = 400;
-const VIEWBOX_HEIGHT = 40;
-const PERIOD = 100;
-const BASELINE = 18;
-
-const AMBIENT_FRONT_DURATION_S = 11;
-const AMBIENT_BACK_DURATION_S = 17;
-const AMBIENT_FILL_PERCENT = 38;
-// Intensity-driven ambient range. Score 1 → MIN, score 10 → MAX, linear
-// in between. Bounds stay inside the breath min/max so transitioning
-// from an ambient high into a breath inhale still produces a visible
-// rise, and an ambient low into exhale still produces a visible dip.
+// Score → fill mapping (design values: 1/10 ≈ 22%, 10/10 = 70%).
 const AMBIENT_MIN_FILL_PERCENT = 22;
-const AMBIENT_MAX_FILL_PERCENT = 68;
-
-const BREATH_PEAK_PERCENT = 78;
-const BREATH_BASELINE_PERCENT = 22;
-const BREATH_FRONT_DURATION_S = 6;
-const BREATH_BACK_DURATION_S = 9;
+const AMBIENT_MAX_FILL_PERCENT = 70;
+// Breath phase levels (design values).
+const BREATH_PEAK_PERCENT = 82;
+const BREATH_BASELINE_PERCENT = 18;
+// Fixed motion intensity (design's default tweak was 0.7).
+const MOTION = 0.7;
 
 export function AnimatedWave(props: AnimatedWaveProps) {
   const fillPercent = useBreathDrivenHeight(props);
   const isBreath = props.mode === "breath";
 
-  const frontColor = isBreath ? "var(--wave-peak)" : "var(--wave-rise)";
-  const backColor = isBreath ? "var(--wave-rise)" : "var(--wave-peak)";
-  const amplitude = isBreath ? 12 : 8;
-  const frontDurationS = isBreath
-    ? BREATH_FRONT_DURATION_S
-    : AMBIENT_FRONT_DURATION_S;
-  const backDurationS = isBreath
-    ? BREATH_BACK_DURATION_S
-    : AMBIENT_BACK_DURATION_S;
-
   // Level transitions ride the breath. Inhale/exhale take the full
-  // `breathDurationSec`. "Hold" snaps quickly so we don't visibly drift
-  // while the patient holds at peak. Ambient mode only transitions when
-  // switching into it, so a short ease is fine.
+  // breathDurationSec; "hold" snaps quickly so we don't visibly drift
+  // at peak. Ambient eases briefly when the score changes.
   const transitionMs =
     isBreath && props.breathPhase !== "hold"
       ? props.breathDurationSec * 1000
       : 700;
 
-  // translateY percentage: at fillPercent=100 the layer sits at its
-  // natural position (fully visible); at fillPercent=0 it's pushed
-  // entirely past the bottom of the clipping container.
+  // translateY %: at fill=100 the water sits fully in view; at fill=0
+  // it's pushed entirely past the bottom of the clip container.
   const translateY = 100 - fillPercent;
+
+  const speedMul = 1 / (0.5 + MOTION * 0.8);
+  const amp = 0.75 + MOTION * 0.4;
 
   return (
     <div
       aria-hidden
-      className="relative h-40 overflow-hidden rounded-2xl border border-border bg-surface"
+      className="relative h-40 overflow-hidden rounded-2xl"
     >
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 overflow-hidden"
         style={{
           transform: `translate3d(0, ${translateY}%, 0)`,
           transition: `transform ${transitionMs}ms ${
@@ -128,26 +103,47 @@ export function AnimatedWave(props: AnimatedWaveProps) {
           willChange: "transform",
         }}
       >
-        <WaveLayer
-          color={backColor}
-          durationS={backDurationS}
-          amplitude={amplitude * 0.7}
-          opacity={0.5}
-          phaseOffset={0.5}
+        {/* Far horizon — slow, low amplitude, soft. */}
+        <OceanLayer
+          seed={11}
+          baseY={28}
+          amps={[4 * amp, 2 * amp]}
+          periods={[320, 200]}
+          phases={[0.1, 0.45]}
+          duration={56 * speedMul}
+          color="color-mix(in oklab, var(--wave-peak) 70%, transparent)"
+          opacity={0.55}
+          topOffset={-2}
+          bobDuration={9 * speedMul}
+          bobOffset={2.6}
         />
-        <WaveLayer
-          color={frontColor}
-          durationS={frontDurationS}
-          amplitude={amplitude}
-          opacity={0.9}
-          phaseOffset={0}
+        {/* Mid layer. */}
+        <OceanLayer
+          seed={37}
+          baseY={22}
+          amps={[6 * amp, 3 * amp]}
+          periods={[280, 170]}
+          phases={[0.3, 0.75]}
+          duration={32 * speedMul}
+          color="color-mix(in oklab, var(--wave-rise) 88%, transparent)"
+          opacity={0.85}
+          topOffset={4}
+          bobDuration={6.4 * speedMul}
+          bobOffset={1.7}
         />
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `linear-gradient(to bottom, transparent 0%, ${frontColor} 60%)`,
-            opacity: 0.4,
-          }}
+        {/* Front layer — the dominant rolling swell. */}
+        <OceanLayer
+          seed={71}
+          baseY={18}
+          amps={[7.5 * amp, 3.6 * amp]}
+          periods={[240, 150]}
+          phases={[0.55, 0.05]}
+          duration={22 * speedMul}
+          color="var(--wave-peak)"
+          opacity={0.95}
+          topOffset={12}
+          bobDuration={4.8 * speedMul}
+          bobOffset={1.2}
         />
       </div>
     </div>
@@ -157,13 +153,10 @@ export function AnimatedWave(props: AnimatedWaveProps) {
 /**
  * Returns the current fill level as a percentage.
  *
- * Ambient mode maps the current craving intensity (1-10) to a fill
- * percent so the wave's height mirrors the patient's latest rating.
- * When no intensity is provided it falls back to a flat mid-level.
- *
- * Breath mode animates the level by switching the target percent
- * whenever the breath phase changes — the CSS transition in the parent
- * does the easing over `breathDurationSec`.
+ * Ambient mode maps the craving intensity (1-10) to a fill percent so
+ * the wave's height mirrors the patient's latest rating; undefined →
+ * a flat mid-level. Breath mode switches the target percent on each
+ * phase change and the parent's CSS transition does the easing.
  */
 function useBreathDrivenHeight(props: AnimatedWaveProps): number {
   const ambientTarget =
@@ -182,17 +175,11 @@ function useBreathDrivenHeight(props: AnimatedWaveProps): number {
 
   useEffect(() => {
     if (props.mode === "ambient") {
-      // ambientTarget is always a number when mode === "ambient"; the
-      // null branch above only covers breath mode.
       setPercent(ambientTarget as number);
       lastPhaseRef.current = null;
       return;
     }
 
-    // Re-trigger the level transition whenever a new breath phase
-    // begins. Setting state inside an effect that depends on the phase
-    // is safe here because the new value lasts for the full
-    // breathDurationSec window.
     if (lastPhaseRef.current !== props.breathPhase) {
       lastPhaseRef.current = props.breathPhase;
       setPercent(targetForPhase(props.breathPhase));
@@ -209,13 +196,13 @@ function useBreathDrivenHeight(props: AnimatedWaveProps): number {
 /**
  * Maps a craving intensity (1-10) to an ambient fill percent. Undefined
  * → mid-level fallback so callers that don't track intensity still get
- * the old behaviour.
+ * a sensible water line.
  */
 function ambientFillForIntensity(intensity: number | undefined): number {
-  if (intensity === undefined || Number.isNaN(intensity)) {
-    return AMBIENT_FILL_PERCENT;
-  }
-  const clamped = Math.max(1, Math.min(10, intensity));
+  const clamped =
+    intensity === undefined || Number.isNaN(intensity)
+      ? 5
+      : Math.max(1, Math.min(10, intensity));
   return (
     AMBIENT_MIN_FILL_PERCENT +
     ((clamped - 1) / 9) *
@@ -226,7 +213,6 @@ function ambientFillForIntensity(intensity: number | undefined): number {
 function targetForPhase(phase: "inhale" | "hold" | "exhale"): number {
   switch (phase) {
     case "inhale":
-      return BREATH_PEAK_PERCENT;
     case "hold":
       return BREATH_PEAK_PERCENT;
     case "exhale":
@@ -235,99 +221,156 @@ function targetForPhase(phase: "inhale" | "hold" | "exhale"): number {
 }
 
 /**
- * One horizontally-scrolling wave strip. The strip is 200% the width
- * of its container and contains two identical SVG copies of the wave;
- * the CSS `wave-slide` keyframes translate it from 0 → -50%, producing
- * a seamless infinite scroll on the compositor.
- *
- * `phaseOffset` shifts the back layer by half a period relative to the
- * front so the two layers don't crest in lockstep.
+ * Build the filled path for one ocean layer at the given per-component
+ * phases. Pure sum-of-sines surface (rounded crests), smoothed with
+ * midpoint quadratic Béziers, closed down to the bottom. Verbatim from
+ * the design source (wave.jsx → buildOceanPaths).
  */
-function WaveLayer({
-  color,
-  durationS,
-  amplitude,
-  opacity,
-  phaseOffset,
-}: {
+function buildOceanFill(
+  baseY: number,
+  amps: number[],
+  periods: number[],
+  phases: number[],
+  seed: number,
+  t: number,
+): string {
+  const W = 800;
+  const H = 100;
+  const STEP = 6;
+  const wobble = (x: number) =>
+    0.12 *
+    Math.sin((x + seed) * 0.0137 + t * 0.31) *
+    Math.cos((x + seed) * 0.0291 - t * 0.19);
+
+  const yAt = (x: number) => {
+    let y = baseY;
+    for (let i = 0; i < amps.length; i++) {
+      const phase = (x / periods[i] + phases[i]) * Math.PI * 2;
+      y -= amps[i] * Math.sin(phase);
+    }
+    return y + wobble(x);
+  };
+
+  const pts: [number, number][] = [];
+  for (let x = 0; x <= W; x += STEP) pts.push([x, yAt(x)]);
+
+  let surface = `M ${pts[0][0]} ${pts[0][1].toFixed(2)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1];
+    const [x, y] = pts[i];
+    const mx = (px + x) / 2;
+    const my = (py + y) / 2;
+    surface += ` Q ${px.toFixed(1)} ${py.toFixed(2)} ${mx.toFixed(1)} ${my.toFixed(2)}`;
+  }
+  const last = pts[pts.length - 1];
+  surface += ` L ${last[0]} ${last[1].toFixed(2)}`;
+  return surface + ` L ${W} ${H} L 0 ${H} Z`;
+}
+
+interface LayerProps {
+  baseY: number;
+  amps: number[];
+  periods: number[];
+  phases: number[];
+  duration: number;
   color: string;
-  durationS: number;
-  amplitude: number;
   opacity: number;
-  phaseOffset: number;
-}) {
-  const pathD = useMemo(
-    () => buildWavePath(amplitude, phaseOffset),
-    [amplitude, phaseOffset],
-  );
-  return (
-    <div
-      className="pointer-events-none absolute left-0 right-0 -top-4 h-10 overflow-hidden"
-      style={{ opacity }}
-    >
-      <div
-        className="flex h-full"
-        style={{
-          width: "200%",
-          animation: `wave-slide ${durationS}s linear infinite`,
-          willChange: "transform",
-        }}
-      >
-        <svg
-          className="block h-full"
-          style={{ width: "50%" }}
-          viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
-          preserveAspectRatio="none"
-        >
-          <path d={pathD} fill={color} />
-        </svg>
-        <svg
-          className="block h-full"
-          style={{ width: "50%" }}
-          viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <path d={pathD} fill={color} />
-        </svg>
-      </div>
-    </div>
-  );
+  topOffset: number;
+  bobDuration: number;
+  bobOffset: number;
+  seed: number;
 }
 
 /**
- * Quadratic-Bezier sine approximation. Sampling every half-period and
- * connecting midpoints via `Q` gives a round, smooth crest without
- * needing a high point count. This looks noticeably softer than the
- * previous dense `L`-segment polyline and costs almost nothing to draw.
- *
- * The path is drawn across the full `VIEWBOX_WIDTH` (2 full periods),
- * so a 50%-width SVG instance renders exactly one horizontal repeat.
+ * One ocean layer. The per-component phase advances every rAF frame
+ * with dispersion (√(longest/period_i)); default drift is the same
+ * left → right for every layer (no crest stroke, no reverse). Latest
+ * props are read from a ref so prop changes never tear down the loop.
+ * The t=0 path is frozen on first render so a re-render never snaps
+ * `d` back to the t=0 shape between frames (the flicker fix).
  */
-function buildWavePath(amplitude: number, phaseOffset: number): string {
-  const segments: string[] = [];
-  const startX = 0;
-  const startPhase = (startX / PERIOD + phaseOffset) * Math.PI * 2;
-  segments.push(`M ${startX} ${(BASELINE - Math.sin(startPhase) * amplitude).toFixed(2)}`);
+function OceanLayer(props: LayerProps) {
+  const {
+    baseY, amps, periods, phases, color,
+    opacity, topOffset, bobDuration, bobOffset, seed,
+  } = props;
+  const fillRef = useRef<SVGPathElement>(null);
+  const params = useRef(props);
+  params.current = props;
 
-  // Step along quarter-periods: Q control point sits at the sine peak,
-  // endpoint sits at the next zero-crossing. The alternating control
-  // y-values give us the up/down wave without the faceted look.
-  const step = PERIOD / 2;
-  for (let x = step; x <= VIEWBOX_WIDTH; x += step) {
-    const controlX = x - step / 2;
-    const controlPhase = (controlX / PERIOD + phaseOffset) * Math.PI * 2;
-    const endPhase = (x / PERIOD + phaseOffset) * Math.PI * 2;
-    // Overshoot the control point so the bezier traces closer to a true
-    // sine amplitude (a Q through the sine peak undershoots by ~21%).
-    const controlY =
-      BASELINE - Math.sin(controlPhase) * amplitude * 1.27;
-    const endY = BASELINE - Math.sin(endPhase) * amplitude;
-    segments.push(`Q ${controlX} ${controlY.toFixed(2)} ${x} ${endY.toFixed(2)}`);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const loop = (now: number) => {
+      const t = (now - start) / 1000;
+      const p = params.current;
+      // Left → right drift.
+      const basePxPerSec = (800 / p.duration) * -1;
+      const longest = Math.max.apply(null, p.periods);
+      const livePhases = p.phases.map((ph, i) => {
+        const dispersion = Math.sqrt(longest / p.periods[i]);
+        const shiftPx = basePxPerSec * dispersion * t;
+        return ph + shiftPx / p.periods[i];
+      });
+      const d = buildOceanFill(
+        p.baseY, p.amps, p.periods, livePhases, p.seed, t,
+      );
+      if (fillRef.current) fillRef.current.setAttribute("d", d);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const initialRef = useRef<string | null>(null);
+  if (!initialRef.current) {
+    initialRef.current = buildOceanFill(baseY, amps, periods, phases, seed, 0);
   }
 
-  segments.push(`L ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`);
-  segments.push(`L 0 ${VIEWBOX_HEIGHT}`);
-  segments.push("Z");
-  return segments.join(" ");
+  // Stable across SSR/CSR — Math.random would mismatch on hydration.
+  const gid = `wave-grad-${useId().replace(/:/g, "")}`;
+
+  return (
+    <div
+      data-ocean-bob
+      style={
+        {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: topOffset,
+          height: 100,
+          opacity,
+          overflow: "hidden",
+          animation: `wave-bob-vert ${bobDuration}s ease-in-out infinite`,
+          "--bob-offset": `${bobOffset}px`,
+          willChange: "transform",
+        } as CSSProperties
+      }
+    >
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 800 100"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop
+              offset="0%"
+              stopColor={`color-mix(in oklab, ${color} 72%, white)`}
+              stopOpacity="1"
+            />
+            <stop offset="40%" stopColor={color} stopOpacity="0.96" />
+            <stop
+              offset="100%"
+              stopColor={`color-mix(in oklab, ${color} 70%, var(--accent-deep, black))`}
+              stopOpacity="1"
+            />
+          </linearGradient>
+        </defs>
+        <path ref={fillRef} d={initialRef.current} fill={`url(#${gid})`} />
+      </svg>
+    </div>
+  );
 }

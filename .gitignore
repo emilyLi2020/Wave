@@ -24,6 +24,18 @@ models/successful_runs/
 # Per-machine logs from benches / conversions / exports.
 logs/
 
+# Node-side @huggingface/transformers FS cache. Deliberately one level above
+# client/ so Turbopack's `next dev` file-watcher never scans the GB-scale
+# model blobs (that scan pegs CPU/RAM). Was client/.cache/ previously.
+.model-cache/
+
+# Scratch dir for unpacking design handoff bundles before porting.
+.design-tmp/
+
+# Stray empty Expo config that tooling drops in the repo root; the real
+# Expo config lives in mobile/.
+/app.json
+
 # Claude Code / Playwright MCP local state.
 .claude/
 .playwright-mcp/

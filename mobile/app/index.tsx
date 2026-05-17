@@ -54,11 +54,11 @@ const TEST_ENTRIES: Entry[] = [
 ];
 
 const SESSION_ENTRIES: Entry[] = [
-  { href: "/session/intake", title: "Intake", blurb: "Patient profile + intake intensity.", status: "stub" },
-  { href: "/session/safety", title: "Safety", blurb: "Rule-based safety screen.", status: "stub" },
-  { href: "/session/chunk", title: "Chunk", blurb: "Generated meditation chunk playback.", status: "stub" },
-  { href: "/session/checkin", title: "Check-in", blurb: "Multi-turn voice check-in.", status: "stub" },
-  { href: "/session/reflection", title: "Reflection", blurb: "Post-session card + next-step chips.", status: "stub" },
+  { href: "/session/intake", title: "Intake", blurb: "Design-ported: 4-step intake (intensity slider, MAT, dose, trigger).", status: "ready" },
+  { href: "/session/safety", title: "Safety", blurb: "Design-ported: pre-LLM safety check + crisis card.", status: "ready" },
+  { href: "/session/chunk", title: "Chunk", blurb: "Design-ported: ChunkPlayer + Wave. Needs an EAS dev-client rebuild (react-native-svg).", status: "wip" },
+  { href: "/session/checkin", title: "Check-in", blurb: "Design-ported: Wave + scripted voice loop. Needs an EAS dev-client rebuild.", status: "wip" },
+  { href: "/session/reflection", title: "Reflection", blurb: "Design-ported: ScoreArc + reflection/plan stages. Needs an EAS dev-client rebuild.", status: "wip" },
 ];
 
 const NON_SESSION_ENTRIES: Entry[] = [

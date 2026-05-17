@@ -5,8 +5,8 @@
  * streamed patient-facing text, and a validated endConversation tool.
  *
  * This test downloads Gemma weights on first run and stores them in
- * `client/.cache/transformers/`, which is gitignored. Later runs reuse
- * that cache.
+ * `Wave/.model-cache/transformers/` (one level above client/, so it stays
+ * out of Turbopack's dev file-watcher). Gitignored; later runs reuse it.
  *
  * Run with:
  *   pnpm test:gemma:tools:live
@@ -22,7 +22,7 @@ import { GEMMA_MODEL_ID } from "@/lib/gemma/local-runtime";
 import { streamCheckInTurn } from "@/lib/gemma/checkin";
 import type { CheckInContextPayload } from "@/lib/prompts/schemas";
 
-const CACHE_DIR = path.resolve(process.cwd(), ".cache", "transformers");
+const CACHE_DIR = path.resolve(process.cwd(), "..", ".model-cache", "transformers");
 const EXPECTED_CRAVING_SCORE = 3;
 
 const PROFILE = {

@@ -366,7 +366,7 @@ async function getCheckInLanguageModel(): Promise<ReturnType<typeof transformers
       device: getTransformersJsDevice(),
       rawInitProgressCallback: logProgress,
       ...(typeof window === "undefined"
-        ? { cacheDir: "./.cache/transformers" }
+        ? { cacheDir: "../.model-cache/transformers" }
         : {}),
     });
 
@@ -404,7 +404,11 @@ function configureTransformersEnvironment(
   } else {
     env.useFSCache = true;
     env.useBrowserCache = false;
-    env.cacheDir = "./.cache/transformers";
+    // Resolved relative to cwd (client/), so this lands at Wave/.model-cache —
+    // OUTSIDE the Next.js project root. Keeps the multi-GB model blobs away
+    // from Turbopack's dev file-watcher, which otherwise pegs CPU/RAM on
+    // `next dev` while scanning them.
+    env.cacheDir = "../.model-cache/transformers";
   }
 
   if (typeof globalThis !== "undefined") {
@@ -481,10 +485,11 @@ async function getGenerator(): Promise<TextGenerationPipeline> {
       env.useWasmCache = true;
       env.cacheKey = GEMMA_CACHE_KEY;
     } else {
-      // Node smoke tests use the same ignored cache directory as manual downloads.
+      // Node smoke tests use the same ignored cache directory as manual
+      // downloads — kept outside client/ so Turbopack's watcher ignores it.
       env.useFSCache = true;
       env.useBrowserCache = false;
-      env.cacheDir = "./.cache/transformers";
+      env.cacheDir = "../.model-cache/transformers";
     }
 
     const device: DeviceType = isBrowser
