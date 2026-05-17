@@ -80,25 +80,33 @@ const PROFILE: ChunkGenerationContextPayload["profile"] = {
   usedSubstanceToday: false,
 };
 
-function priorChunk(n: 1 | 2 | 3 | 4 | 5): SessionHistoryEntry {
+// Post-corner-cut, renderHistoryBlock renders ONLY the single
+// immediately-prior check-in. So a faithful synthetic history for chunk N
+// is exactly one realistic ~5-turn check-in entry (the check-in after
+// chunk N-1); chunk 1 has none. (Adding chunk-narration entries would be
+// ignored by the new renderHistoryBlock, so they're omitted — this
+// matches real production token load post-cut.)
+function priorCheckIn(n: 1 | 2 | 3 | 4 | 5): SessionHistoryEntry {
   return {
-    kind: "chunk",
+    kind: "checkIn",
     chunkNumber: n,
-    lines: [
-      "Let your shoulders drop a little, and notice the weight of your body where it meets the chair.",
-      "There is nothing to fix in this breath. Just let it arrive and leave on its own.",
-      "If the urge is here, you do not have to push it away. You can let it sit beside you.",
-      "Notice one place that feels even slightly more settled than a moment ago.",
-      "You are not behind. You are exactly where this practice begins.",
-      "When you are ready, let your attention widen back out to the room.",
+    cravingScore: 6,
+    obstacleCategory: null,
+    turns: [
+      { role: "agent", content: "On a scale of 1 to 10, where is the craving right now?" },
+      { role: "patient", content: "Maybe a six. It dipped a little but it's still here in my chest." },
+      { role: "agent", content: "A six, and you noticed it ease slightly — that's worth naming. What was happening in your body during that last stretch?" },
+      { role: "patient", content: "My jaw was really tight and I kept wanting to check my phone instead of staying with it." },
+      { role: "agent", content: "That pull to distract is the wave doing its work — and you stayed anyway. Try letting the jaw soften on the next out-breath. Ready to keep going?" },
+      { role: "patient", content: "Yeah, I think so." },
     ],
   };
 }
 
 function historyUpTo(chunk: number): SessionHistoryEntry[] {
-  const h: SessionHistoryEntry[] = [];
-  for (let n = 1; n < chunk; n++) h.push(priorChunk(n as 1 | 2 | 3 | 4 | 5));
-  return h;
+  if (chunk <= 1) return [];
+  // Only the immediately-prior check-in matters post-cut.
+  return [priorCheckIn((chunk - 1) as 1 | 2 | 3 | 4 | 5)];
 }
 
 const REFLECTION_CTX: ReflectionContext = {
