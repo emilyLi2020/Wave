@@ -26,14 +26,13 @@ import {
 import { File } from "expo-file-system";
 
 import { buildChunkPrompt } from "@/prompts/chunk-generator";
-import { buildCheckInPrompt } from "@/prompts/check-in";
 import { buildReflectionPrompt } from "@/prompts/reflection";
 import type {
   ChunkGenerationContextPayload,
-  CheckInContextPayload,
   ReflectionContext,
   SessionHistoryEntry,
 } from "@/prompts/schemas";
+import { WAVE_SYSTEM_PROMPT_STOCK_COMPACT } from "@/prompts/wave-system";
 import { ensureModel, getModelDir } from "@/runtime/model-cache";
 import { createLLM, type LiteRTLMInstance } from "react-native-litert-lm";
 
@@ -237,36 +236,23 @@ export default function LiteRTStockScreen() {
       );
       setResults([...acc]);
 
-      // ── 2. Check-in — 3 turns, ending in the endConversation tool call
+      // ── 2. Check-in — 3 turns, ending in the endConversation tool call.
+      // buildCheckInPrompt's contextBlock (full turn-templates + tool-spec
+      // + score sections, ~1.5k tok) overflows the stock 2048 budget —
+      // same root cause the chunk corner-cut fixed. This is a compact,
+      // self-contained check-in prompt: the compact WAVE persona +
+      // a minimal JSON/tool contract. ~600 tok system vs ~2.5k, while
+      // preserving the readiness → endConversation behavior.
       setNote("2/3 · check-in (3 turns + endConversation tool call)…");
-      const ci = buildCheckInPrompt(
-        {
-          chunkNumber: 3,
-          cravingScore: 6,
-          scoreHistory: [7, 6],
-          obstacleHint: null,
-          profile: PROFILE,
-          intakeIntensity: 7,
-          sessionHistory: [],
-          demoMode: false,
-        } satisfies CheckInContextPayload,
-        { agentTurnsInHistory: 3 },
-      );
-      const ciSystem = `${ci.systemPrompt}
+      const ciSystem = `${WAVE_SYSTEM_PROMPT_STOCK_COMPACT}
 
-<output_contract>
-Respond with ONLY a JSON object matching this exact schema:
-
-{ "reply": "<patient-facing prose, 1-3 short sentences>", "endConversation": null | { "cravingScore": <integer 1-10>, "obstacleCategory": "<one of: ${TOOL_OBSTACLES}>" } }
-
-Rules:
-- "reply" is the visible patient-facing text. Plain prose, no markdown.
-- "endConversation" is null UNLESS the check-in is complete and the patient has clearly signalled they are ready to continue — then fill it in ("obstacleCategory" is "none" when no clear obstacle).
-- Emit nothing outside the JSON object.
-</output_contract>`;
-      // Three accumulating turns; by turn 3 the patient has answered the
-      // readiness question affirmatively, so the model must fire the
-      // endConversation tool call (per the <end_conversation_tool> block).
+You are running a post-chunk check-in. Respond with ONLY a JSON object:
+{ "reply": "<1-3 short sentences to the patient>", "endConversation": null | { "cravingScore": <1-10 int>, "obstacleCategory": "<one of: ${TOOL_OBSTACLES}>" } }
+- "reply" is plain patient-facing prose, no markdown, no extra keys.
+- Keep "endConversation" null until the patient has clearly said they are ready to continue; THEN set it ("obstacleCategory" is "none" when no clear obstacle present).
+- Emit nothing outside the JSON object.`;
+      // Three accumulating turns; by turn 3 the patient has affirmed
+      // readiness, so the model must fire endConversation.
       const ciTranscript = [
         "Patient: 6",
         "WAVE: A six — and you stayed with it through that whole stretch, that counts. What did you notice in your body while the wave moved?",
@@ -275,8 +261,7 @@ Rules:
         "Patient: Yeah, I'm ready, let's keep going.",
       ];
       const ciTurns = [1, 3, 5].map(
-        (n) =>
-          `${ci.contextBlock}\n\n${ciTranscript.slice(0, n).join("\n")}\n\nWAVE:`,
+        (n) => `${ciTranscript.slice(0, n).join("\n")}\n\nWAVE:`,
       );
       acc.push(
         await runSurface(
