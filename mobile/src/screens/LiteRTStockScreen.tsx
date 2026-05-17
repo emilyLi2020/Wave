@@ -94,21 +94,23 @@ function fmtBytes(b: number): string {
   return `${(b / Math.pow(1024, i)).toFixed(i > 1 ? 2 : 0)} ${u[i]}`;
 }
 
-/** Pull the endConversation tool call out of a check-in JSON reply. */
+/**
+ * Parse the native Gemma-4 tool-call shape (the fine-tune-dataset shape,
+ * base-reliable): a plain reply followed by a literal
+ * `endConversation{cravingScore:N,obstacleCategory:CAT}`. Reply = the text
+ * with that literal stripped. No JSON wrapper.
+ */
 function extractToolCall(raw: string): { reply: string; tool: string | null } {
-  const m = raw.match(/\{[\s\S]*\}/);
+  const m = raw.match(/endConversation\s*\{([^}]*)\}/i);
   if (!m) return { reply: raw.trim(), tool: null };
-  try {
-    const o = JSON.parse(m[0]);
-    const reply = typeof o.reply === "string" ? o.reply : raw.trim();
-    const tool =
-      o.endConversation && typeof o.endConversation === "object"
-        ? `endConversation(cravingScore: ${o.endConversation.cravingScore}, obstacleCategory: ${o.endConversation.obstacleCategory})`
-        : null;
-    return { reply, tool };
-  } catch {
-    return { reply: raw.trim(), tool: null };
-  }
+  const args = m[1];
+  const score = args.match(/cravingScore\s*[:=]\s*(\d+)/i)?.[1] ?? "?";
+  const obst =
+    args.match(/obstacleCategory\s*[:=]\s*"?([a-zA-Z_]+)"?/i)?.[1] ?? "none";
+  return {
+    reply: raw.replace(m[0], "").trim(),
+    tool: `endConversation{cravingScore:${score},obstacleCategory:${obst}}`,
+  };
 }
 
 export default function LiteRTStockScreen() {
@@ -169,9 +171,14 @@ export default function LiteRTStockScreen() {
         temperature: 0,
         topK: 1,
       });
+      // Reset ONCE, then send each turn as a real user message so the
+      // wrapper's chat template manages user/assistant turns. (Per-turn
+      // resetConversation made every turn a fresh conversation with a
+      // forged transcript — that's what collapsed the check-in into a
+      // stray </start_of_turn>.) Single-turn surfaces are unaffected.
       let last = "";
+      llm.resetConversation();
       for (const turn of userTurns) {
-        llm.resetConversation();
         last = await llm.sendMessage(turn);
       }
       const s = llm.getStats();
@@ -236,33 +243,26 @@ export default function LiteRTStockScreen() {
       );
       setResults([...acc]);
 
-      // ── 2. Check-in — 3 turns, ending in the endConversation tool call.
-      // buildCheckInPrompt's contextBlock (full turn-templates + tool-spec
-      // + score sections, ~1.5k tok) overflows the stock 2048 budget —
-      // same root cause the chunk corner-cut fixed. This is a compact,
-      // self-contained check-in prompt: the compact WAVE persona +
-      // a minimal JSON/tool contract. ~600 tok system vs ~2.5k, while
-      // preserving the readiness → endConversation behavior.
+      // ── 2. Check-in — real user/assistant multi-turn ending in the
+      // native endConversation tool call. Compact WAVE persona +
+      // native-tool-call instruction (no JSON wrapper, no forged
+      // transcript). The 3 user messages are just the patient's words;
+      // the wrapper's chat template produces each assistant turn, and the
+      // conversation is preserved across sends (runSurface resets once).
       setNote("2/3 · check-in (3 turns + endConversation tool call)…");
       const ciSystem = `${WAVE_SYSTEM_PROMPT_STOCK_COMPACT}
 
-You are running a post-chunk check-in. Respond with ONLY a JSON object:
-{ "reply": "<1-3 short sentences to the patient>", "endConversation": null | { "cravingScore": <1-10 int>, "obstacleCategory": "<one of: ${TOOL_OBSTACLES}>" } }
-- "reply" is plain patient-facing prose, no markdown, no extra keys.
-- Keep "endConversation" null until the patient has clearly said they are ready to continue; THEN set it ("obstacleCategory" is "none" when no clear obstacle present).
-- Emit nothing outside the JSON object.`;
-      // Three accumulating turns; by turn 3 the patient has affirmed
-      // readiness, so the model must fire endConversation.
-      const ciTranscript = [
-        "Patient: 6",
-        "WAVE: A six — and you stayed with it through that whole stretch, that counts. What did you notice in your body while the wave moved?",
-        "Patient: My chest was tight but it loosened a bit near the end.",
-        "WAVE: That loosening is the wave cresting and starting to fall — you let it move without acting on it. Ready to continue with the next part and see if it helps?",
-        "Patient: Yeah, I'm ready, let's keep going.",
+You are running a post-chunk check-in with the patient. The patient's first message is their craving score (1-10). Reply naturally in 1-3 short plain sentences each turn — validate, then one question — no markdown.
+
+Once the patient has clearly said they are ready to continue, give a brief warm closing line with NO question, then on its OWN final line emit exactly:
+endConversation{cravingScore:N,obstacleCategory:CAT}
+where N is their latest score and CAT is one of: ${TOOL_OBSTACLES} (use none if no clear obstacle). Do NOT emit endConversation before the patient is ready, and emit it at most once.`;
+      // Real multi-turn: just the patient utterances, sent sequentially.
+      const ciTurns = [
+        "6",
+        "My chest was tight but it loosened a bit near the end.",
+        "Yeah, I'm ready, let's keep going.",
       ];
-      const ciTurns = [1, 3, 5].map(
-        (n) => `${ciTranscript.slice(0, n).join("\n")}\n\nWAVE:`,
-      );
       acc.push(
         await runSurface(
           modelPath,
