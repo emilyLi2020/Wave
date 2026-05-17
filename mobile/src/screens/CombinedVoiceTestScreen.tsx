@@ -290,6 +290,17 @@ export default function CombinedVoiceTestScreen() {
                   .startPcmPlayer(c.sampleRate, 1)
                   .then(() => {
                     pcmPlayerActiveRef.current = true;
+                    // sherpa's startTtsPcmPlayer forces the shared
+                    // AVAudioSession to Playback (output-only), which kills
+                    // the createPcmLiveStream mic queue → no VAD during TTS
+                    // → barge-in impossible. Re-assert PlayAndRecord so the
+                    // mic survives playback. Best-effort, JS-only; the
+                    // durable fix is patching SherpaOnnx+TTS.mm
+                    // (Playback → PlayAndRecord), which needs a rebuild.
+                    setAudioModeAsync({
+                      playsInSilentMode: true,
+                      allowsRecording: true,
+                    }).catch(() => {});
                     return eng.writePcmChunk(c.samples);
                   })
                   .catch(() => {});
