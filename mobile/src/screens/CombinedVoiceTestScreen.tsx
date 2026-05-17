@@ -467,11 +467,23 @@ export default function CombinedVoiceTestScreen() {
     // Kokoro streaming TTS (sherpa-managed download).
     setSubsystems((s) => ({ ...s, kokoro: "loading" }));
     try {
-      const sherpaTts: any = await import("react-native-sherpa-onnx/tts");
-      const sherpaDl: any = await import("react-native-sherpa-onnx/download");
-      await sherpaDl.refreshModelsByCategory(sherpaDl.ModelCategory.Tts);
+      // Dynamic-import interop: depending on Metro's CJS/ESM wrapping the
+      // real exports can land under `.default`. Normalize by probing for
+      // the function we actually need, then fall back to `.default`.
+      const ttsMod: any = await import("react-native-sherpa-onnx/tts");
+      const dlMod: any = await import("react-native-sherpa-onnx/download");
+      const sherpaTts: any = ttsMod?.createStreamingTTS
+        ? ttsMod
+        : (ttsMod?.default ?? ttsMod);
+      const sherpaDl: any = dlMod?.ensureModelByCategory
+        ? dlMod
+        : (dlMod?.default ?? dlMod);
+      // ModelCategory.Tts is just the string "tts" at runtime — use it
+      // directly so a missing enum object can't crash the loader.
+      const TTS_CAT: string = sherpaDl?.ModelCategory?.Tts ?? "tts";
+      await sherpaDl.refreshModelsByCategory(TTS_CAT);
       const result = await sherpaDl.ensureModelByCategory(
-        sherpaDl.ModelCategory.Tts,
+        TTS_CAT,
         KOKORO_MODEL_ID,
         {
           onProgress: (pr: {
