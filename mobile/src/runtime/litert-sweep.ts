@@ -340,13 +340,18 @@ export async function runProbe(
  * outlier probes in the screen.
  */
 export const ASCENDING_PROBES: Probe[] = [
-  { surface: "reflection", variant: "canonical" }, // smallest input (~700)
+  // chunk1/canonical is the CONTROL: the v1 grid proved it ok at
+  // 4096/512 (94 tok, ~30 s). If it's ok here too, the harness is sound
+  // and any later "hang" is real (slow-to-cap or wedge), not a bug. With
+  // the 300 s timeout below, a slow-but-completing gen now reports its
+  // true completionTokens + tok/s instead of a false "hang".
+  { surface: "chunk1", variant: "canonical" }, // CONTROL (known-good)
+  { surface: "reflection", variant: "canonical" }, // ~700 tok in
   { surface: "chunk1", variant: "compact" },
-  { surface: "chunk1", variant: "canonical" },
   { surface: "chunk3", variant: "compact" },
   { surface: "chunk3", variant: "canonical" },
   { surface: "chunk5", variant: "compact" },
-  { surface: "chunk5", variant: "canonical" }, // heaviest — the known hang
+  { surface: "chunk5", variant: "canonical" }, // heaviest input
 ];
 
 export async function runAdaptiveSafe(
@@ -387,4 +392,8 @@ export async function runAdaptiveSafe(
 
 /** Suggested upward outlier ladder for the manual >4096 probe control. */
 export const OUTLIER_LADDER = [6144, 8192, 12288, 16384, 24576, 32768];
-export const SWEEP_TIMEOUT_MS = 90_000;
+// 300 s: at the stock bundle's ~3 tok/s, a near-cap generation
+// (≈512 tok ≈ 170 s) must be allowed to finish so we capture
+// valid-but-slow (the real throughput finding) instead of a false
+// "hang". A true wedge still trips this; the distinction is the point.
+export const SWEEP_TIMEOUT_MS = 300_000;
