@@ -28,6 +28,12 @@ const TEST_ENTRIES: Entry[] = [
     status: "ready",
   },
   {
+    href: "/tests/litert-stock-custom",
+    title: "LiteRT (stock Gemma 4, custom)",
+    blurb: "Same 3-surface harness as the prize demo, on the from-source libLiteRTLMEngine v0.11.0 dylib instead of PhoneClaw's CLiteRTLM. Passed the HANDOFF step-4 on-device acceptance — coherent output, tok/s in range of the ~50 baseline, MLDrift GPU cache present. The from-source binary is a proven drop-in.",
+    status: "ready",
+  },
+  {
     href: "/tests/litert-sweep",
     title: "LiteRT context sweep (Wave#15 Phase 0)",
     blurb: "Sweeps engineMaxTokens × outputMaxTokens × backend × prompt-variant × WAVE surface on the stock bundle. Measures the real envelope (tokens, JSON validity, RAM, hangs).",
