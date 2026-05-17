@@ -276,6 +276,15 @@ export function SessionMachine() {
     }
   }, [state.phase]);
 
+  // Duck the ambient bed to silence while the hands-free voice
+  // check-in is live. With barge-in active the mic listens through the
+  // assistant's speech; the continuous ambient bed (which, unlike
+  // Kokoro, doesn't route through markAudioOutput) would otherwise
+  // self-trigger the VAD. Restored the moment we leave the check-in.
+  useEffect(() => {
+    audioRef.current?.setDucked(state.phase === "checkIn");
+  }, [state.phase]);
+
   // Drive chunk generation whenever we enter the loadingChunk phase.
   // The RelaxingLoader is the patient-facing cover during this wait.
   useEffect(() => {
@@ -341,10 +350,11 @@ export function SessionMachine() {
     state.sessionHistory,
   ]);
 
+  // The mute toggle is hidden during the check-in: the bed is ducked
+  // automatically there, and exposing an unmute control would let the
+  // patient re-introduce the mic self-trigger mid-conversation.
   const showAmbientToggle =
-    state.phase === "loadingChunk" ||
-    state.phase === "chunk" ||
-    state.phase === "checkIn";
+    state.phase === "loadingChunk" || state.phase === "chunk";
 
   const reflectionContext: ReflectionContext | null = useMemo(() => {
     if (!profile || !state.intake || state.checkIns.length < 5) return null;

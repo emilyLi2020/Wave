@@ -1,9 +1,12 @@
 /**
  * Multi-turn check-in chat boundary.
  *
- * Calls local Gemma through `local-runtime.ts`, pushes accumulated reply
- * text to `onDelta`, and surfaces an `endConversation` signal via
- * `onEndConversation` when the model decides the chat is over.
+ * Calls the WAVE fine-tune through the shared wllama runtime
+ * (`@/lib/gemma/wllama-generators` → `@/lib/wllama/wave-instance`),
+ * pushes accumulated reply text to `onDelta`, and surfaces an
+ * `endConversation` signal via `onEndConversation` when the model
+ * decides the chat is over. (The patient `/session` check-in and the
+ * `/models/voice-test` dev probe run the same wllama engine.)
  *
  * Two-strikes-then-fallback retains the same semantics as before:
  * model / validation failure twice in a row falls through to
