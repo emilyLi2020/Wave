@@ -28,6 +28,11 @@ import {
 
 import { setAudioModeAsync } from "expo-audio";
 
+import {
+  SentenceChunkBuffer,
+  AsyncTextChunkStream,
+} from "@/voice/sentence-buffer";
+
 // Lazy-import — react-native-sherpa-onnx pulls in native bindings only
 // resolved on device. Keeps Metro from crashing on web/dev imports.
 type StreamingTtsEngine = {
@@ -91,6 +96,31 @@ export default function KokoroTestScreen() {
   const engineRef = useRef<StreamingTtsEngine | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pcmPlayerActiveRef = useRef(false);
+
+  // ── Streaming sandbox (issue #25): simulate an LLM token stream →
+  // SentenceChunkBuffer → one generateSpeechStream per sentence into a
+  // single shared PCM player. Also a back-to-back engine-reuse repro to
+  // isolate the loop's "2nd turn no voice" (does call N>1 emit chunks?).
+  const STREAM_DEFAULT =
+    "Okay, a six. That tightness in your chest makes a lot of sense " +
+    "right now. You stayed with it instead of reaching for something, " +
+    "and that matters. What's the urge doing as you breathe? " +
+    "Take your time. We can sit here as long as you need.";
+  const [streamText, setStreamText] = useState(STREAM_DEFAULT);
+  const [streamPhase, setStreamPhase] = useState<
+    "idle" | "running" | "done" | "error"
+  >("idle");
+  const [streamLog, setStreamLog] = useState<
+    { idx: number; text: string; chunks: number; ms: number }[]
+  >([]);
+  const [streamSummary, setStreamSummary] = useState<{
+    mode: string;
+    ttfaMs: number;
+    totalMs: number;
+    sentences: number;
+    zeroChunkCalls: number;
+  } | null>(null);
+  const streamCancelRef = useRef(false);
 
   // Configure the audio session so playback works even with the silent
   // switch on (sherpa's PCM player honors the app's AVAudioSession).
@@ -284,6 +314,189 @@ export default function KokoroTestScreen() {
     } catch {}
   };
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // One generateSpeechStream call into the shared player. Resolves on
+  // onEnd; returns chunk/sample counts so a 0-chunk call is observable.
+  const genOnce = (
+    engine: StreamingTtsEngine,
+    sentence: string,
+    onFirstAudio: () => void,
+  ): Promise<{ chunks: number; samples: number; ms: number; sr: number }> => {
+    const g0 = Date.now();
+    let chunks = 0;
+    let samples = 0;
+    let sr = 0;
+    return new Promise((resolve) => {
+      let settled = false;
+      const fin = () => {
+        if (settled) return;
+        settled = true;
+        resolve({ chunks, samples, ms: Date.now() - g0, sr });
+      };
+      engine
+        .generateSpeechStream(sentence, undefined, {
+          onChunk: (c) => {
+            if (chunks === 0) {
+              sr = c.sampleRate;
+              onFirstAudio();
+            }
+            if (!pcmPlayerActiveRef.current) {
+              pcmPlayerActiveRef.current = true;
+              engine
+                .startPcmPlayer(c.sampleRate, 1)
+                .then(() => engine.writePcmChunk(c.samples))
+                .catch(() => {});
+            } else {
+              engine.writePcmChunk(c.samples).catch(() => {});
+            }
+            chunks += 1;
+            samples += c.samples.length;
+          },
+          onEnd: () => fin(),
+          onError: () => fin(),
+        })
+        .catch(() => fin());
+    });
+  };
+
+  const stopSharedPlayer = async (engine: StreamingTtsEngine) => {
+    if (!pcmPlayerActiveRef.current) return;
+    try {
+      await engine.stopPcmPlayer();
+    } catch {}
+    pcmPlayerActiveRef.current = false;
+  };
+
+  // The LLM always streams word-by-word (45 ms/word ≈ 22 tok/s). What
+  // changes between tests is the TTS chunk granularity:
+  //   wordThreshold 12 → "sentence" stream (fewer, larger gen calls)
+  //   wordThreshold 2  → "word-by-word" stream (many tiny gen calls,
+  //                       lowest TTFA, tests choppiness + reuse stress)
+  // Both pipeline: producer keeps streaming while audio of earlier
+  // chunks plays.
+  const runStream = async (wordThreshold: number, mode: string) => {
+    const engine = engineRef.current;
+    if (!engine) {
+      setError("Kokoro not loaded yet");
+      return;
+    }
+    setError(null);
+    setStreamLog([]);
+    setStreamSummary(null);
+    setStreamPhase("running");
+    streamCancelRef.current = false;
+
+    const buf = new SentenceChunkBuffer(wordThreshold);
+    const stream = new AsyncTextChunkStream();
+    const words = streamText.trim().split(/\s+/);
+    const t0 = Date.now();
+    let ttfaMs = 0;
+    let zeroChunkCalls = 0;
+    const log: { idx: number; text: string; chunks: number; ms: number }[] = [];
+
+    // Producer: 45 ms/word ≈ a ~22 tok/s LLM.
+    (async () => {
+      for (const w of words) {
+        if (streamCancelRef.current) break;
+        for (const s of buf.push(w + " ")) stream.enqueue(s);
+        await sleep(45);
+      }
+      for (const s of buf.flush()) stream.enqueue(s);
+      stream.close();
+    })();
+
+    try {
+      let idx = 0;
+      for await (const sentence of stream) {
+        if (streamCancelRef.current) break;
+        idx += 1;
+        const r = await genOnce(engine, sentence, () => {
+          if (ttfaMs === 0) ttfaMs = Date.now() - t0;
+        });
+        if (r.chunks === 0) zeroChunkCalls += 1;
+        log.push({ idx, text: sentence, chunks: r.chunks, ms: r.ms });
+        setStreamLog([...log]);
+      }
+      setStreamSummary({
+        mode,
+        ttfaMs,
+        totalMs: Date.now() - t0,
+        sentences: log.length,
+        zeroChunkCalls,
+      });
+      setStreamPhase(streamCancelRef.current ? "idle" : "done");
+      // let the last chunk's audio drain, then stop the shared player
+      setTimeout(() => void stopSharedPlayer(engine), 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStreamPhase("error");
+      await stopSharedPlayer(engine);
+    }
+  };
+
+  const onSentenceStream = () => runStream(12, "sentence");
+  const onWordStream = () => runStream(2, "word-by-word");
+
+  // Back-to-back reuse: does generateSpeechStream produce chunks on
+  // call 2 and 3 on the same engine? Directly repros the loop's
+  // "2nd turn no voice" in isolation from the LLM.
+  const onReproReuse = async () => {
+    const engine = engineRef.current;
+    if (!engine) {
+      setError("Kokoro not loaded yet");
+      return;
+    }
+    setError(null);
+    setStreamLog([]);
+    setStreamSummary(null);
+    setStreamPhase("running");
+    streamCancelRef.current = false;
+    const phrases = [
+      "This is the first reply.",
+      "This is the second reply.",
+      "This is the third reply.",
+    ];
+    const t0 = Date.now();
+    let zeroChunkCalls = 0;
+    const log: { idx: number; text: string; chunks: number; ms: number }[] = [];
+    try {
+      for (let i = 0; i < phrases.length; i++) {
+        if (streamCancelRef.current) break;
+        const r = await genOnce(engine, phrases[i]!, () => {});
+        if (r.chunks === 0) zeroChunkCalls += 1;
+        log.push({ idx: i + 1, text: phrases[i]!, chunks: r.chunks, ms: r.ms });
+        setStreamLog([...log]);
+        await sleep(300);
+      }
+      setStreamSummary({
+        mode: "engine-reuse",
+        ttfaMs: 0,
+        totalMs: Date.now() - t0,
+        sentences: log.length,
+        zeroChunkCalls,
+      });
+      setStreamPhase("done");
+      setTimeout(() => void stopSharedPlayer(engine), 1200);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStreamPhase("error");
+      await stopSharedPlayer(engine);
+    }
+  };
+
+  const onStopStream = async () => {
+    streamCancelRef.current = true;
+    const engine = engineRef.current;
+    if (engine) {
+      try {
+        await engine.cancelSpeechStream();
+      } catch {}
+      await stopSharedPlayer(engine);
+    }
+    setStreamPhase("idle");
+  };
+
   const isDownloading = phase === "downloading" || phase === "extracting";
   const isBusy = isDownloading || phase === "loading" || phase === "speaking";
 
@@ -303,7 +516,7 @@ export default function KokoroTestScreen() {
     >
       <Text style={styles.sub} selectable>
         Kokoro {KOKORO_MODEL_ID} (fp32, CoreML EP). Sentence-streaming
-        playback via sherpa's native PCM queue.
+        playback via sherpa’s native PCM queue.
       </Text>
 
       <View style={styles.statusRow}>
@@ -403,6 +616,97 @@ export default function KokoroTestScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* ── Streaming sandbox (issue #25) ───────────────────────────── */}
+      <View style={styles.panel}>
+        <Text style={styles.panelHead}>Streaming sandbox (#25)</Text>
+        <Text style={[styles.bodyText, styles.subtle]}>
+          The LLM streams word-by-word either way; the test varies TTS
+          granularity. “Sentence” = chunk at sentence ends (fewer, larger
+          gen calls). “Word-by-word” = ~2-word chunks (lowest TTFA, many
+          tiny gen calls — tests choppiness + reuse stress). “Engine reuse
+          ×3” isolates the loop’s 2nd-turn-no-voice: if call 2/3 show 0
+          chunks, that’s the bug — independent of the LLM. Compare TTFA.
+        </Text>
+      </View>
+
+      <TextInput
+        style={styles.textInput}
+        multiline
+        value={streamText}
+        onChangeText={setStreamText}
+        placeholder="LLM reply to simulate streaming…"
+        placeholderTextColor="#6B7280"
+      />
+
+      <View style={styles.buttonRow}>
+        {(
+          [
+            ["Sentence stream", onSentenceStream],
+            ["Word-by-word stream", onWordStream],
+            ["Engine reuse ×3 (repro)", onReproReuse],
+          ] as const
+        ).map(([label, fn]) => {
+          const disabled =
+            (phase !== "ready" && phase !== "played") ||
+            streamPhase === "running";
+          return (
+            <Pressable
+              key={label}
+              style={[styles.button, disabled && styles.buttonDisabled]}
+              disabled={disabled}
+              onPress={fn}
+            >
+              <Text style={styles.buttonText}>{label}</Text>
+            </Pressable>
+          );
+        })}
+
+        {streamPhase === "running" && (
+          <Pressable
+            style={[styles.button, styles.cancelButton]}
+            onPress={onStopStream}
+          >
+            <Text style={styles.buttonText}>Stop streaming</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {(streamLog.length > 0 || streamSummary) && (
+        <View style={styles.panel}>
+          <Text style={styles.panelHead}>
+            Streaming result · {streamSummary?.mode ?? "—"} ({streamPhase})
+          </Text>
+          {streamSummary && (
+            <Text
+              selectable
+              style={[
+                styles.kv,
+                streamSummary.zeroChunkCalls > 0 && { color: "#F87171" },
+              ]}
+            >
+              {streamSummary.sentences} calls · TTFA{" "}
+              {streamSummary.ttfaMs > 0 ? `${streamSummary.ttfaMs} ms` : "—"} ·
+              total {streamSummary.totalMs} ms · zero-chunk calls{" "}
+              {streamSummary.zeroChunkCalls}
+              {streamSummary.zeroChunkCalls > 0
+                ? "  ⚠ engine-reuse bug reproduced"
+                : "  ✓ all calls produced audio"}
+            </Text>
+          )}
+          {streamLog.map((r) => (
+            <Text
+              key={r.idx}
+              selectable
+              style={[styles.kv, r.chunks === 0 && { color: "#F87171" }]}
+            >
+              #{r.idx} · {r.chunks} chunks · {r.ms} ms ·{" "}
+              {r.chunks === 0 ? "⚠ SILENT — " : ""}
+              {r.text.length > 48 ? `${r.text.slice(0, 48)}…` : r.text}
+            </Text>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
