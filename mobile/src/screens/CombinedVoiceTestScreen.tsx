@@ -57,6 +57,10 @@ import {
 import { useVadEndpointer } from "@/voice/use-vad-endpointer";
 import { writePcmToWavFile } from "@/voice/pcm-wav";
 import { WAVE_SYSTEM_PROMPT_STOCK_COMPACT } from "@/prompts/wave-system";
+import {
+  ConversationController,
+  type ConvMessage,
+} from "@/voice/conversation";
 import type { LiteRTLMInstance } from "react-native-litert-lm";
 
 // ── Stock-Gemma-GPU config = the Wave#15-verified envelope (matches
@@ -166,21 +170,8 @@ function cleanWhisper(raw: string): string {
     .trim();
 }
 
-// Native Gemma-4 tool-call shape (the base-reliable one): a plain reply
-// then a literal endConversation{...}. Spoken text = reply with that
-// stripped. Mirrors LiteRTStockScreen.extractToolCall.
-function extractToolCall(raw: string): { reply: string; tool: string | null } {
-  const m = raw.match(/endConversation\s*\{([^}]*)\}/i);
-  if (!m) return { reply: raw.trim(), tool: null };
-  const args = m[1] ?? "";
-  const score = args.match(/cravingScore\s*[:=]\s*(\d+)/i)?.[1] ?? "?";
-  const obst =
-    args.match(/obstacleCategory\s*[:=]\s*"?([a-zA-Z_]+)"?/i)?.[1] ?? "none";
-  return {
-    reply: raw.replace(m[0], "").trim(),
-    tool: `endConversation{cravingScore:${score},obstacleCategory:${obst}}`,
-  };
-}
+// Tool-call parsing now lives in the pure, unit-tested conversation
+// module (extractToolCall there) — no private copy here.
 
 export default function CombinedVoiceTestScreen() {
   const [phase, setPhaseState] = useState<Phase>("idle");
@@ -197,11 +188,19 @@ export default function CombinedVoiceTestScreen() {
     kokoro: "missing",
   });
   const [error, setError] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState("");
-  const [llmReply, setLlmReply] = useState("");
-  const [toolCall, setToolCall] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ConvMessage[]>([]);
   const [residentBytes, setResidentBytes] = useState(0);
   const [stats, setStats] = useState({ sttMs: 0, llmMs: 0, tps: 0 });
+  // Per-turn diagnostics (issue #25 B): isolate "no LLM text" vs Kokoro
+  // engine-reuse on turn 2+. Shown on-screen and logged to Metro.
+  const [diag, setDiag] = useState<{
+    turn: number;
+    rawLen: number;
+    replyLen: number;
+    ttsChunks: number;
+    ttsEnded: boolean;
+    note: string;
+  } | null>(null);
   const [kokoroDl, setKokoroDl] = useState<{
     percent: number;
     phase: "downloading" | "extracting" | null;
@@ -219,6 +218,8 @@ export default function CombinedVoiceTestScreen() {
   const pcmPlayerActiveRef = useRef(false);
   const speakingStartedAtRef = useRef(0);
   const mountedRef = useRef(true);
+  const convRef = useRef(new ConversationController());
+  const turnCountRef = useRef(0);
 
   // Barge-in / duplex mode. Default = half-duplex (false): mic muted
   // during TTS, no barge-in, bulletproof on an open speaker — the
@@ -286,8 +287,10 @@ export default function CombinedVoiceTestScreen() {
       if (!eng || !text) return Promise.resolve();
       setPhase("speaking");
       let totalSamples = 0;
+      let chunkCount = 0;
       let firstChunkAt = 0;
       let playerSr = 24_000;
+      const turnNo = turnCountRef.current;
 
       return new Promise<void>((resolve) => {
         let settled = false;
@@ -327,9 +330,29 @@ export default function CombinedVoiceTestScreen() {
               } else {
                 eng.writePcmChunk(c.samples).catch(() => {});
               }
+              chunkCount += 1;
               totalSamples += c.samples.length;
             },
             onEnd: () => {
+              // Diagnostic (issue #25 B): 0 chunks here on turn 2+ ⇒ the
+              // Kokoro streaming engine isn't producing on reuse (the
+              // "2nd turn no voice" suspect), independent of the LLM.
+              console.log(
+                `[voiceloop] tts turn ${turnNo} chunks=${chunkCount} samples=${totalSamples} ended=true`,
+              );
+              setDiag((d) =>
+                d
+                  ? {
+                      ...d,
+                      ttsChunks: chunkCount,
+                      ttsEnded: true,
+                      note:
+                        chunkCount === 0
+                          ? "TTS produced 0 chunks (Kokoro engine reuse?)"
+                          : d.note,
+                    }
+                  : d,
+              );
               // Let the queued audio drain before stopping the player —
               // [player stop] discards unplayed buffers otherwise.
               const audioMs = (totalSamples / (playerSr || 24_000)) * 1000;
@@ -346,7 +369,17 @@ export default function CombinedVoiceTestScreen() {
                 done();
               }, drainMs);
             },
-            onError: () => done(),
+            onError: (e) => {
+              console.log(
+                `[voiceloop] tts turn ${turnNo} ERROR chunks=${chunkCount} msg=${e?.message ?? ""}`,
+              );
+              setDiag((d) =>
+                d
+                  ? { ...d, ttsChunks: chunkCount, note: `TTS error: ${e?.message ?? "?"}` }
+                  : d,
+              );
+              done();
+            },
           })
           .catch(() => done());
       });
@@ -375,8 +408,17 @@ export default function CombinedVoiceTestScreen() {
         const { result } = await promise;
         const text = cleanWhisper(result);
         setStats((s) => ({ ...s, sttMs: Date.now() - sttT0 }));
-        setTranscript(text || "(no speech)");
-        if (!text) return; // finally → unmute + drain pending
+        if (!text) {
+          setDiag({
+            turn: turnCountRef.current,
+            rawLen: 0,
+            replyLen: 0,
+            ttsChunks: 0,
+            ttsEnded: false,
+            note: "empty transcript — turn skipped",
+          });
+          return; // finally → unmute + drain pending
+        }
 
         // ── LLM ──────────────────────────────────────────────────────
         setPhase("generating");
@@ -384,25 +426,57 @@ export default function CombinedVoiceTestScreen() {
         if (!llm) throw new Error("LiteRT not initialized");
         if (!convStartedRef.current) {
           llm.resetConversation();
+          convRef.current.reset();
           convStartedRef.current = true;
         }
+        const turnNo = ++turnCountRef.current;
         const llmT0 = Date.now();
-        const raw = await llm.sendMessage(text);
-        const { reply, tool } = extractToolCall(raw);
+        let rawLen = 0;
+        let rawHead = "";
+        // The pure, unit-tested controller owns history + tool parsing
+        // (issue 1 fix). It pushes user + assistant and fires onChange so
+        // the conversation accumulates instead of overwriting.
+        const turn = await convRef.current.runTurn(
+          text,
+          async (u) => {
+            const raw = await llm.sendMessage(u);
+            rawLen = raw.length;
+            rawHead = raw.slice(0, 120);
+            return raw;
+          },
+          { onChange: (m) => setMessages(m as ConvMessage[]) },
+        );
+        const reply = turn?.reply ?? "";
+        const tool = turn?.tool ?? null;
+        // Diagnostic (issue #25 B): is the model returning nothing, only a
+        // tool call, or is TTS the problem (chunk count, set in speak)?
+        console.log(
+          `[voiceloop] turn ${turnNo} llm rawLen=${rawLen} replyLen=${reply.length} tool=${tool ? "yes" : "no"} raw="${rawHead}"`,
+        );
+        let tps = 0;
         try {
-          setStats((s) => ({
-            ...s,
-            llmMs: Date.now() - llmT0,
-            tps: llm.getStats().tokensPerSecond,
-          }));
+          tps = llm.getStats().tokensPerSecond;
         } catch {
-          setStats((s) => ({ ...s, llmMs: Date.now() - llmT0 }));
+          /* engine may be mid-call */
         }
-        setLlmReply(reply);
-        setToolCall(tool);
+        setStats((s) => ({ ...s, llmMs: Date.now() - llmT0, tps }));
+        setDiag({
+          turn: turnNo,
+          rawLen,
+          replyLen: reply.length,
+          ttsChunks: 0,
+          ttsEnded: false,
+          note:
+            rawLen === 0
+              ? "LLM returned empty"
+              : reply.length === 0
+                ? "LLM output was only a tool call"
+                : "ok",
+        });
 
         // Barged over while generating? Don't speak the stale reply.
         if (epochRef.current !== myEpoch) return;
+        if (!reply) return; // nothing to speak; diag already explains why
 
         // ── TTS ──────────────────────────────────────────────────────
         // Full-duplex: unmute so VAD can barge-in over playback.
@@ -723,32 +797,56 @@ export default function CombinedVoiceTestScreen() {
         </View>
       )}
 
-      {transcript ? (
+      {messages.length > 0 && (
         <View style={styles.panel}>
           <Text style={styles.panelHead}>
-            You said ({fmtMs(stats.sttMs)})
+            Conversation ({messages.filter((m) => m.role === "user").length}{" "}
+            turns) · STT {fmtMs(stats.sttMs)} · LLM {fmtMs(stats.llmMs)} ·{" "}
+            {stats.tps.toFixed(1)} tok/s
           </Text>
-          <Text selectable style={styles.outputText}>
-            {transcript}
-          </Text>
+          {messages.map((m, i) => (
+            <View
+              key={i}
+              style={[
+                styles.msg,
+                m.role === "user" ? styles.msgUser : styles.msgAsst,
+              ]}
+            >
+              <Text style={styles.msgRole}>
+                {m.role === "user" ? "You" : "Gemma"}
+              </Text>
+              {m.tool ? (
+                <Text selectable style={styles.toolCall}>
+                  🛠 {m.tool}
+                </Text>
+              ) : null}
+              <Text selectable style={styles.outputText}>
+                {m.pending ? "…" : m.text || "(empty)"}
+              </Text>
+            </View>
+          ))}
         </View>
-      ) : null}
+      )}
 
-      {llmReply ? (
+      {diag && (
         <View style={styles.panel}>
-          <Text style={styles.panelHead}>
-            Gemma ({fmtMs(stats.llmMs)} · {stats.tps.toFixed(1)} tok/s)
+          <Text style={styles.panelHead}>Turn diagnostics</Text>
+          <Text selectable style={styles.kv}>
+            turn {diag.turn} · llm rawLen {diag.rawLen} · replyLen{" "}
+            {diag.replyLen} · tts chunks {diag.ttsChunks} · ended{" "}
+            {String(diag.ttsEnded)}
           </Text>
-          {toolCall && (
-            <Text selectable style={styles.toolCall}>
-              🛠 {toolCall}
-            </Text>
-          )}
-          <Text selectable style={styles.outputText}>
-            {llmReply}
+          <Text
+            selectable
+            style={[
+              styles.kv,
+              { color: diag.note === "ok" ? "#9CA3AF" : "#FBBF24" },
+            ]}
+          >
+            {diag.note}
           </Text>
         </View>
-      ) : null}
+      )}
     </ScrollView>
   );
 }
@@ -843,6 +941,34 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   outputText: { color: "#F1F1F4", fontSize: 14, lineHeight: 20 },
+  msg: {
+    borderRadius: 8,
+    borderCurve: "continuous",
+    padding: 10,
+    marginTop: 6,
+    gap: 2,
+  },
+  msgUser: {
+    backgroundColor: "#1C2230",
+    borderWidth: 1,
+    borderColor: "#2A3550",
+    alignSelf: "flex-end",
+    maxWidth: "92%",
+  },
+  msgAsst: {
+    backgroundColor: "#16211B",
+    borderWidth: 1,
+    borderColor: "#23402F",
+    alignSelf: "flex-start",
+    maxWidth: "92%",
+  },
+  msgRole: {
+    color: "#6B7280",
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
   kv: { color: "#F1F1F4", fontSize: 13, fontFamily: "Menlo" },
   toolCall: {
     color: "#34D399",
