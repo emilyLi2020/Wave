@@ -85,6 +85,13 @@ export interface State {
   outcome: SessionOutcome | null;
   pickedNextStep: string | null;
   demoMode: boolean;
+  /**
+   * Number of chunk/check-in rounds before reflection. Standard run is
+   * 5; demo mode runs an abbreviated 2 (2 chunks + 2 check-ins + the
+   * final reflection) so a reviewer can watch the whole arc quickly.
+   * Set from `IntakeAnswers.demoMode` at intake.
+   */
+  totalChunks: number;
 }
 
 export type Action =
@@ -115,8 +122,13 @@ export function initialState(): State {
     outcome: null,
     pickedNextStep: null,
     demoMode: false,
+    totalChunks: 5,
   };
 }
+
+/** Rounds for a run: demo is an abbreviated 2, standard is 5. */
+export const DEMO_TOTAL_CHUNKS = 2;
+export const STANDARD_TOTAL_CHUNKS = 5;
 
 export function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -125,6 +137,9 @@ export function reducer(state: State, action: Action): State {
         ...state,
         intake: action.answers,
         demoMode: action.answers.demoMode,
+        totalChunks: action.answers.demoMode
+          ? DEMO_TOTAL_CHUNKS
+          : STANDARD_TOTAL_CHUNKS,
         phase: "safety",
       };
     case "safetyResolved":
@@ -191,7 +206,7 @@ export function reducer(state: State, action: Action): State {
       };
       const sessionHistory = [...state.sessionHistory, checkInEntry];
 
-      if (action.checkIn.chunkNumber === 5) {
+      if (action.checkIn.chunkNumber >= state.totalChunks) {
         return {
           ...state,
           checkIns,

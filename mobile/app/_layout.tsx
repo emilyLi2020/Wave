@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { ensureNotificationPermission } from "@/notifications/lock-screen-ping";
+import { SessionProvider } from "@/session/session-context";
 
 // The oceanic skin is dark-first and full-bleed: every screen draws its
 // own in-screen top bar over the shared wave, so the stack chrome is
@@ -30,21 +31,23 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={DarkTheme}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: "#02060d" },
-          }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="tests" />
-          <Stack.Screen name="session" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="dashboard" />
-          <Stack.Screen name="history" />
-          <Stack.Screen name="insights" />
-        </Stack>
-        <StatusBar style="light" />
+        <SessionProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#02060d" },
+            }}
+          >
+            <Stack.Screen name="index" />
+            <Stack.Screen name="tests" />
+            <Stack.Screen name="session" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="dashboard" />
+            <Stack.Screen name="history" />
+            <Stack.Screen name="insights" />
+          </Stack>
+          <StatusBar style="light" />
+        </SessionProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
