@@ -309,47 +309,51 @@ export default function CombinedVoiceTestScreen() {
               // A barge-in (or next turn) bumped the epoch — stop feeding
               // the player; cancelTtsAndPlayer() already tore it down.
               if (epochRef.current !== myEpoch) return;
-              if (!pcmPlayerActiveRef.current && firstChunkAt === 0) {
+              if (firstChunkAt === 0) {
+                // First chunk of THIS turn — mark when this turn's audio
+                // begins entering the (continuous) player.
                 firstChunkAt = Date.now();
                 speakingStartedAtRef.current = firstChunkAt;
+                playbackStartedAt = firstChunkAt;
                 playerSr = c.sampleRate;
+              }
+              if (!pcmPlayerActiveRef.current) {
+                // Start the PCM player ONCE for the whole session and keep
+                // it alive across turns. sherpa's player goes silent after
+                // a stop→restart cycle (turn-2-no-voice: startPcmPlayer
+                // reports OK but outputs nothing); the sandbox works
+                // precisely because it never stops between calls. So we
+                // never stopPcmPlayer between turns — only on barge-in or
+                // teardown. Guard with the ref so only the first chunk
+                // ever triggers the single start.
+                pcmPlayerActiveRef.current = true;
                 console.log(
-                  `[voiceloop] tts turn ${turnNo} startPcmPlayer(sr=${c.sampleRate})…`,
+                  `[voiceloop] tts turn ${turnNo} startPcmPlayer(sr=${c.sampleRate}) [once]…`,
                 );
                 eng
                   .startPcmPlayer(c.sampleRate, 1)
                   .then(() => {
-                    pcmPlayerActiveRef.current = true;
-                    playbackStartedAt = Date.now();
                     console.log(
                       `[voiceloop] tts turn ${turnNo} startPcmPlayer OK`,
                     );
                     // sherpa's startTtsPcmPlayer forces the shared
-                    // AVAudioSession to Playback (output-only), which kills
-                    // the createPcmLiveStream mic queue → no VAD during TTS
-                    // → barge-in impossible. Re-assert PlayAndRecord so the
-                    // mic survives playback. Best-effort, JS-only; the
-                    // durable fix is patching SherpaOnnx+TTS.mm
-                    // (Playback → PlayAndRecord), which needs a rebuild.
+                    // AVAudioSession to Playback (output-only). Re-assert
+                    // PlayAndRecord so the mic survives playback.
                     setAudioModeAsync({
                       playsInSilentMode: true,
                       allowsRecording: true,
                     }).catch(() => {});
                     return eng.writePcmChunk(c.samples);
                   })
-                  .catch((e) =>
+                  .catch((e) => {
+                    pcmPlayerActiveRef.current = false; // allow a retry
                     console.log(
                       `[voiceloop] tts turn ${turnNo} startPcmPlayer/write ERR: ${
                         e instanceof Error ? e.message : String(e)
                       }`,
-                    ),
-                  );
+                    );
+                  });
               } else {
-                if (!pcmPlayerActiveRef.current) {
-                  console.log(
-                    `[voiceloop] tts turn ${turnNo} WRITE w/o active player (skip-start path — player not ready)`,
-                  );
-                }
                 eng
                   .writePcmChunk(c.samples)
                   .catch((e) =>
@@ -383,25 +387,17 @@ export default function CombinedVoiceTestScreen() {
                     }
                   : d,
               );
-              // Let the queued audio drain before stopping the player —
-              // [player stop] discards unplayed buffers otherwise. Measure
-              // from real playback start (not chunk arrival) and keep a
-              // generous margin for AVAudioPlayerNode buffer scheduling.
+              // Resolve speak() only after THIS turn's audio has played
+              // out, so the loop doesn't start listening over the reply —
+              // but do NOT stop the player (it stays alive across turns;
+              // stopping then restarting silences sherpa). Measured from
+              // this turn's first chunk + margin for buffer scheduling.
               const audioMs = (totalSamples / (playerSr || 24_000)) * 1000;
               const elapsed = playbackStartedAt
                 ? Date.now() - playbackStartedAt
                 : 0;
               const drainMs = Math.max(0, audioMs - elapsed) + 500;
-              setTimeout(() => {
-                if (
-                  epochRef.current === myEpoch &&
-                  pcmPlayerActiveRef.current
-                ) {
-                  ttsRef.current?.stopPcmPlayer().catch(() => {});
-                  pcmPlayerActiveRef.current = false;
-                }
-                done();
-              }, drainMs);
+              setTimeout(done, drainMs);
             },
             onError: (e) => {
               console.log(
