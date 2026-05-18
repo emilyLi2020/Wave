@@ -289,6 +289,10 @@ export default function CombinedVoiceTestScreen() {
       let totalSamples = 0;
       let chunkCount = 0;
       let firstChunkAt = 0;
+      // Set only once startPcmPlayer resolves — true playback start.
+      // Measuring drain from chunk-arrival instead truncates the tail
+      // (startPcmPlayer is async, ~100-300 ms behind the first chunk).
+      let playbackStartedAt = 0;
       let playerSr = 24_000;
       const turnNo = turnCountRef.current;
 
@@ -313,6 +317,7 @@ export default function CombinedVoiceTestScreen() {
                   .startPcmPlayer(c.sampleRate, 1)
                   .then(() => {
                     pcmPlayerActiveRef.current = true;
+                    playbackStartedAt = Date.now();
                     // sherpa's startTtsPcmPlayer forces the shared
                     // AVAudioSession to Playback (output-only), which kills
                     // the createPcmLiveStream mic queue → no VAD during TTS
@@ -354,10 +359,14 @@ export default function CombinedVoiceTestScreen() {
                   : d,
               );
               // Let the queued audio drain before stopping the player —
-              // [player stop] discards unplayed buffers otherwise.
+              // [player stop] discards unplayed buffers otherwise. Measure
+              // from real playback start (not chunk arrival) and keep a
+              // generous margin for AVAudioPlayerNode buffer scheduling.
               const audioMs = (totalSamples / (playerSr || 24_000)) * 1000;
-              const since = firstChunkAt ? Date.now() - firstChunkAt : 0;
-              const drainMs = Math.max(0, audioMs - since) + 200;
+              const elapsed = playbackStartedAt
+                ? Date.now() - playbackStartedAt
+                : 0;
+              const drainMs = Math.max(0, audioMs - elapsed) + 500;
               setTimeout(() => {
                 if (
                   epochRef.current === myEpoch &&
