@@ -97,11 +97,11 @@ export default function HistoryScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Link href="/dashboard" asChild>
-          <Text style={styles.footerLink}>← Back to dashboard</Text>
+        <Link href="/" asChild>
+          <Text style={styles.footerLink}>← Home</Text>
         </Link>
-        <Link href="/insights" asChild>
-          <Text style={styles.footerLinkAccent}>See patterns →</Text>
+        <Link href="/dashboard" asChild>
+          <Text style={styles.footerLinkAccent}>Continue to dashboard →</Text>
         </Link>
       </View>
     </WaveScreen>

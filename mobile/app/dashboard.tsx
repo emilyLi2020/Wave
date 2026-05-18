@@ -139,11 +139,11 @@ export default function DashboardScreen() {
       </WaveCard>
 
       <View style={styles.footer}>
-        <Link href="/session/intake" asChild>
-          <Text style={styles.footerLink}>← Start another session</Text>
-        </Link>
         <Link href="/history" asChild>
-          <Text style={styles.footerLinkAccent}>See full history →</Text>
+          <Text style={styles.footerLink}>← Back to history</Text>
+        </Link>
+        <Link href="/" asChild>
+          <Text style={styles.footerLinkAccent}>Done →</Text>
         </Link>
       </View>
     </WaveScreen>

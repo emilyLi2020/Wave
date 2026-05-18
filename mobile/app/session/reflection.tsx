@@ -71,7 +71,9 @@ export default function ReflectionScreenRoute() {
     if (choice) dispatch({ type: "nextStepPicked", choice });
     dispatch({ type: "sessionFinished" });
     resetSession();
-    router.replace("/");
+    // End of session → History first, then the user continues to the
+    // Dashboard, then Home (post-session review flow).
+    router.replace("/history");
   }
 
   return (
