@@ -165,11 +165,19 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
           }
         }
 
-        // Deterministic termination: model tool OR patient said done OR
-        // demo mode wraps after the first full exchange.
+        // Deterministic termination.
+        //  • Demo mode: EXACTLY 2 patient turns (score + body location),
+        //    i.e. opener → P1 → A1 → P2 → A2 → end. Ignore the model's
+        //    endConversation / "ready" heuristics entirely so the demo
+        //    is always the full 4-turn script the prompt drives.
+        //  • Standard mode: model tool OR the patient signalled done.
+        const patientTurns = historyRef.current.filter(
+          (t) => t.role === "patient",
+        ).length;
         const ready = detectReadyToEnd(patientText);
-        const demoWrap = state.demoMode && historyRef.current.length >= 2;
-        const ending = !!endHolder.sig || ready || demoWrap;
+        const ending = state.demoMode
+          ? patientTurns >= 2
+          : !!endHolder.sig || ready;
 
         // ── TTS ── (mic stays muted — half-duplex)
         if (reply) {
@@ -182,6 +190,9 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
         }
 
         if (ending) {
+          // speak() already drains to the end of audio; add a short
+          // settle so navigation/unmount can't clip the closing line.
+          await new Promise((r) => setTimeout(r, 700));
           finalize();
           return;
         }
