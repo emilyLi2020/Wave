@@ -18,6 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import CachePanel from "@/screens/CachePanel";
+import { scheduleLockScreenPing } from "@/notifications/lock-screen-ping";
 import { WaveColors, WaveType } from "@/constants/wave-theme";
 
 interface Entry {
@@ -159,6 +160,22 @@ export function DebugDrawer() {
             <Text style={styles.drawerTitle}>Debug menu</Text>
             <Text style={styles.sectionSub}>Swipe right to close.</Text>
 
+            <Pressable
+              style={({ pressed }) => [styles.action, pressed && styles.rowPressed]}
+              onPress={async () => {
+                const id = await scheduleLockScreenPing(6);
+                setOpen(false);
+                if (id) console.log("[wave] lock-screen ping scheduled", id);
+                else console.warn("[wave] notification permission not granted");
+              }}
+            >
+              <Text style={styles.actionText}>Send lock-screen ping (6s)</Text>
+              <Text style={styles.rowBlurb}>
+                Schedules the design&apos;s prophylactic notification. Close the
+                drawer and lock the phone to see it.
+              </Text>
+            </Pressable>
+
             <Section title="Tests" sub="Isolated runtime smoke checks.">
               {TEST_ENTRIES.map((e) => (
                 <Row key={e.href} entry={e} onNavigate={() => setOpen(false)} />
@@ -232,6 +249,18 @@ const styles = StyleSheet.create({
   section: { color: WaveColors.ink, fontSize: 16, fontWeight: "700", marginTop: 12 },
   sectionSub: { color: WaveColors.inkFaint, fontSize: 12, marginBottom: 6 },
   gap: { height: 8 },
+  action: {
+    backgroundColor: WaveColors.chipActive,
+    borderWidth: 1,
+    borderColor: WaveColors.borderGlow,
+    borderRadius: 12,
+    borderCurve: "continuous",
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    gap: 4,
+  },
+  actionText: { color: WaveColors.waveCrest, fontSize: 14, fontWeight: "600" },
   row: {
     backgroundColor: WaveColors.surface,
     padding: 12,
