@@ -246,7 +246,7 @@ export default function LiteRTStockScreenBase({
       const acc: SurfaceResult[] = [];
 
       // ── 1. Phase narration (chunk 3, post-corner-cut: 1 prior check-in)
-      setNote("1/3 · phase narration…");
+      setNote("1/4 · phase narration…");
       const chunk = buildChunkPrompt({
         chunkNumber: 3,
         intakeIntensity: 7,
@@ -269,7 +269,7 @@ export default function LiteRTStockScreenBase({
       // transcript). The 3 user messages are just the patient's words;
       // the wrapper's chat template produces each assistant turn, and the
       // conversation is preserved across sends (runSurface resets once).
-      setNote("2/3 · check-in (3 turns + endConversation tool call)…");
+      setNote("2/4 · check-in (3 quick turns)…");
       const ciSystem = `${WAVE_SYSTEM_PROMPT}
 
 You are running a post-chunk check-in with the patient. The patient's first message is their craving score (1-10). Reply naturally in 1-3 short plain sentences each turn — validate, then one question — no markdown.
@@ -293,8 +293,31 @@ where N is their latest score and CAT is one of: ${TOOL_OBSTACLES} (use none if 
       );
       setResults([...acc]);
 
-      // ── 3. Reflection
-      setNote("3/3 · reflection…");
+      // ── 3. Full-arc check-in → ending turn. Drives the real WAVE
+      // 5-turn arc (score → body → obstacle → technique landed →
+      // readiness confirmed) so the model is AT the genuine ending
+      // point — the test for whether endConversation actually fires
+      // with the full prompt (vs the 3-turn surface which is mid-arc).
+      setNote("3/4 · full-arc check-in (→ ending turn)…");
+      const ciTurnsFullArc = [
+        "It's about a seven.",
+        "It's mostly in my chest, tight, but it eased a little near the end.",
+        "Honestly I kept wanting to check my phone — it was hard to stay with it.",
+        "Yeah, that actually helped, the urge backed off a bit.",
+        "Yeah, I'm ready to keep going.",
+      ];
+      acc.push(
+        await runSurface(
+          modelPath,
+          "Full-arc check-in (5 turns → ending)",
+          ciSystem,
+          ciTurnsFullArc,
+        ),
+      );
+      setResults([...acc]);
+
+      // ── 4. Reflection
+      setNote("4/4 · reflection…");
       const refl = buildReflectionPrompt({
         intakeIntensity: 7,
         matType: "buprenorphine",
@@ -314,7 +337,7 @@ where N is their latest score and CAT is one of: ${TOOL_OBSTACLES} (use none if 
       setResults([...acc]);
 
       probeMlDrift();
-      setNote("Done — 3 surfaces.");
+      setNote("Done — 4 surfaces.");
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
