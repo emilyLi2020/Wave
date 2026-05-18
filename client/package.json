@@ -12,7 +12,7 @@
     "test:gemma": "tsx scripts/test-gemma-boundaries.ts",
     "test:gemma:live": "tsx scripts/test-fallback.ts",
     "test:gemma:tools:live": "tsx scripts/test-gemma-ai-sdk-tools-live.ts",
-    "test:voice-loop": "tsx scripts/test-extract-craving-score.ts && tsx scripts/test-wllama-generators.ts"
+    "test:voice-loop": "tsx scripts/test-extract-craving-score.ts && tsx scripts/test-wllama-generators.ts && tsx scripts/test-check-in-end-session.ts"
   },
   "dependencies": {
     "@browser-ai/transformers-js": "^2.2.2",

@@ -16,7 +16,7 @@
 
 To delete (HF web UI, your action): `lora-wave-session-r32-{merged,gguf,onnx,onnx-fused}` — all obsolete.
 
-Next step (not yet done): swap [`client/lib/gemma/local-runtime.ts`](client/lib/gemma/local-runtime.ts) from transformers.js+ONNX to `@/lib/wllama`. See `client/docs/wllama.md#production-wiring-next-step-not-yet-done`.
+Production wiring: **done.** Chunk narration, check-in, reflection, and insights all run through `@/lib/wllama` via [`client/lib/gemma/wllama-generators.ts`](client/lib/gemma/wllama-generators.ts) (the `client/lib/gemma/{chunk,checkin,session}.ts` boundaries import it). The legacy `local-runtime.ts` (transformers.js + ONNX) is retained only for the dev `pnpm test:gemma:tools:live` smoke. See `client/docs/wllama.md`.
 
 ---
 

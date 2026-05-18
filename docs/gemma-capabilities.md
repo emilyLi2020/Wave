@@ -7,6 +7,17 @@
 > For *which* Gemma model and LoRAs WAVE ships, see [`models.md`](./models.md).
 > For the training pipeline, see [`model-training.md`](./model-training.md).
 > For the isolated voice stack test page, see [`client/docs/voice-test.md`](../client/docs/voice-test.md).
+>
+> **⚠️ Runtime correction (read first):** sections below that describe WAVE's
+> *current* runtime as Transformers.js / `@browser-ai/transformers-js` /
+> `client/lib/gemma/local-runtime.ts` / a native `endConversation` tool call
+> are **stale**. The shipped runtime is the merged Q4_K_M GGUF
+> (`Maelstrome/lora-wave-session-r32`) served via **wllama** (llama.cpp / WASM,
+> WebGPU when available); check-in structure comes from
+> `response_format: json_schema` (`{ reply, endConversation }`), **not** native
+> function calls. The general "what Gemma 4 can do" capability content remains
+> valid; only the WAVE-runtime attributions are outdated. See
+> `client/docs/wllama.md` and `client/docs/tool-calling-investigation.md`.
 
 Sources used throughout this file:
 

@@ -307,6 +307,12 @@ Rules:
     }
   }
 
+  // Single blocking JSON-schema generation. The grammar guarantees the
+  // { reply, endConversation } shape; we parse the full object once, push
+  // the whole reply to onDelta (the hook hands it to Kokoro, which still
+  // streams audio sentence-by-sentence via its TextSplitterStream), and
+  // read the reliable endConversation signal off the same parse. Token
+  // streaming was intentionally not adopted here — see the file header.
   const out = await wllama.createChatCompletion({
     messages,
     max_tokens: Math.max(options.maxNewTokens, 220),

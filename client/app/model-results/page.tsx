@@ -3,20 +3,21 @@ import Link from "next/link";
 
 import {
   CAVEATS,
-  EXAMPLE_COMPARISON,
+  DATASET_SURFACES,
   MODEL_RESULT,
-  QUALITY_GATES,
+  PAIRED_STATS,
   SCORE_CARDS,
-  SCORE_WEIGHTS,
 } from "@/lib/data/model-results";
 
 export const metadata: Metadata = {
   title: "Model Results - WAVE",
   description:
-    "Base Gemma versus WAVE phase-narration LoRA training results, methodology, and held-out eval scores.",
+    "Held-out evaluation of the lora-wave-session fine-tune WAVE actually serves (Maelstrome/lora-wave-session-r32): completion NLL, perplexity, and paired statistics versus base Gemma.",
 };
 
 export default function ModelResultsPage() {
+  const surfaceTotal = DATASET_SURFACES.reduce((a, s) => a + s.value, 0);
+
   return (
     <div className="relative overflow-hidden">
       <div
@@ -37,14 +38,22 @@ export default function ModelResultsPage() {
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/90 px-3 py-1 text-xs font-medium text-foreground/70 shadow-sm backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              Contest fine-tuning proof
+              The fine-tune WAVE actually serves
             </p>
             <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-              Fine-tuning made WAVE&apos;s narration model measurably better.
+              The shipped LoRA beat base Gemma on every held-out prompt.
             </h1>
             <p className="mt-4 max-w-2xl text-lg leading-relaxed text-foreground/70">
-              {MODEL_RESULT.claim} The evaluation compares base Gemma and the
-              LoRA on the same held-out prompts.
+              {MODEL_RESULT.claim}
+            </p>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-foreground/55">
+              Served as{" "}
+              <code className="rounded bg-surface-muted px-1.5 py-0.5 text-xs">
+                {MODEL_RESULT.servedRepo}
+              </code>{" "}
+              — {MODEL_RESULT.servedArtifact}, covering{" "}
+              {MODEL_RESULT.surfaces}. {MODEL_RESULT.evalMode} Eval generated{" "}
+              {MODEL_RESULT.evalDate}.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               {MODEL_RESULT.badges.map((badge) => (
@@ -60,19 +69,19 @@ export default function ModelResultsPage() {
 
           <article className="rounded-[2rem] border border-border bg-surface/90 p-6 shadow-lg shadow-accent/10 backdrop-blur">
             <p className="text-xs uppercase tracking-wide text-foreground/50">
-              Composite score
+              Held-out perplexity
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <ScorePlate label="Base Gemma" value="67.29" muted />
-              <ScorePlate label="LoRA Gemma" value="70.44" />
+              <ScorePlate label="Base Gemma" value="138.8" muted />
+              <ScorePlate label="WAVE LoRA" value="28.7" />
             </div>
             <div className="mt-5 rounded-2xl bg-accent-soft/60 p-4">
               <p className="text-sm font-medium text-accent">
-                +3.15 point WAVE score improvement
+                32.0% lower completion NLL · 428/428 held-out wins
               </p>
               <p className="mt-1 text-sm leading-relaxed text-foreground/70">
-                The adapter improved held-out likelihood and reference
-                similarity without losing format, style, or safety.
+                Lower NLL on every one of the 428 frozen prompts — no losses,
+                no ties (sign-test p ≈ 2.9e-129).
               </p>
             </div>
           </article>
@@ -87,9 +96,9 @@ export default function ModelResultsPage() {
                 Scorecard
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-foreground/70">
-                NLL and perplexity are the closest LLM analogs to traditional
-                ML loss. Lower is better. Token F1 and ROUGE-L show reference
-                similarity.
+                Completion NLL and perplexity are the closest LLM analogs to a
+                training loss — lower is better. Base and LoRA were scored on
+                the same frozen held-out prompts.
               </p>
             </div>
             <span className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground">
@@ -97,7 +106,7 @@ export default function ModelResultsPage() {
             </span>
           </div>
 
-          <ul className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <ul className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {SCORE_CARDS.map((score) => (
               <li
                 key={score.label}
@@ -125,31 +134,27 @@ export default function ModelResultsPage() {
       <section className="mx-auto grid max-w-6xl gap-6 px-6 py-14 lg:grid-cols-[0.95fr_1.05fr]">
         <article className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-2xl font-semibold tracking-tight">
-            Quality gates stayed clean
+            Statistical strength
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-foreground/70">
-            The LoRA improved likelihood without breaking the behaviors WAVE
-            needs before a narration can appear in the app.
+            A paired per-prompt comparison: every held-out prompt scored under
+            base and under the LoRA, then differenced. The win is not a
+            few-example fluke.
           </p>
           <ul className="mt-6 space-y-3">
-            {QUALITY_GATES.map((gate) => (
+            {PAIRED_STATS.map((stat) => (
               <li
-                key={gate.label}
+                key={stat.label}
                 className="rounded-2xl border border-border bg-surface-muted/50 p-4"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">{gate.label}</p>
-                  <div className="flex gap-2 text-xs font-medium">
-                    <span className="rounded-full bg-surface px-2.5 py-1 text-foreground/60">
-                      Base {gate.base}
-                    </span>
-                    <span className="rounded-full bg-accent-soft px-2.5 py-1 text-accent">
-                      LoRA {gate.lora}
-                    </span>
-                  </div>
+                  <p className="font-medium">{stat.label}</p>
+                  <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent">
+                    {stat.value}
+                  </span>
                 </div>
                 <p className="mt-2 text-sm text-foreground/60">
-                  {gate.description}
+                  {stat.description}
                 </p>
               </li>
             ))}
@@ -158,97 +163,88 @@ export default function ModelResultsPage() {
 
         <article className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-2xl font-semibold tracking-tight">
-            How the score is built
+            Methodology
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-foreground/70">
-            The WAVE score is intentionally task-specific: it rewards lower
-            held-out loss, but only if the model also keeps format, voice, and
-            clinical safety intact.
+            One multitask LoRA over all three runtime surfaces, trained once on
+            the selected config (no hyperparameter search).
           </p>
-          <ul className="mt-6 space-y-4">
-            {SCORE_WEIGHTS.map((weight) => (
-              <li key={weight.label}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{weight.label}</span>
-                  <span className="text-foreground/60">{weight.value} pts</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
-                  <div
-                    className="h-full rounded-full bg-accent"
-                    style={{ width: `${weight.value}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-6 rounded-2xl bg-surface-muted p-4 text-sm leading-relaxed text-foreground/70">
-            <p>
-              Dataset: {MODEL_RESULT.dataset.totalExamples} examples,{" "}
-              {MODEL_RESULT.dataset.trainExamples} train and{" "}
-              {MODEL_RESULT.dataset.heldOutExamples} held out, split with seed{" "}
-              {MODEL_RESULT.dataset.seed}.
+
+          <div className="mt-6">
+            <p className="text-xs uppercase tracking-wide text-foreground/50">
+              Held-out test split by surface ({surfaceTotal} prompts)
             </p>
-            <p className="mt-2">
-              Training: {MODEL_RESULT.training.method}, rank{" "}
-              {MODEL_RESULT.training.loraRank}, alpha{" "}
-              {MODEL_RESULT.training.loraAlpha}, learning rate{" "}
-              {MODEL_RESULT.training.learningRate},{" "}
-              {MODEL_RESULT.training.quantization}.
-            </p>
+            <ul className="mt-3 space-y-3">
+              {DATASET_SURFACES.map((s) => (
+                <li key={s.label}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{s.label}</span>
+                    <span className="text-foreground/60">{s.value}</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
+                    <div
+                      className="h-full rounded-full bg-accent"
+                      style={{
+                        width: `${(s.value / surfaceTotal) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
+
+          <dl className="mt-6 grid gap-3 rounded-2xl bg-surface-muted p-4 text-sm leading-relaxed text-foreground/70 sm:grid-cols-2">
+            <Fact
+              k="Dataset"
+              v={`${MODEL_RESULT.dataset.totalExamples.toLocaleString()} examples · ${MODEL_RESULT.dataset.split} split · seed ${MODEL_RESULT.dataset.seed}`}
+            />
+            <Fact
+              k="LoRA"
+              v={`rank ${MODEL_RESULT.training.loraRank} · alpha ${MODEL_RESULT.training.loraAlpha} · dropout ${MODEL_RESULT.training.loraDropout}`}
+            />
+            <Fact
+              k="Optimizer"
+              v={`${MODEL_RESULT.training.optimizerSteps} steps · lr ${MODEL_RESULT.training.learningRate} · ${MODEL_RESULT.training.batchSize}`}
+            />
+            <Fact k="Base" v={MODEL_RESULT.baseModel} />
+            <Fact k="Trained on" v={MODEL_RESULT.training.gpu} />
+            <Fact k="Wall time" v={MODEL_RESULT.training.wallTime} />
+            <Fact k="Peak GPU memory" v={MODEL_RESULT.training.peakGpuMemory} />
+            <Fact k="Backend" v={MODEL_RESULT.training.method} />
+            <Fact
+              k={MODEL_RESULT.adapterCheck.label}
+              v={MODEL_RESULT.adapterCheck.detail}
+              wide
+            />
+          </dl>
         </article>
       </section>
 
-      <section className="border-y border-border bg-surface-muted/40">
-        <div className="mx-auto max-w-6xl px-6 py-14">
-          <div className="max-w-3xl">
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Same prompt, two generations
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/70">
-              {EXAMPLE_COMPARISON.promptSummary} Both outputs satisfy the
-              schema; the LoRA version is more grounded in bodily support and
-              surface contact.
-            </p>
-          </div>
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            <OutputCard
-              title="Base Gemma"
-              subtitle="Original model"
-              lines={EXAMPLE_COMPARISON.baseLines}
-            />
-            <OutputCard
-              title="LoRA Gemma"
-              subtitle="Fine-tuned adapter"
-              lines={EXAMPLE_COMPARISON.loraLines}
-              highlighted
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 py-14">
-        <div className="grid gap-6 lg:grid-cols-[1fr_0.85fr]">
+      <section className="border-t border-border bg-surface-muted/40">
+        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-14 lg:grid-cols-[1fr_0.85fr]">
           <article className="rounded-2xl border border-border bg-surface p-6">
             <h2 className="text-2xl font-semibold tracking-tight">
               What this proves
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-foreground/70">
-              On the held-out set, the LoRA reduced completion NLL from 4.7676
-              to 4.7097 and perplexity from 117.63 to 111.02. That means the
-              desired WAVE narration became more likely under the fine-tuned
-              model. It also improved Token F1 and ROUGE-L while keeping every
-              quality gate at 100%.
+              On the 428-prompt held-out split, the LoRA reduced completion NLL
+              from 4.9327 to 3.3555 (−1.58, a 32.0% improvement) and perplexity
+              from 138.76 to 28.66. It beat base Gemma on{" "}
+              <span className="font-medium text-foreground/85">
+                every prompt
+              </span>{" "}
+              (428/428, sign-test p ≈ 2.9e-129) across check-in,
+              phase-narration, and reflection prompts — the exact surfaces the
+              app serves this adapter for.
             </p>
             <div className="mt-5 rounded-2xl border border-border bg-surface-muted/60 p-4">
-              <p className="text-sm font-medium">
-                Contest-ready claim
-              </p>
+              <p className="text-sm font-medium">Contest-ready claim</p>
               <p className="mt-2 text-sm leading-relaxed text-foreground/70">
-                Fine-tuning improved held-out completion likelihood and
-                reference similarity versus base Gemma while preserving 100%
-                JSON validity, schema adherence, patient-facing style, safety,
-                and medication directive pass rates.
+                Fine-tuning the model WAVE actually ships (
+                {MODEL_RESULT.servedRepo}) made the desired WAVE completion
+                dramatically more likely than base Gemma — a 32% NLL reduction
+                with a 100% paired win rate on held-out data.
               </p>
             </div>
           </article>
@@ -313,48 +309,19 @@ function MetricRow({
   );
 }
 
-function OutputCard({
-  title,
-  subtitle,
-  lines,
-  highlighted = false,
+function Fact({
+  k,
+  v,
+  wide = false,
 }: {
-  title: string;
-  subtitle: string;
-  lines: readonly string[];
-  highlighted?: boolean;
+  k: string;
+  v: string;
+  wide?: boolean;
 }) {
   return (
-    <article
-      className={`rounded-2xl border p-6 ${
-        highlighted
-          ? "border-accent/50 bg-accent-soft/40"
-          : "border-border bg-surface"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="font-semibold">{title}</h3>
-          <p className="text-xs uppercase tracking-wide text-foreground/50">
-            {subtitle}
-          </p>
-        </div>
-        {highlighted ? (
-          <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
-            Fine-tuned
-          </span>
-        ) : null}
-      </div>
-      <ol className="mt-5 space-y-3">
-        {lines.map((line, index) => (
-          <li key={line} className="flex gap-3 text-sm leading-relaxed">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-medium text-foreground/50">
-              {index + 1}
-            </span>
-            <span className="text-foreground/75">{line}</span>
-          </li>
-        ))}
-      </ol>
-    </article>
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <dt className="font-medium text-foreground/70">{k}</dt>
+      <dd className="mt-1">{v}</dd>
+    </div>
   );
 }

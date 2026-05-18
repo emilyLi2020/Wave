@@ -13,9 +13,19 @@ The browser demo trains and ships one LoRA:
 lora-wave-session
 ```
 
-That LoRA is merged into the Gemma ONNX artifact before it is loaded by
-Transformers.js. We are choosing this because browser LoRA hot-swapping is not
-yet mature enough for a reliable PWA demo.
+That LoRA is merged into the Gemma base and quantized to a **Q4_K_M GGUF**
+(`Maelstrome/lora-wave-session-r32`, 5 shards), loaded in the browser by
+**wllama** (llama.cpp / WASM, WebGPU when available). We merge one model
+because browser LoRA hot-swapping is not yet mature enough for a reliable PWA
+demo.
+
+> **Note (runtime):** ONNX + Transformers.js was the original export/serve
+> target and was parked (fp16 WebGPU divergence — see
+> `docs/postmortems/onnx-export.md`). Sections below that say "export a single
+> ONNX artifact for Transformers.js" describe that parked path; the shipped
+> deliverable is the merged Q4_K_M GGUF served via wllama (PEFT merge → f16 →
+> Q4_K_M → split → upload; pipeline in `models/gguf/README.md`). The training
+> and data process itself is unchanged.
 
 We still collect data under specialized future adapter IDs:
 

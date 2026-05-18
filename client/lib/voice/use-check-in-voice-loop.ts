@@ -137,8 +137,13 @@ export function useCheckInVoiceLoop(
   const [handsFreeEnabled, setHandsFreeEnabledState] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // `useRef(options)` seeds the first-render value; subsequent renders
+  // refresh it after commit (not during render — the callbacks that read
+  // it are all async / event-driven, so post-commit freshness is fine).
   const optionsRef = useRef(options);
-  optionsRef.current = options;
+  useEffect(() => {
+    optionsRef.current = options;
+  });
 
   const vadListenerRef = useRef<VadListenerController | null>(null);
   const kokoroRef = useRef<KokoroTextToSpeechEngine | null>(null);

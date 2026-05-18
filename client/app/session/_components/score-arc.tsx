@@ -1,116 +1,120 @@
 "use client";
 
 /**
- * Sparkline of the 5 craving scores collected at every check-in.
- *
- * Rendered above the reflection card so the patient can see the full
- * arc at a glance — where they came in, the path between, and where
- * they ended up. Inline SVG, no chart library.
+ * Craving arc — the interactive prototype's `ScoreArc`, drawn as a
+ * glass `.arc-card`: a 1–10 baseline with the session's scores
+ * connected (intake anchor + one point per check-in), a soft area
+ * fill, value labels, and a mono axis row.
  */
 
 interface Props {
   /** One score per check-in, in order. May have fewer than 5 entries. */
   scores: number[];
-  /** Intake intensity collected before Check-in 1. Drawn as the leftmost anchor. */
+  /** Intake intensity collected before Check-in 1 — the leftmost anchor. */
   intakeIntensity: number;
 }
 
-const VIEW_WIDTH = 320;
-const VIEW_HEIGHT = 90;
-const PAD_X = 24;
-const PAD_Y = 14;
-const POINT_RADIUS = 4.5;
+const W = 320;
+const H = 120;
+const PADX = 14;
+const PADY = 16;
 
 export function ScoreArc({ scores, intakeIntensity }: Props) {
-  // Always include intake as point 0 so the chart shows the journey
-  // from the initial reading.
   const series = [intakeIntensity, ...scores];
-  if (series.length < 2) {
-    return null;
-  }
+  if (series.length < 2) return null;
 
-  const xs = series.map((_, i) =>
-    PAD_X + (i / (series.length - 1)) * (VIEW_WIDTH - PAD_X * 2),
-  );
-  const ys = series.map(
-    (score) =>
-      PAD_Y + (1 - clamp(score, 1, 10) / 10) * (VIEW_HEIGHT - PAD_Y * 2),
-  );
+  const n = series.length;
+  const x = (i: number) => PADX + (i / Math.max(1, n - 1)) * (W - PADX * 2);
+  const y = (s: number) => H - PADY - ((s - 1) / 9) * (H - PADY * 2);
 
-  const path = xs
-    .map((x, i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${ys[i].toFixed(1)}`)
+  const dPath = series
+    .map((s, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(s).toFixed(1)}`)
     .join(" ");
+  const areaPath = `${dPath} L ${x(n - 1).toFixed(1)} ${H - PADY} L ${x(0).toFixed(1)} ${H - PADY} Z`;
 
-  const areaPath = `${path} L ${xs[xs.length - 1].toFixed(1)} ${VIEW_HEIGHT - PAD_Y} L ${xs[0].toFixed(1)} ${VIEW_HEIGHT - PAD_Y} Z`;
+  const axisLabel = (i: number) => {
+    if (i === 0) return "Intake";
+    if (i === n - 1 && scores.length >= 5) return "End";
+    return String(i);
+  };
 
   return (
-    <figure className="rounded-2xl border border-border bg-surface p-4">
-      <figcaption className="mb-2 flex items-center justify-between text-xs uppercase tracking-wide text-foreground/50">
-        <span>Craving arc</span>
-        <span>
-          {intakeIntensity} → {series[series.length - 1]}
+    <div className="arc-card">
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <span className="eyebrow">Craving · this session</span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: "var(--fg-faint)",
+            letterSpacing: "0.06em",
+          }}
+        >
+          {series[0]} → {series[n - 1]}
         </span>
-      </figcaption>
+      </div>
       <svg
-        viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-        className="h-24 w-full"
+        width="100%"
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        style={{ display: "block" }}
         role="img"
-        aria-label={`Craving scores from intake ${intakeIntensity} through ${scores.length} check-ins, ending at ${series[series.length - 1]}.`}
+        aria-label={`Craving from intake ${intakeIntensity} through ${scores.length} check-ins, ending at ${series[n - 1]}.`}
       >
-        <line
-          x1={PAD_X}
-          y1={VIEW_HEIGHT - PAD_Y}
-          x2={VIEW_WIDTH - PAD_X}
-          y2={VIEW_HEIGHT - PAD_Y}
-          stroke="var(--border)"
-          strokeWidth="1"
-        />
-        <path d={areaPath} fill="var(--wave-rise)" opacity={0.18} />
+        <defs>
+          <linearGradient id="arcgrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--accent)" stopOpacity="0.35" />
+            <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[1, 5, 10].map((v) => (
+          <line
+            key={v}
+            x1={PADX}
+            x2={W - PADX}
+            y1={y(v)}
+            y2={y(v)}
+            stroke="var(--border)"
+            strokeDasharray="2 4"
+          />
+        ))}
+        <path d={areaPath} fill="url(#arcgrad)" />
         <path
-          d={path}
+          d={dPath}
           fill="none"
           stroke="var(--accent)"
-          strokeWidth="2.4"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {xs.map((x, i) => (
+        {series.map((s, i) => (
           <g key={i}>
             <circle
-              cx={x}
-              cy={ys[i]}
-              r={POINT_RADIUS}
+              cx={x(i)}
+              cy={y(s)}
+              r="4"
               fill="var(--surface)"
               stroke="var(--accent)"
               strokeWidth="2"
             />
             <text
-              x={x}
-              y={ys[i] - POINT_RADIUS - 4}
+              x={x(i)}
+              y={y(s) - 10}
               textAnchor="middle"
-              fontSize="9"
-              fill="var(--foreground)"
-              opacity={0.6}
+              fontFamily="var(--font-geist-mono), monospace"
+              fontSize="10"
+              fill="var(--fg-faint)"
             >
-              {series[i]}
-            </text>
-            <text
-              x={x}
-              y={VIEW_HEIGHT - 2}
-              textAnchor="middle"
-              fontSize="8"
-              fill="var(--foreground)"
-              opacity={0.4}
-            >
-              {i === 0 ? "intake" : `c${i}`}
+              {s}
             </text>
           </g>
         ))}
       </svg>
-    </figure>
+      <div className="arc-axis">
+        {series.map((_, i) => (
+          <span key={i}>{axisLabel(i)}</span>
+        ))}
+      </div>
+    </div>
   );
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

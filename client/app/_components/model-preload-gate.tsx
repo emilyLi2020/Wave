@@ -58,8 +58,13 @@ export function ModelPreloadGate({ children }: Props) {
   const summaryLabel = showProgress ? `${progress}%` : runtimeLabel;
   const sourceLabel = describeWaveWllamaSource();
 
+  // Full-area blocking setup screen. Fixed below the sticky 4rem site
+  // header so the menu bar stays visible/usable, and fully opaque so
+  // the WaveSkin ocean canvas behind the route can't bleed through at
+  // the edges (the symptom that made this look like a half-finished
+  // panel rather than an intentional gate).
   return (
-    <section className="flex min-h-[calc(100vh-8rem)] items-center justify-center bg-background px-6 py-12 text-foreground">
+    <section className="fixed inset-x-0 bottom-0 top-16 z-20 flex items-center justify-center overflow-y-auto bg-background px-6 py-12 text-foreground">
       <section
         className="w-full max-w-xl rounded-[2rem] border border-border bg-surface p-8 shadow-2xl shadow-accent/10"
         aria-live="polite"

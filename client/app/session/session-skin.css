@@ -1,0 +1,965 @@
+/* ============================================================
+   session-skin.css
+
+   The demo prototype's design system (public/demo-app/styles.css),
+   ported verbatim and rescoped under `.wave-session` so the real
+   /session route renders the exact same flow + look as the embedded
+   prototype, while keeping the real Whisper / Kokoro / wllama plumbing.
+
+   The WAVE aesthetic is dark-only (the prototype's bioluminescent
+   palette lives in its `[data-theme="dark"]` block). So this file
+   pins the dark token values directly on `.wave-session`, and the
+   `[data-frame="web"]` sizing variants are folded in as the base
+   (the real app is the web surface, not the iPhone frame).
+
+   Source order within each component mirrors the prototype:
+   base rule → web-frame sizing → dark tuning, so dark wins ties.
+   ============================================================ */
+
+.wave-session {
+  /* base tokens */
+  --surface: rgba(8, 22, 38, 0.62);
+  --surface-mute: rgba(7, 24, 42, 0.45);
+  --border: rgba(232, 243, 252, 0.14);
+  --border-soft: rgba(232, 243, 252, 0.08);
+
+  /* bioluminescent oceanic palette (prototype dark theme) */
+  --bg-deep: #02060d;
+  --bg: #05101c;
+  --bg-mid: #07182a;
+
+  --ink: #f3faff;
+  --ink-soft: rgba(243, 250, 255, 0.92);
+  --ink-mute: rgba(243, 250, 255, 0.75);
+  --ink-faint: rgba(243, 250, 255, 0.55);
+  --ink-ghost: rgba(243, 250, 255, 0.22);
+
+  --fg: var(--ink);
+  --fg-soft: var(--ink-soft);
+  --fg-faint: var(--ink-faint);
+  --fg-ghost: var(--ink-ghost);
+
+  --accent: #22d3ee;
+  --accent-fg: #02060d;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+  --accent-deep: #5ce1d6;
+
+  --wave-glow: #5ce1d6;
+  --wave-crest: #b8fff2;
+  --wave-rise: #5ce1d6;
+  --wave-peak: #22d3ee;
+  --wave-fall: #b8fff2;
+  --warm: #f0c987;
+
+  --warn: #f0c987;
+  --warn-soft: rgba(240, 201, 135, 0.14);
+  --danger: #ef9a9a;
+  --danger-soft: rgba(239, 154, 154, 0.14);
+
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -16px rgba(0, 0, 0, 0.7);
+  --shadow-deep: 0 30px 80px -30px rgba(0, 0, 0, 0.85);
+
+  color: var(--ink);
+  font-family: var(--font-geist-sans), "Geist", -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.wave-session *,
+.wave-session *::before,
+.wave-session *::after { box-sizing: border-box; }
+
+.wave-session .serif,
+.wave-session .display,
+.wave-session .section,
+.wave-session h1.display {
+  font-family: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.wave-session .mono {
+  font-family: var(--font-geist-mono), "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── screen + topbar + crumb + back-link ──────────────────── */
+
+.wave-session .screen {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  color: var(--fg);
+  position: relative;
+  z-index: 10;
+}
+
+.wave-session .topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 880px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px 8px 0;
+  color: var(--ink-mute);
+  font-size: 13px;
+}
+
+.wave-session .screen-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 26px 4px 40px;
+  gap: 22px;
+}
+
+.wave-session .topbar .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--ink-mute);
+  background: none;
+  border: 0;
+  font: inherit;
+  padding: 6px 10px 6px 4px;
+  border-radius: 999px;
+}
+.wave-session .topbar .back-link:hover { color: var(--wave-glow); }
+
+.wave-session .crumb {
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ── type ─────────────────────────────────────────────────── */
+
+.wave-session .eyebrow {
+  font-family: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.wave-session .eyebrow.accent {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.35);
+}
+
+.wave-session h1.display {
+  font-size: 44px;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  margin: 0;
+  text-wrap: pretty;
+  color: var(--ink);
+}
+.wave-session h1.display.big {
+  font-size: 64px;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 300;
+  text-wrap: pretty;
+}
+
+.wave-session h2.section {
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.wave-session p.lede {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.55;
+  max-width: 56ch;
+  color: var(--ink-soft);
+  font-weight: 400;
+  text-wrap: pretty;
+}
+
+.wave-session .hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+
+/* ── buttons ──────────────────────────────────────────────── */
+
+.wave-session .btn {
+  appearance: none;
+  background: color-mix(in oklab, var(--bg-mid) 55%, transparent);
+  color: var(--ink);
+  padding: 12px 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--ink-ghost);
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 120ms ease, background 160ms ease,
+    border-color 160ms ease, opacity 160ms ease;
+}
+.wave-session .btn:hover {
+  border-color: var(--accent);
+  color: var(--wave-crest);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+.wave-session .btn:active { transform: scale(0.985); }
+.wave-session .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.wave-session .btn.primary {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--wave-glow) 28%, transparent),
+    color-mix(in oklab, var(--accent) 22%, transparent));
+  border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+  color: var(--wave-crest);
+  box-shadow:
+    inset 0 1px 0 rgba(184, 255, 242, 0.18),
+    0 14px 30px -14px rgba(34, 211, 238, 0.5),
+    0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
+  text-shadow: 0 0 12px rgba(92, 225, 214, 0.5);
+}
+.wave-session .btn.primary:hover {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--wave-glow) 38%, transparent),
+    color-mix(in oklab, var(--accent) 32%, transparent));
+  color: #fff;
+}
+
+.wave-session .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-mute);
+}
+.wave-session .btn.ghost:hover { color: var(--wave-glow); background: transparent; }
+
+.wave-session .btn.huge {
+  font-size: 17px;
+  min-height: 60px;
+  padding: 18px 30px;
+  border-radius: 999px;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
+.wave-session .btn-row { display: flex; gap: 10px; }
+.wave-session .btn-stack { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── cards + plan textarea ────────────────────────────────── */
+
+.wave-session .card {
+  background: color-mix(in oklab, var(--bg-mid) 70%, transparent);
+  border: 1px solid var(--ink-ghost);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 243, 252, 0.04),
+    0 24px 50px -32px rgba(0, 0, 0, 0.6);
+}
+.wave-session .card.flush { padding: 18px; }
+.wave-session .card.tight { padding: 14px 16px; }
+
+.wave-session .plan-area {
+  width: 100%;
+  min-height: 76px;
+  padding: 12px 14px;
+  background: var(--surface-mute);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.4;
+  resize: none;
+  color: var(--fg);
+}
+.wave-session .plan-area:focus { outline: none; border-color: var(--accent); }
+.wave-session .plan-area::placeholder { color: var(--ink-faint); }
+
+/* ── pills & chips ────────────────────────────────────────── */
+
+.wave-session .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-mid) 60%, transparent);
+  border: 1px solid var(--ink-ghost);
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.wave-session .pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--wave-glow);
+  box-shadow: 0 0 0 4px rgba(92, 225, 214, 0.18), 0 0 8px var(--wave-glow);
+}
+
+.wave-session .chip-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.wave-session .chip-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.wave-session .chip-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+.wave-session .chip {
+  appearance: none;
+  border: 1px solid var(--ink-ghost);
+  background: color-mix(in oklab, var(--bg-mid) 55%, transparent);
+  color: var(--ink-soft);
+  padding: 14px 6px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 140ms ease, background 140ms ease,
+    color 140ms ease, transform 120ms ease;
+  text-align: center;
+}
+.wave-session .chip:hover { border-color: var(--accent); color: var(--ink); }
+.wave-session .chip:active { transform: scale(0.97); }
+.wave-session .chip[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  color: var(--wave-crest);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent),
+    0 8px 24px -12px rgba(34, 211, 238, 0.45);
+}
+.wave-session .chip.list {
+  padding: 14px 14px;
+  text-align: left;
+  font-size: 15px;
+}
+
+/* ── intensity slider ─────────────────────────────────────── */
+
+.wave-session .intensity {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  user-select: none;
+}
+.wave-session .intensity-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  min-height: 60px;
+}
+.wave-session .intensity-num {
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  transition: opacity 200ms ease, color 200ms ease;
+}
+.wave-session .intensity-num .intensity-unit {
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--fg-faint);
+  margin-left: 4px;
+}
+.wave-session .intensity.lg .intensity-num { font-size: 92px; font-weight: 200; }
+
+.wave-session .intensity-track {
+  position: relative;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  touch-action: none;
+  cursor: grab;
+  padding: 0 4px;
+  border-radius: 999px;
+}
+.wave-session .intensity-track:active { cursor: grabbing; }
+.wave-session .intensity-track:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+.wave-session .intensity.lg .intensity-track { height: 64px; }
+
+.wave-session .intensity-track-bg {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-mute);
+  border: 1px solid var(--border-soft);
+}
+.wave-session .intensity-track-fill {
+  position: absolute;
+  left: 4px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px -6px color-mix(in oklab, var(--accent) 70%, transparent);
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.wave-session .intensity-ticks {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 12px;
+  pointer-events: none;
+}
+.wave-session .intensity-tick {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 4px;
+  background: color-mix(in oklab, var(--fg) 24%, transparent);
+  border-radius: 1px;
+}
+.wave-session .intensity-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 6px 20px -6px color-mix(in oklab, var(--accent) 50%, transparent),
+    0 0 0 1px var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 120ms ease;
+  pointer-events: none;
+}
+.wave-session .intensity-track:active .intensity-thumb {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+.wave-session .intensity-thumb-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+.wave-session .intensity.lg .intensity-thumb { width: 44px; height: 44px; }
+.wave-session .intensity.lg .intensity-thumb-dot { width: 18px; height: 18px; }
+
+.wave-session .scale-rail {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 0 2px;
+}
+
+/* ── drag-the-wave intake ─────────────────────────────────── */
+
+.wave-session .drag-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.wave-session .drag-readout { text-align: center; pointer-events: none; }
+.wave-session .drag-readout .num {
+  font-family: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 96px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--wave-crest);
+  display: inline-block;
+  transition: text-shadow 240ms ease;
+}
+.wave-session .drag-readout .denom {
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+.wave-session .drag-readout .label {
+  display: block;
+  margin-top: 12px;
+  font-family: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--ink-soft);
+  letter-spacing: -0.01em;
+}
+.wave-session .drag-readout.touched .num {
+  text-shadow:
+    0 0 18px var(--wave-glow),
+    0 0 42px color-mix(in oklab, var(--wave-glow) 60%, transparent);
+}
+
+/* ── chat bubbles ─────────────────────────────────────────── */
+
+.wave-session .chat-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 2px;
+}
+.wave-session .bubble {
+  max-width: 86%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  animation: fadeup 260ms ease both;
+}
+.wave-session .bubble.agent {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  align-self: flex-start;
+  border-top-left-radius: 8px;
+}
+.wave-session .bubble.patient {
+  background: var(--accent);
+  color: var(--accent-fg);
+  align-self: flex-end;
+  border-top-right-radius: 8px;
+  border: 1px solid transparent;
+}
+.wave-session .dot-typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.wave-session .dot-typing span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--fg-ghost);
+  animation: bob 1s ease-in-out infinite;
+}
+.wave-session .dot-typing span:nth-child(2) { animation-delay: 120ms; }
+.wave-session .dot-typing span:nth-child(3) { animation-delay: 240ms; }
+
+/* ── voice orb + transcript + score readout ───────────────── */
+
+.wave-session .voice-transcript {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 110px;
+  max-height: 240px;
+  padding: 4px 2px;
+  scroll-behavior: smooth;
+  mask-image: linear-gradient(180deg, transparent 0, black 14px,
+    black calc(100% - 14px), transparent 100%);
+}
+.wave-session .voice-empty {
+  margin: 12px 4px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--fg) 50%, transparent);
+  text-align: center;
+}
+.wave-session .voice-orb {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.wave-session .voice-orb-core {
+  position: relative;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%,
+    var(--wave-crest) 0%,
+    var(--wave-glow) 45%,
+    color-mix(in oklab, var(--accent) 70%, transparent) 100%);
+  box-shadow:
+    0 0 16px var(--wave-glow),
+    0 0 48px color-mix(in oklab, var(--wave-glow) 60%, transparent),
+    inset 0 -6px 14px rgba(2, 6, 13, 0.25);
+}
+.wave-session .voice-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in oklab, var(--wave-glow) 50%, transparent);
+  pointer-events: none;
+}
+.wave-session .voice-orb[data-state="idle"] .voice-orb-core {
+  animation: orb-idle-core 4s ease-in-out infinite;
+  opacity: 0.7;
+}
+.wave-session .voice-orb[data-state="idle"] .voice-orb-ring {
+  animation: orb-idle-ring 4s ease-in-out infinite;
+  opacity: 0.35;
+}
+.wave-session .voice-orb[data-state="speaking"] .voice-orb-core {
+  animation: orb-speak-core 2.4s ease-in-out infinite;
+}
+.wave-session .voice-orb[data-state="speaking"] .voice-orb-ring {
+  animation: orb-speak-ring 2.4s ease-out infinite;
+}
+.wave-session .voice-orb[data-state="listening"] .voice-orb-core {
+  opacity: 1;
+  transform: scale(1.05);
+}
+.wave-session .voice-orb[data-state="listening"] .voice-orb-ring {
+  animation: orb-listen-ring 1.6s ease-out infinite;
+}
+.wave-session .voice-orb[data-state="listening"] .voice-orb-ring.r2 {
+  animation-delay: 0.8s;
+}
+.wave-session .voice-orb-label {
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+  margin-top: 18px;
+  min-height: 14px;
+}
+
+.wave-session .score-readout {
+  text-align: center;
+  font-family: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 56px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--wave-crest);
+}
+.wave-session .score-readout .denom {
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-style: normal;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  margin-left: 8px;
+  text-transform: uppercase;
+  vertical-align: 0.4em;
+}
+.wave-session .score-readout .word {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+  color: var(--ink-soft);
+}
+.wave-session .score-readout.is-updating { animation: score-flash 900ms ease; }
+
+/* ── score arc card ───────────────────────────────────────── */
+
+.wave-session .arc-card {
+  background: color-mix(in oklab, var(--bg-mid) 70%, transparent);
+  border: 1px solid var(--ink-ghost);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px 18px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+}
+.wave-session .arc-card svg { max-width: 460px; display: block; margin: 0 auto; }
+.wave-session .arc-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--fg-faint);
+  margin: 8px auto 0;
+  max-width: 460px;
+  text-transform: uppercase;
+}
+
+/* ── breath loader orb ────────────────────────────────────── */
+
+.wave-session .breath {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 40px 24px 64px;
+  flex: 1;
+}
+.wave-session .breath-orb {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%),
+    radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--wave-fall) 92%, white), transparent 55%),
+    radial-gradient(circle at 50% 45%,
+      var(--wave-fall) 0%,
+      var(--wave-rise) 38%,
+      var(--wave-peak) 100%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, black 38%,
+    rgba(0, 0, 0, 0.85) 58%, rgba(0, 0, 0, 0.4) 82%, transparent 100%);
+  mask-image: radial-gradient(circle at 50% 50%, black 38%,
+    rgba(0, 0, 0, 0.85) 58%, rgba(0, 0, 0, 0.4) 82%, transparent 100%);
+  filter: drop-shadow(0 0 60px color-mix(in oklab, var(--wave-peak) 45%, transparent));
+  animation: breathe 7s ease-in-out infinite;
+}
+
+/* ── thinking list (reflection) ───────────────────────────── */
+
+.wave-session .thinking-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wave-session .thinking-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14.5px;
+  color: var(--fg-soft);
+  padding: 8px 0;
+}
+.wave-session .thinking-list .marker {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+  background: var(--ink-ghost);
+  transition: background 320ms ease, box-shadow 320ms ease;
+}
+.wave-session .thinking-list li.active .marker {
+  border-color: var(--accent);
+  background: var(--wave-glow);
+  box-shadow: 0 0 0 4px rgba(92, 225, 214, 0.18), 0 0 12px var(--wave-glow);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.wave-session .thinking-list li.done .marker {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+.wave-session .thinking-list li.done .marker::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 4px;
+  height: 8px;
+  border: 2px solid var(--accent-fg);
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(45deg);
+}
+.wave-session .thinking-list li span:last-child {
+  font-family: var(--font-instrument-serif), "Instrument Serif", serif;
+  font-style: italic;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--ink-soft);
+}
+.wave-session .thinking-list li:not(.done):not(.active) span:last-child {
+  color: var(--ink-mute);
+}
+.wave-session .thinking-list li.active span:last-child { color: var(--wave-crest); }
+
+/* ── dashboard mini stats (done screen) ───────────────────── */
+
+.wave-session .stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.wave-session .stat {
+  background: color-mix(in oklab, var(--bg-mid) 70%, transparent);
+  border: 1px solid var(--ink-ghost);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.wave-session .stat .num {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.wave-session .stat .num .unit {
+  font-size: 13px;
+  color: var(--fg-faint);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.wave-session .stat .label {
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-top: 4px;
+}
+
+/* ── thin progress + MAT banner (chunk player) ────────────── */
+
+.wave-session .thin-progress {
+  position: relative;
+  height: 1.5px;
+  background: var(--ink-ghost);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.wave-session .thin-progress > span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--wave-glow), var(--wave-crest));
+  box-shadow: 0 0 12px var(--wave-glow);
+  transition: width 800ms ease;
+}
+.wave-session .mat-banner {
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: 18px;
+  padding: 14px 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px -16px rgba(34, 211, 238, 0.4);
+  opacity: 1;
+  transition: opacity 480ms ease, transform 480ms ease;
+}
+.wave-session .mat-banner.dismissing { opacity: 0; transform: translateY(-4px); }
+
+/* ── wordmark + misc utilities ────────────────────────────── */
+
+.wave-session .wordmark {
+  font-family: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+.wave-session .crisis-line {
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  text-align: center;
+}
+.wave-session .divider {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 4px 0;
+}
+.wave-session .spacer-grow { flex: 1; }
+.wave-session .center-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+.wave-session .row { display: flex; align-items: center; gap: 10px; }
+.wave-session .row.between { justify-content: space-between; }
+
+/* ── keyframes (only those referenced above) ──────────────── */
+
+@keyframes fadeup {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50%      { transform: translateY(-3px); opacity: 1; }
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 0%, transparent); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(0.86); filter: brightness(0.92); }
+  45%, 55% { transform: scale(1.08); filter: brightness(1.08); }
+}
+@keyframes orb-idle-core {
+  0%, 100% { transform: scale(0.95); opacity: 0.6; }
+  50%      { transform: scale(1.08); opacity: 1; }
+}
+@keyframes orb-idle-ring {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50%      { transform: scale(1.12); opacity: 0.55; }
+}
+@keyframes orb-speak-core {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.55); }
+}
+@keyframes orb-speak-ring {
+  0%   { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes orb-listen-ring {
+  0%   { transform: scale(0.9); opacity: 0.9; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+@keyframes score-flash {
+  0%   { text-shadow: 0 0 0 rgba(184, 255, 242, 0); }
+  30%  { text-shadow: 0 0 32px rgba(184, 255, 242, 0.9), 0 0 64px rgba(92, 225, 214, 0.6); }
+  100% { text-shadow: 0 0 0 rgba(184, 255, 242, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-session .breath-orb,
+  .wave-session .voice-orb-core,
+  .wave-session .voice-orb-ring,
+  .wave-session .thinking-list li.active .marker,
+  .wave-session .bubble { animation: none; }
+}

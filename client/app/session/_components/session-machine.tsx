@@ -5,22 +5,20 @@
  *
  *   intake → safety → loop(loadingChunk → chunk N → check-in N) for N=1..5 → reflection → done
  *
- * Both the chunk narration and the check-in agent are now LLM-driven.
- *   - Each chunk's lines come from `generateChunk()`. The generator
- *     receives the patient profile + the FULL prior session history
- *     (every prior chunk's lines + every prior check-in's transcript)
- *     so the new narration can ground itself in what the patient has
- *     already heard and said.
- *   - Each check-in is a multi-turn LLM conversation that ends when
- *     the model calls the `endConversation` tool. There is no
- *     regex-based readiness gate — the chat surface treats the tool
- *     call as the "we're done" signal.
+ * The visual flow mirrors the interactive prototype (/demo): immersive
+ * full-bleed screens over the WaveSkin ocean, no card/heading chrome.
+ * `loadingChunk` is presented as the prototype's breath orb so the
+ * unavoidable chunk-generation wait reads as part of the meditation
+ * rather than a system interstitial.
  *
- * The ambient audio bed is mounted ONCE here at the shell so it never
- * restarts on a chunk → check-in → chunk transition (PRD § Risk Areas
- * #6, audio continuity invariant). It starts on the intake "Continue"
- * gesture (which doubles as the audio-context unlock) and fades out at
- * the reflection screen.
+ * Both the chunk narration and the check-in agent are LLM-driven (real
+ * Whisper / Kokoro / wllama) — only the presentation changed here, not
+ * the reducer or the model plumbing.
+ *
+ * The ambient audio bed is mounted ONCE here so it never restarts on a
+ * chunk → check-in → chunk transition (PRD § Risk Areas #6). It starts
+ * on the intake "Continue" gesture and fades out at the reflection
+ * screen.
  */
 
 import Link from "next/link";
@@ -30,14 +28,17 @@ import { AmbientAudioBed, type AmbientAudioBedHandle } from "./ambient-audio-bed
 import { ChunkPlayer } from "./chunk-player";
 import { VoiceCheckIn } from "./voice-check-in";
 import { IntakeForm, type IntakeAnswers } from "./intake-form";
-import { NarrationCard } from "./narration-card";
-import { NextStepChips } from "./next-step-chips";
-import { ReflectionProgress } from "./reflection-progress";
 import { RelaxingLoader } from "./relaxing-loader";
 import { SafetyHandoff } from "./safety-handoff";
 import { SafetyScreen, type SafetyOutcome } from "./safety-screen";
 import { ScoreArc } from "./score-arc";
 
+import {
+  MEDICATION_LABEL,
+  OUTCOME_LABEL,
+  TRIGGER_LABEL,
+} from "@/lib/data/mock-sessions";
+import { recordCompletedSession } from "@/lib/sessions/completed-store";
 import { generateChunk } from "@/lib/gemma/chunk";
 import {
   generateReflection,
@@ -209,9 +210,9 @@ function reducer(state: State, action: Action): State {
           phase: "reflection",
         };
       }
-      // Hand off to the chunk loader. The RelaxingLoader stays on
-      // screen with soft breath cues until the next scripted chunk is
-      // ready. There is no fixed-duration countdown.
+      // Hand off to the chunk loader. The breath orb stays on screen
+      // with soft breath cues until the next chunk is ready. There is
+      // no fixed-duration countdown.
       return {
         ...state,
         checkIns,
@@ -286,7 +287,7 @@ export function SessionMachine() {
   }, [state.phase]);
 
   // Drive chunk generation whenever we enter the loadingChunk phase.
-  // The RelaxingLoader is the patient-facing cover during this wait.
+  // The breath orb is the patient-facing cover during this wait.
   useEffect(() => {
     if (state.phase !== "loadingChunk") return;
     // Skip if we already have the chunk (defensive — chunkGenerated
@@ -350,9 +351,8 @@ export function SessionMachine() {
     state.sessionHistory,
   ]);
 
-  // The mute toggle is hidden during the check-in: the bed is ducked
-  // automatically there, and exposing an unmute control would let the
-  // patient re-introduce the mic self-trigger mid-conversation.
+  // The mute toggle is only meaningful while narration / breath cues
+  // are playing. It's hidden during the check-in (bed auto-ducked).
   const showAmbientToggle =
     state.phase === "loadingChunk" || state.phase === "chunk";
 
@@ -383,8 +383,39 @@ export function SessionMachine() {
     state.startedAt,
   ]);
 
+  // When a session completes, prepend it to the on-device completed-
+  // session log so it shows up at the top of History and bumps the
+  // Dashboard "Sessions surfed" count. Fires once; dashboard/history
+  // otherwise stay on the curated mock baseline.
+  const recordedRef = useRef(false);
+  useEffect(() => {
+    if (state.phase !== "done" || recordedRef.current || !state.intake) {
+      return;
+    }
+    recordedRef.current = true;
+    const end =
+      priorScores.length > 0
+        ? priorScores[priorScores.length - 1]
+        : intakeIntensity;
+    recordCompletedSession({
+      id: `s_${Date.now().toString(36)}`,
+      date: "Just now",
+      start: state.intake.intakeIntensity,
+      end,
+      trigger: TRIGGER_LABEL[state.intake.trigger],
+      medication: MEDICATION_LABEL[state.intake.medicationStatus],
+      outcome: OUTCOME_LABEL[state.outcome ?? "completed"],
+    });
+  }, [
+    state.phase,
+    state.intake,
+    state.outcome,
+    priorScores,
+    intakeIntensity,
+  ]);
+
   return (
-    <div className="space-y-8">
+    <>
       <AmbientAudioBed ref={audioRef} showMuteButton={showAmbientToggle} />
 
       {state.phase === "intake" ? (
@@ -403,7 +434,11 @@ export function SessionMachine() {
         />
       ) : null}
 
-      {state.phase === "safetyHandoff" ? <SafetyHandoff /> : null}
+      {state.phase === "safetyHandoff" ? (
+        <PhaseScreen crumb="Before we start">
+          <SafetyHandoff />
+        </PhaseScreen>
+      ) : null}
 
       {state.phase === "loadingChunk" ? (
         <RelaxingLoader
@@ -416,6 +451,8 @@ export function SessionMachine() {
         <ChunkPlayer
           key={`chunk-${state.currentChunk}`}
           chunk={state.generatedChunk}
+          chunkNumber={state.currentChunk}
+          matType={profile?.matType ?? "none"}
           demoMode={state.demoMode}
           currentIntensity={currentIntensity}
           onComplete={() => dispatch({ type: "chunkCompleted" })}
@@ -438,46 +475,47 @@ export function SessionMachine() {
       ) : null}
 
       {state.phase === "reflection" && reflectionContext ? (
-        <div className="space-y-4">
-          <ScoreArc scores={priorScores} intakeIntensity={intakeIntensity} />
-          <ReflectionPhaseBlock
-            reflectionContext={reflectionContext}
-            onPickNextStep={(choice) => {
-              dispatch({ type: "nextStepPicked", choice });
-              dispatch({ type: "sessionFinished" });
-            }}
-          />
-        </div>
+        <ReflectionScreen
+          reflectionContext={reflectionContext}
+          scores={priorScores}
+          intakeIntensity={intakeIntensity}
+          onPickNextStep={(choice) => {
+            dispatch({ type: "nextStepPicked", choice });
+            dispatch({ type: "sessionFinished" });
+          }}
+        />
       ) : null}
 
       {state.phase === "done" ? (
-        <article className="rounded-2xl border border-border bg-surface p-8 text-center">
-          <h2 className="text-xl font-semibold">
-            You stayed for the whole wave.
-          </h2>
-          <p className="mt-2 text-foreground/70">
-            {state.pickedNextStep
-              ? `Heading to: ${state.pickedNextStep}.`
-              : "That's a complete session."}
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <Link
-              href="/dashboard"
-              className="rounded-full bg-accent px-5 py-2.5 text-accent-foreground font-medium hover:opacity-90"
-            >
-              See dashboard →
-            </Link>
-            <Link
-              href="/"
-              className="rounded-full border border-border px-5 py-2.5 hover:border-accent hover:text-accent"
-            >
-              Home
-            </Link>
-          </div>
-        </article>
+        <DoneScreen
+          plan={state.pickedNextStep}
+          intakeIntensity={intakeIntensity}
+          finalScore={
+            priorScores.length > 0
+              ? priorScores[priorScores.length - 1]
+              : intakeIntensity
+          }
+          durationSeconds={reflectionContext?.durationSeconds ?? null}
+        />
       ) : null}
+    </>
+  );
+}
 
-      <SessionFooter phase={state.phase} />
+/** Bare demo-style screen wrapper: topbar crumb + centered body. */
+function PhaseScreen({
+  crumb,
+  children,
+}: {
+  crumb: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="screen">
+      <div className="topbar">
+        <span className="crumb">{crumb}</span>
+      </div>
+      <div className="screen-body">{children}</div>
     </div>
   );
 }
@@ -490,11 +528,22 @@ type ReflectionState =
       source: "model" | "fallback";
     };
 
-function ReflectionPhaseBlock({
+const FALLBACK_THINKING_TITLES = [
+  "Re-reading your check-ins",
+  "Comparing to your last session",
+  "Looking for what worked",
+  "Writing your reflection",
+];
+
+function ReflectionScreen({
   reflectionContext,
+  scores,
+  intakeIntensity,
   onPickNextStep,
 }: {
   reflectionContext: ReflectionContext;
+  scores: number[];
+  intakeIntensity: number;
   onPickNextStep: (choice: string) => void;
 }) {
   const [phaseInput] = useState<ReflectionContext>(reflectionContext);
@@ -502,6 +551,8 @@ function ReflectionPhaseBlock({
     kind: "loading",
     titles: [],
   });
+  const [stage, setStage] = useState<"askPlan" | "suggestions">("askPlan");
+  const [ownPlanDraft, setOwnPlanDraft] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -542,123 +593,271 @@ function ReflectionPhaseBlock({
     };
   }, [phaseInput]);
 
-  if (state.kind === "loading") {
-    return <ReflectionProgress titles={state.titles} />;
-  }
+  const finalScore =
+    scores.length > 0 ? scores[scores.length - 1] : intakeIntensity;
+  const drop = intakeIntensity - finalScore;
+  const headline =
+    drop >= 2
+      ? `Your craving fell ${drop} points across the session.`
+      : drop >= 1
+        ? `Your craving dropped ${drop} point, and you stayed.`
+        : "You stayed for the whole wave. That counts.";
+
+  // Streamed titles drive the thinking list; fall back to canonical
+  // copy until the first title lands so the list is never empty.
+  const thinkingTitles =
+    state.kind === "loading" && state.titles.length > 0
+      ? state.titles.map((t) => t.text)
+      : FALLBACK_THINKING_TITLES;
+  const completedCount =
+    state.kind === "ready" ? thinkingTitles.length : state.titles.length;
 
   return (
-    <ReflectionPlanAndSuggestions
-      payload={state.payload}
-      source={state.source}
-      onPickNextStep={onPickNextStep}
-    />
-  );
-}
+    <div className="screen">
+      <div className="topbar">
+        <span className="crumb">Closing · reflection</span>
+      </div>
+      <div className="screen-body">
+        <ScoreArc scores={scores} intakeIntensity={intakeIntensity} />
 
-function ReflectionPlanAndSuggestions({
-  payload,
-  source,
-  onPickNextStep,
-}: {
-  payload: ReflectionPayload;
-  source: "model" | "fallback";
-  onPickNextStep: (choice: string) => void;
-}) {
-  const [stage, setStage] = useState<"askPlan" | "suggestions">("askPlan");
-  const [ownPlanDraft, setOwnPlanDraft] = useState("");
-  const nextStepOptions = [
-    payload.nextSteps.one,
-    payload.nextSteps.two,
-    payload.nextSteps.three,
-    payload.nextSteps.four,
-  ];
-
-  const trimmedPlan = ownPlanDraft.trim();
-  const canUseOwnPlan = trimmedPlan.length >= 2;
-
-  return (
-    <NarrationCard
-      title="Reflection"
-      badge="Closing"
-      loading={false}
-      source={source}
-      footer={
-        stage === "askPlan" ? (
-          <div className="space-y-3">
-            <p className="text-sm text-foreground/70">
-              What feels doable in the next 10 minutes? Name anything that fits,
-              even a tiny step. If nothing comes to mind, you can see four
-              gentle ideas to pick from.
-            </p>
-            <label className="block text-xs font-medium text-foreground/55">
-              Your plan (optional)
-              <textarea
-                value={ownPlanDraft}
-                onChange={(event) => setOwnPlanDraft(event.target.value)}
-                rows={2}
-                maxLength={160}
-                placeholder="e.g. drink water, step outside, text someone safe"
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground/90 focus:outline-none focus:border-accent"
-              />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!canUseOwnPlan}
-                onClick={() => onPickNextStep(trimmedPlan)}
-                className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 transition disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Use my plan
-              </button>
-              <button
-                type="button"
-                onClick={() => setStage("suggestions")}
-                className="rounded-full border border-border bg-surface-muted px-4 py-2 text-sm font-medium text-foreground/85 hover:border-accent hover:text-accent transition"
-              >
-                No ideas, show suggestions
-              </button>
-            </div>
+        {state.kind === "loading" ? (
+          <div className="card flush">
+            <span className="eyebrow accent">Writing reflection</span>
+            <ul className="thinking-list" style={{ marginTop: 8 }}>
+              {thinkingTitles.map((t, i) => (
+                <li
+                  key={t}
+                  className={
+                    i < completedCount
+                      ? "done"
+                      : i === completedCount
+                        ? "active"
+                        : ""
+                  }
+                >
+                  <span className="marker" />
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-foreground/70">
-              Four gentle options. Pick one, or go back to write your own.
-            </p>
-            <NextStepChips
-              options={nextStepOptions}
-              onPick={onPickNextStep}
-            />
-            <button
-              type="button"
-              onClick={() => setStage("askPlan")}
-              className="text-xs text-foreground/55 hover:text-accent underline-offset-2 hover:underline"
-            >
-              Back to my own plan
-            </button>
-          </div>
-        )
-      }
-    >
-      <div className="space-y-3">
-        <p>{payload.insight}</p>
-        <p className="text-sm text-foreground/70">
-          {payload.journalPromptQuestion}
-        </p>
+          <>
+            <div className="card flush">
+              <span className="eyebrow accent">Reflection</span>
+              <h2 className="section" style={{ marginTop: 6 }}>
+                {headline}
+              </h2>
+              <p className="lede" style={{ marginTop: 8 }}>
+                {state.payload.insight}
+              </p>
+              <p
+                className="hint"
+                style={{ marginTop: 10, fontStyle: "italic" }}
+              >
+                {state.payload.journalPromptQuestion}
+              </p>
+            </div>
+
+            {stage === "askPlan" ? (
+              <div className="card flush">
+                <span className="eyebrow">Next 10 minutes · your plan</span>
+                <textarea
+                  className="plan-area"
+                  style={{ marginTop: 10 }}
+                  rows={2}
+                  maxLength={160}
+                  placeholder="Drink water · step outside · text someone safe…"
+                  value={ownPlanDraft}
+                  onChange={(e) => setOwnPlanDraft(e.target.value)}
+                />
+                <div
+                  className="btn-row"
+                  style={{ marginTop: 10, justifyContent: "flex-end" }}
+                >
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => setStage("suggestions")}
+                  >
+                    No ideas, show options
+                  </button>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={ownPlanDraft.trim().length < 2}
+                    onClick={() => onPickNextStep(ownPlanDraft.trim())}
+                  >
+                    Use my plan
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="card flush">
+                <span className="eyebrow">Pick one. Or write your own.</span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    marginTop: 10,
+                  }}
+                >
+                  {[
+                    state.payload.nextSteps.one,
+                    state.payload.nextSteps.two,
+                    state.payload.nextSteps.three,
+                    state.payload.nextSteps.four,
+                  ].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="chip list"
+                      onClick={() => onPickNextStep(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{ marginTop: 8, padding: 0 }}
+                  onClick={() => setStage("askPlan")}
+                >
+                  ← Back to my plan
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </NarrationCard>
+    </div>
   );
 }
 
-function SessionFooter({ phase }: { phase: Phase }) {
-  if (phase === "done" || phase === "safetyHandoff") return null;
+function DoneScreen({
+  plan,
+  intakeIntensity,
+  finalScore,
+  durationSeconds,
+}: {
+  plan: string | null;
+  intakeIntensity: number;
+  finalScore: number;
+  durationSeconds: number | null;
+}) {
+  const drop = intakeIntensity - finalScore;
+  const eyebrow =
+    drop >= 2
+      ? "The wave passed"
+      : drop >= 1
+        ? "The wave eased"
+        : drop === 0
+          ? "You watched the wave"
+          : "The wave is still here";
+  const headline =
+    drop >= 1
+      ? "You stayed with it."
+      : drop === 0
+        ? "You stayed for the whole wave."
+        : "You met it.";
+  const duration =
+    durationSeconds != null
+      ? `${Math.floor(durationSeconds / 60)}:${String(
+          durationSeconds % 60,
+        ).padStart(2, "0")}`
+      : "—";
+  const arc = `${intakeIntensity} → ${finalScore}`;
+
   return (
-    <div className="flex items-center justify-start pt-4">
-      <Link
-        href="/"
-        className="text-sm text-foreground/60 hover:text-accent"
+    <div className="screen">
+      <div className="topbar">
+        <span className="crumb" style={{ letterSpacing: "0.28em" }}>
+          {eyebrow.toUpperCase()}
+        </span>
+      </div>
+      <div
+        className="screen-body"
+        style={{
+          alignItems: "center",
+          textAlign: "center",
+          justifyContent: "center",
+          gap: 24,
+        }}
       >
-        ← Leave session
-      </Link>
+        <div style={{ flex: 1 }} />
+
+        <h1 className="display big serif" style={{ maxWidth: 320 }}>
+          {headline}
+        </h1>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 32,
+            justifyContent: "center",
+            marginTop: 8,
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div className="eyebrow">Duration</div>
+            <div
+              className="serif"
+              style={{
+                fontSize: 40,
+                color: "var(--wave-crest)",
+                marginTop: 4,
+                lineHeight: 1,
+                textShadow: "0 0 16px rgba(92,225,214,0.4)",
+              }}
+            >
+              {duration}
+            </div>
+          </div>
+          <div style={{ width: 1, background: "var(--ink-ghost)" }} />
+          <div style={{ textAlign: "center" }}>
+            <div className="eyebrow">Intensity</div>
+            <div
+              className="serif"
+              style={{
+                fontSize: 40,
+                color: "var(--wave-crest)",
+                marginTop: 4,
+                lineHeight: 1,
+                textShadow: "0 0 16px rgba(92,225,214,0.4)",
+              }}
+            >
+              {arc}
+            </div>
+          </div>
+        </div>
+
+        {plan ? (
+          <p className="lede" style={{ maxWidth: 300, marginTop: 4 }}>
+            Heading to:{" "}
+            <b style={{ color: "var(--ink)", fontStyle: "italic" }}>{plan}</b>
+          </p>
+        ) : (
+          <p
+            className="lede"
+            style={{ marginTop: 4, fontStyle: "italic" }}
+          >
+            That&apos;s a complete session.
+          </p>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        <div className="btn-stack" style={{ alignSelf: "stretch" }}>
+          <Link href="/dashboard" className="btn primary">
+            See your dashboard →
+          </Link>
+          <Link href="/" className="btn ghost">
+            Done
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

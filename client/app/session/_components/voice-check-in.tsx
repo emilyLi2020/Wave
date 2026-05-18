@@ -1,20 +1,25 @@
 "use client";
 
 /**
- * Voice-driven multi-turn check-in.
+ * Voice-driven multi-turn check-in — re-skinned to the interactive
+ * prototype's check-in screen:
  *
- * Replaces the text-based {@link CheckInChat} in the clinical session
- * flow. The patient speaks their craving score, hears each agent turn
- * via Kokoro TTS, and continues until the wllama check-in generator
- * emits an `endConversation` signal (parsed out of the response_format
- * json_schema reply — see `generateWllamaCheckIn`).
+ *   - crumb "Check-in N of 5"
+ *   - big italic-serif score readout (value /10 + intensity word) that
+ *     glow-flashes when a new score is committed
+ *   - the prototype's 88 px voice orb (ring stack), state-driven
+ *   - a mono status label under the orb
+ *   - chat-bubble transcript with a typing indicator while streaming
+ *   - a quiet "Skip →" control bottom-right
  *
- * Output contract is identical to `CheckInChat`: same `Props`, same
- * `CheckIn` shape on `onComplete`, same `SessionHistoryEntry` plumbing
- * downstream. The session-machine swap is mechanical.
+ * All of the real plumbing is unchanged: the wllama check-in generator,
+ * Whisper STT, Kokoro TTS, barge-in, the `endConversation` gate, the
+ * `CheckIn` payload, and `SessionHistoryEntry` downstream. Only the
+ * presentation moved — the ambient ocean is the shared WaveSkin canvas
+ * behind the route, so this screen carries no inline wave widget.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   streamCheckInTurn,
@@ -24,6 +29,7 @@ import {
 import { extractCravingScore } from "@/lib/session/extract-craving-score";
 import {
   useCheckInVoiceLoop,
+  type CheckInVoiceLoopStatus,
   type VoiceCheckInGenerator,
   type VoiceCheckInTurnEvent,
   type VoiceTranscriptTurn,
@@ -38,7 +44,6 @@ import type {
   ChunkNumber,
   SessionUserProfile,
 } from "@/types/session";
-import { AnimatedWave } from "./animated-wave";
 
 interface Props {
   chunkNumber: ChunkNumber;
@@ -52,6 +57,33 @@ interface Props {
 
 const CHECK_IN_OPENER =
   "How intense is the craving right now? Give me a number from 1 to 10.";
+
+const INTENSITY_LABELS = [
+  "barely there",
+  "faint",
+  "noticing it",
+  "present",
+  "hard to ignore",
+  "pulling",
+  "strong",
+  "loud",
+  "urgent",
+  "all-consuming",
+];
+
+function intensityLabel(score: number): string {
+  return INTENSITY_LABELS[Math.max(0, Math.min(9, Math.round(score) - 1))];
+}
+
+const STATUS_COPY: Record<CheckInVoiceLoopStatus, string> = {
+  idle: "Tap to start",
+  warming: "Warming up the voice…",
+  recording: "You're speaking",
+  transcribing: "Transcribing…",
+  thinking: "Thinking…",
+  speaking: "Wave is speaking",
+  error: "Something interrupted us",
+};
 
 export function VoiceCheckIn({
   chunkNumber,
@@ -67,6 +99,30 @@ export function VoiceCheckIn({
   const cravingScoreRef = useRef<number | null>(null);
   const turnsRef = useRef<CheckInTurn[]>([]);
   const [displayedScore, setDisplayedScore] = useState<number | null>(null);
+  const [scoreFlash, setScoreFlash] = useState(false);
+  const flashTimerRef = useRef<number | null>(null);
+
+  // Commit a freshly-heard score and trigger the glow-flash. Driven by
+  // the turn-complete event (not an effect) so it stays a single render.
+  const commitScore = useCallback((score: number) => {
+    setDisplayedScore(score);
+    setScoreFlash(true);
+    if (flashTimerRef.current !== null) {
+      window.clearTimeout(flashTimerRef.current);
+    }
+    flashTimerRef.current = window.setTimeout(() => {
+      setScoreFlash(false);
+      flashTimerRef.current = null;
+    }, 900);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current !== null) {
+        window.clearTimeout(flashTimerRef.current);
+      }
+    };
+  }, []);
 
   const resolveActiveScore = useCallback((): number => {
     return (
@@ -108,9 +164,6 @@ export function VoiceCheckIn({
       if (completedRef.current) return;
       completedRef.current = true;
 
-      // Prefer the model's final cravingScore over the running ref; the
-      // model has been listening to the whole conversation and may have
-      // updated its estimate.
       const finalScore = signal.cravingScore ?? resolveActiveScore();
 
       const checkIn: CheckIn = {
@@ -135,8 +188,6 @@ export function VoiceCheckIn({
     [chunkNumber, onComplete, resolveActiveScore, startedAt],
   );
 
-  // Adapt streamCheckInTurn (which uses the wllama generator under the
-  // hood) into the hook's generator shape.
   const generate = useMemo<VoiceCheckInGenerator>(
     () => async (history, { signal, onDelta }) => {
       const llmHistory: CheckInChatTurnPayload[] = history.map((t) => ({
@@ -161,7 +212,6 @@ export function VoiceCheckIn({
 
   const handleTurnComplete = useCallback(
     (event: VoiceCheckInTurnEvent) => {
-      // Record both sides of the turn for the eventual CheckIn payload.
       const turnIndex = turnsRef.current.length;
       const userTurn: CheckInTurn = {
         index: turnIndex + 1,
@@ -178,18 +228,13 @@ export function VoiceCheckIn({
       };
       turnsRef.current = [...turnsRef.current, userTurn, agentTurn];
 
-      // First patient turn: extract craving score from the transcription.
-      // Fallback hierarchy lives in `resolveActiveScore` so subsequent
-      // turns reuse whatever's most recent.
       if (event.turnIndex === 1) {
         const extracted = extractCravingScore(event.user);
         if (extracted !== null) {
           cravingScoreRef.current = extracted;
-          setDisplayedScore(extracted);
+          commitScore(extracted);
         } else {
-          // Couldn't pick a number out — show whatever we'd ground the
-          // LLM on so the wave UI still moves.
-          setDisplayedScore(resolveActiveScore());
+          commitScore(resolveActiveScore());
         }
       }
 
@@ -197,11 +242,10 @@ export function VoiceCheckIn({
         finalizeCheckIn(event.endConversation);
       }
     },
-    [finalizeCheckIn, resolveActiveScore],
+    [commitScore, finalizeCheckIn, resolveActiveScore],
   );
 
   const handleError = useCallback((err: Error) => {
-    // Log only — the hook surfaces a user-visible errorMessage already.
     if (typeof console !== "undefined") {
       console.error("[wave] VoiceCheckIn error", err);
     }
@@ -212,98 +256,164 @@ export function VoiceCheckIn({
     opener: CHECK_IN_OPENER,
     onTurnComplete: handleTurnComplete,
     onError: handleError,
-    // Full hands-free loop: the patient can interrupt the assistant
-    // mid-sentence, same as /models/voice-test. The ambient bed is
-    // ducked by the session machine while this surface is mounted so
-    // it can't self-trigger the mic.
     enableBargeIn: true,
   });
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  // Auto-scroll the transcript on new turns.
-  if (containerRef.current) {
-    const el = containerRef.current;
-    queueMicrotask(() =>
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }),
-    );
-  }
+  // Auto-start: the check-in begins on its own the moment this screen
+  // mounts (matches the prototype — no "Start" tap). The hook speaks the
+  // opener through Kokoro, then listens. Earlier gestures in the session
+  // (intake/safety/chunk) already unlocked audio; if the mic can't be
+  // acquired the hook surfaces `errorMessage` and the control below
+  // becomes a tap-to-enable fallback.
+  const autoStartedRef = useRef(false);
+  const setHandsFreeEnabled = loop.setHandsFreeEnabled;
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void setHandsFreeEnabled(true);
+  }, [setHandsFreeEnabled]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [loop.transcript]);
 
   const displayedIntensity =
     displayedScore ??
     priorScores[priorScores.length - 1] ??
     intakeIntensity;
 
+  // Map the real loop status → the prototype's three-state orb grammar.
+  const listeningLike =
+    loop.status === "recording" ||
+    loop.status === "transcribing" ||
+    loop.status === "thinking" ||
+    (loop.status === "idle" && loop.handsFreeEnabled) ||
+    loop.status === "warming";
+  const orbState: "idle" | "speaking" | "listening" =
+    loop.status === "speaking"
+      ? "speaking"
+      : listeningLike
+        ? "listening"
+        : "idle";
+
+  const statusLabel =
+    loop.status === "idle" && loop.handsFreeEnabled
+      ? "Listening"
+      : STATUS_COPY[loop.status];
+
+  // Auto-started, so the control is a Stop. It only becomes a manual
+  // affordance if the patient stopped, or the mic/permission errored.
   const buttonLabel = loop.handsFreeEnabled
-    ? "Stop check-in"
-    : "Start check-in";
+    ? "Stop"
+    : loop.errorMessage
+      ? "Enable microphone"
+      : "Resume";
   const buttonDisabled =
     loop.status === "warming" ||
     loop.status === "transcribing" ||
     loop.status === "thinking";
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/60">
-          Check-in {chunkNumber} of 5
-        </h2>
-        <p className="text-xs text-foreground/50">
-          Wave height: {displayedIntensity}/10
-        </p>
-      </header>
+    <div className="screen">
+      <div className="topbar">
+        <span className="crumb">Check-in {chunkNumber} of 5</span>
+      </div>
 
-      <AnimatedWave mode="ambient" intensity={displayedIntensity} />
+      <div className="screen-body" style={{ paddingTop: 8, gap: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <span className={`score-readout ${scoreFlash ? "is-updating" : ""}`}>
+            {displayedIntensity}
+            <span className="denom">/10</span>
+            <span className="word">{intensityLabel(displayedIntensity)}</span>
+          </span>
 
-      <div
-        ref={containerRef}
-        className="max-h-[420px] min-h-[280px] space-y-3 overflow-y-auto rounded-2xl border border-border bg-surface p-4"
-      >
-        {loop.transcript.length === 0 ? (
-          <p className="text-sm text-foreground/50">
-            Tap start, then speak when you're ready. The assistant will ask
-            for your craving score first.
+          <div className="voice-orb" data-state={orbState}>
+            <span className="voice-orb-ring" />
+            <span className="voice-orb-ring r2" />
+            <span className="voice-orb-core" />
+          </div>
+          <div className="voice-orb-label">{statusLabel}</div>
+        </div>
+
+        <div ref={scrollRef} className="voice-transcript">
+          {loop.transcript.length === 0 ? (
+            <p className="voice-empty">
+              On-device · Whisper transcribes you, Kokoro replies in voice.
+              Nothing leaves this device.
+            </p>
+          ) : (
+            <div className="chat-scroll">
+              {loop.transcript.map((turn) => (
+                <ChatBubble key={turn.id} turn={turn} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              void loop.setHandsFreeEnabled(!loop.handsFreeEnabled);
+            }}
+            disabled={buttonDisabled}
+            aria-pressed={loop.handsFreeEnabled}
+            className="btn"
+            style={loop.handsFreeEnabled ? { borderColor: "var(--danger)" } : undefined}
+          >
+            {buttonLabel}
+          </button>
+
+          <button
+            type="button"
+            className="btn ghost"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              padding: "6px 10px",
+            }}
+            onClick={() =>
+              finalizeCheckIn({
+                cravingScore: resolveActiveScore(),
+                obstacleCategory: null,
+              })
+            }
+          >
+            Skip →
+          </button>
+        </div>
+
+        {loop.errorMessage ? (
+          <p
+            role="alert"
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: "var(--danger)",
+            }}
+          >
+            {loop.errorMessage}
           </p>
         ) : null}
-        {loop.transcript.map((turn) => (
-          <ChatBubble key={turn.id} turn={turn} />
-        ))}
-        {loop.status === "thinking" || loop.status === "transcribing" ? (
-          <ShimmerLine />
-        ) : null}
       </div>
-
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-        <LevelMeter
-          rms={loop.level.rms}
-          peak={loop.level.peak}
-          active={loop.handsFreeEnabled}
-          status={loop.status}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            void loop.setHandsFreeEnabled(!loop.handsFreeEnabled);
-          }}
-          disabled={buttonDisabled}
-          className={`w-full rounded-full px-5 py-3 text-sm font-semibold transition disabled:opacity-50 ${
-            loop.handsFreeEnabled
-              ? "bg-danger text-danger-foreground hover:opacity-90"
-              : "bg-accent text-accent-foreground hover:opacity-90"
-          }`}
-          aria-pressed={loop.handsFreeEnabled}
-        >
-          {buttonLabel}
-        </button>
-      </div>
-
-      {loop.errorMessage ? (
-        <p
-          className="rounded-2xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger"
-          role="alert"
-        >
-          {loop.errorMessage}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -311,72 +421,16 @@ export function VoiceCheckIn({
 function ChatBubble({ turn }: { turn: VoiceTranscriptTurn }) {
   const isAgent = turn.role === "agent";
   return (
-    <div
-      className={`flex ${isAgent ? "justify-start" : "justify-end"} animate-fade-in-up`}
-    >
-      <div
-        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-          isAgent
-            ? "rounded-tl-sm bg-surface-muted text-foreground/90"
-            : "rounded-tr-sm bg-accent text-accent-foreground"
-        }`}
-      >
-        {turn.content || <ShimmerLine inline />}
-      </div>
-    </div>
-  );
-}
-
-function ShimmerLine({ inline = false }: { inline?: boolean }) {
-  return (
-    <span
-      className={`${inline ? "inline-flex" : "flex"} items-center gap-1 text-xs text-foreground/50 animate-shimmer`}
-      aria-live="polite"
-    >
-      <span className="h-1 w-1 rounded-full bg-foreground/40" />
-      <span className="h-1 w-1 rounded-full bg-foreground/40" />
-      <span className="h-1 w-1 rounded-full bg-foreground/40" />
-      <span className="ml-1">still with you...</span>
-    </span>
-  );
-}
-
-function LevelMeter({
-  rms,
-  peak,
-  active,
-  status,
-}: {
-  rms: number;
-  peak: number;
-  active: boolean;
-  status: string;
-}) {
-  const width = Math.min(100, Math.round(rms * 500));
-  const stateLabel = !active
-    ? "off"
-    : status === "speaking"
-      ? "assistant speaking"
-      : status === "recording"
-        ? "you're speaking"
-        : status === "thinking"
-          ? "thinking..."
-          : "listening";
-  return (
-    <div>
-      <div className="flex items-center justify-between text-xs text-foreground/55">
-        <span>Microphone</span>
-        <span>{stateLabel}</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-background">
-        <div
-          className="h-full bg-accent transition-[width] duration-100"
-          style={{ width: `${width}%` }}
-        />
-      </div>
-      <p className="mt-2 font-mono text-xs text-foreground/40">
-        rms {rms.toFixed(3)} · peak {peak.toFixed(3)}
-      </p>
+    <div className={`bubble ${isAgent ? "agent" : "patient"}`}>
+      {turn.content === "" ? (
+        <span className="dot-typing">
+          <span />
+          <span />
+          <span />
+        </span>
+      ) : (
+        turn.content
+      )}
     </div>
   );
 }

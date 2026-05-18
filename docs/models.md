@@ -8,18 +8,19 @@
 
 ## Quick Overview
 
-The browser demo ships **one base model plus one multitask LoRA merged into a
-single ONNX artifact**:
+The browser demo ships **one base model plus one multitask LoRA merged and
+quantized into a single Q4_K_M GGUF**, served in the browser via wllama
+(llama.cpp compiled to WASM, WebGPU when available):
 
 ```
-Gemma 4 E2B-it (INT4) + lora-wave-session -> merged ONNX demo model
+Gemma 4 E2B-it + lora-wave-session -> merged Q4_K_M GGUF (Maelstrome/lora-wave-session-r32) -> wllama
 ```
 
-This is a deliberate runtime choice. Current browser runtimes such as
-Transformers.js + WebGPU do not provide mature production support for loading
-one base model and hot-swapping LoRA adapters in memory. Loading one merged
-model keeps the PWA demo simpler: one model download, one model in memory, and
-no full-model reload between check-ins.
+This is a deliberate runtime choice. Loading one merged model keeps the PWA
+demo simple: one model download (5 GGUF shards, ~3.2 GB, cached in browser
+storage), one model in memory, and no full-model reload between check-ins.
+(ONNX + Transformers.js was attempted first and parked — fp16 WebGPU
+divergence; see `docs/postmortems/onnx-export.md`.)
 
 We still train future specialized LoRAs as demonstration artifacts:
 
@@ -57,7 +58,7 @@ Sources for Gemma 4 itself:
 | Quantization | INT4 |
 | Disk size | ~1.5 GB |
 | Fine-tuned? | No global fine-tune |
-| Runtime, web demo | `@huggingface/transformers` + WebGPU |
+| Runtime, web demo | wllama (llama.cpp / WASM), WebGPU when available |
 | Runtime, mobile | LiteRT, future port |
 
 **Why this size.** E2B is the Gemma size designed for browser-class and
@@ -74,7 +75,7 @@ session.
 | Field | Value |
 |---|---|
 | Base | `google/gemma-4-E2B-it` (INT4) |
-| Runtime artifact | Merged ONNX model: base + LoRA |
+| Runtime artifact | Merged Q4_K_M GGUF (base + LoRA, 5 shards) served via wllama from `Maelstrome/lora-wave-session-r32` |
 | Where used | Browser demo session path |
 | Training data | Combined ready rows from `lora-phase-narration`, `lora-check-in-1` through `lora-check-in-5`, and `lora-reflection` |
 | Target sample count | 158 human-written seed rows total: 10 for phase narration (5 chunks × 2 intake bands), 20 each for the five check-ins, and 48 for reflection (16 medicationStatus × trigger cells × 3 matType variants; see `client/scripts/generate-lora-reflection-grid.ts`) |
@@ -89,7 +90,7 @@ The input includes a `surface` discriminator so the same adapter can produce:
 
 The shipped browser demo uses this merged model because separate browser LoRA
 hot-swapping would otherwise require either unsupported adapter APIs or loading
-multiple full merged ONNX models.
+multiple full merged GGUF models.
 
 **Hard safety invariants.**
 

@@ -6,11 +6,12 @@ import {
   MOCK_WEEK_SUMMARY,
   TRIGGER_LABEL,
 } from "@/lib/data/mock-sessions";
+import { SessionsSurfedValue } from "./sessions-surfed-value";
 
-const stats = [
+const stats: { label: string; value: React.ReactNode; hint: string }[] = [
   {
     label: "Sessions surfed",
-    value: String(MOCK_SESSION_STATS.sessionsCount),
+    value: <SessionsSurfedValue base={MOCK_SESSION_STATS.sessionsCount} />,
     hint: "Last 30 days",
   },
   {

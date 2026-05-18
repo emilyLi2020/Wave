@@ -1,82 +1,107 @@
 "use client";
 
 /**
- * Auto-advancing player for one scripted Chunk.
+ * Auto-advancing player for one generated Chunk — re-skinned to match
+ * the interactive prototype's chunk screen:
  *
- * State is a single `currentSegmentIndex`. For each segment type:
- *   - `text`   — display the line and advance after `max(3000ms, length * 55ms)`.
- *               This is a reading-speed estimate, not a fixed timeout, so
- *               longer instructions get more time (PRD § Session Runtime
- *               Requirements rule 3).
- *   - `pause`  — display nothing new (the wave bed continues on its own)
- *               and advance after `duration * 1000ms`.
- *   - `breath` — display the instruction and tell <AnimatedWave> the
- *               current breath phase + duration so the visualization
- *               rises on inhale, holds at peak, recedes on exhale —
- *               in lockstep with the count.
+ *   - thin glowing progress bar pinned at the top
+ *   - centered uppercase crumb "CHUNK N OF 5 · <phase>"
+ *   - a medication-aware banner that auto-dismisses (~7 s) on chunk 1
+ *   - centered italic-serif guidance line, with a "Breathe in · 4s"
+ *     overline while a breath segment is active
+ *   - a quiet "Skip to check-in →" control bottom-right
  *
- * After the last segment we call `onComplete()` with NO transition copy
- * (PRD § Session Runtime Requirements rule 4: no "chunk complete", no
- * "the agent will check in now" — the next surface mounts seamlessly).
+ * The ambient ocean is the WaveSkin canvas behind the whole route, so
+ * this screen carries no inline wave widget (matching the prototype's
+ * "minimal chrome, the shared wave does the rest").
  *
- * The ambient audio bed is intentionally NOT mounted here — it lives at
- * the session shell so it never restarts on chunk boundaries (PRD Risk
- * Area #6). All this component owns is text + the wave visualization.
+ * Segment timing + Kokoro narration are unchanged from before:
+ *   - `text`   — spoken via Kokoro; advance the instant playback ends.
+ *   - `pause`  — silent beat; advance after `duration` (or the demo beat).
+ *   - `breath` — show the breath instruction + count; advance after
+ *                `duration` (or the demo beat).
  *
- * Demo mode
- *
- * When `demoMode` is true (set by the intake-screen toggle) every
- * `pause` and `breath` segment is collapsed to a flat 2-second beat
- * and the text-segment minimum drops to 1.2 s. The whole 5-chunk arc
- * runs in roughly two minutes so a reviewer can watch the flow
- * end-to-end. The breath visualization still receives the segment's
- * actual duration so the wave keeps its calm rise/hold/recede shape;
- * only the time we wait before advancing is shortened.
+ * Demo mode collapses every pause/breath to a flat 1-second beat.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { AnimatedWave } from "./animated-wave";
 import {
   createKokoroTextToSpeechEngine,
   KOKORO_DEFAULT_RUNTIME_ID,
   KOKORO_DEFAULT_VOICE_ID,
   type KokoroTextToSpeechEngine,
 } from "@/lib/voice";
-import type { Chunk, Segment } from "@/types/session";
+import type { MatType } from "@/types/models";
+import type { Chunk, ChunkNumber, Segment } from "@/types/session";
 
 interface Props {
   chunk: Chunk;
+  chunkNumber: ChunkNumber;
+  matType: MatType;
   onComplete: () => void;
   demoMode?: boolean;
-  /**
-   * Current craving intensity (1-10) the ambient wave should render at.
-   * SessionMachine passes the most recent check-in score when one
-   * exists, otherwise the intake intensity, so the wave's height stays
-   * consistent with whatever rating the patient owns right now.
-   */
+  /** Current craving intensity (1-10). Unused visually now that the
+   *  shared WaveSkin canvas owns the ocean, but kept on the prop so the
+   *  session-machine call site doesn't have to special-case it. */
   currentIntensity?: number;
 }
 
-// Demo-mode fast pause between spoken lines. Real mode comes from each
-// segment's own `duration` (default 5 s, set by `DEFAULT_LINE_PAUSE_SECONDS`
-// in `lib/gemma/chunk.ts`).
 const DEMO_BEAT_MS = 1000;
+
+const CHUNK_PHASE_WORD: Record<ChunkNumber, string> = {
+  1: "Settle",
+  2: "Body",
+  3: "Sound",
+  4: "Breath",
+  5: "Close",
+};
+
+// Medication-aware acknowledgment copy (ported from the prototype's
+// session-screens.jsx MAT_ACK). A statement of fact about how the
+// medication is or isn't buffering the urge — never a judgment.
+const MAT_ACK: Record<MatType, { label: string; body: string }> = {
+  buprenorphine: {
+    label: "Suboxone",
+    body: "Your Suboxone is in your system right now. What you're feeling at this intensity would be far louder without it. Work with what's left.",
+  },
+  methadone: {
+    label: "Methadone",
+    body: "Your methadone is steady underneath this. What you're feeling isn't withdrawal, it's the urge on top. We can meet just that.",
+  },
+  naltrexone: {
+    label: "Naltrexone",
+    body: "Naltrexone is blocking the reward right now. Whatever this craving is promising, the receptor isn't open. Stay with the wave.",
+  },
+  vivitrol: {
+    label: "Vivitrol",
+    body: "Vivitrol is still active. The reward isn't going to land, that's the chemistry. Let's let the urge crest without chasing it.",
+  },
+  none: {
+    label: "No medication",
+    body: "No medication is buffering this, you're meeting it fully. That's harder, and it counts more.",
+  },
+};
+
+const BREATH_LABEL: Record<"inhale" | "hold" | "exhale", string> = {
+  inhale: "Breathe in",
+  hold: "Hold",
+  exhale: "Breathe out",
+};
 
 export function ChunkPlayer({
   chunk,
+  chunkNumber,
+  matType,
   onComplete,
   demoMode = false,
-  currentIntensity,
 }: Props) {
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
-  const advanceHandleRef = useRef<number | null>(null);
   const kokoroRef = useRef<KokoroTextToSpeechEngine | null>(null);
 
-  // Lazily create the Kokoro engine on first text segment. Whisper/Kokoro
-  // are already preloaded during the `loadingChunk` phase by
-  // session-machine, so the engine factory call here is cheap (it just
-  // wires up the API surface; the model itself is cached).
+  const [bannerVisible, setBannerVisible] = useState(chunkNumber === 1);
+  const [bannerLeaving, setBannerLeaving] = useState(false);
+
   const getKokoro = useCallback((): KokoroTextToSpeechEngine => {
     if (!kokoroRef.current) {
       kokoroRef.current = createKokoroTextToSpeechEngine(
@@ -86,19 +111,26 @@ export function ChunkPlayer({
     return kokoroRef.current;
   }, []);
 
-  // Reset when the chunk changes (re-mounted by the session machine on
-  // every chunk boundary, but defensive in case parents reuse the
-  // component).
-  useEffect(() => {
-    setCurrentSegmentIndex(0);
-  }, [chunk.id]);
+  // No chunk.id reset effect needed: the session machine remounts this
+  // component with a per-chunk `key`, so state starts fresh each chunk.
 
-  // Stop any in-flight Kokoro playback on unmount.
   useEffect(() => {
     return () => {
       kokoroRef.current?.stop();
     };
   }, []);
+
+  // MAT banner auto-dismiss (~7 s, shortened in demo mode).
+  useEffect(() => {
+    if (!bannerVisible) return;
+    const mul = demoMode ? 0.5 : 1;
+    const t1 = window.setTimeout(() => setBannerLeaving(true), 7000 * mul);
+    const t2 = window.setTimeout(() => setBannerVisible(false), 7600 * mul);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [bannerVisible, demoMode]);
 
   const segments = chunk.segments;
   const segment: Segment | undefined = segments[currentSegmentIndex];
@@ -117,14 +149,6 @@ export function ChunkPlayer({
 
     if (segment.type === "text") {
       const kokoro = getKokoro();
-      // Read the line aloud; advance the INSTANT playback ends, not a
-      // beat sooner. We deliberately use no fallback timer — the
-      // narration should never get truncated because we guessed wrong
-      // about reading speed. If Kokoro genuinely errors (not abort),
-      // log it and advance so the patient isn't stuck staring at the
-      // line; a model that fails this way will surface as audible
-      // silence followed by the next line, which is the gentlest
-      // failure mode.
       void kokoro
         .speak(segment.content, KOKORO_DEFAULT_VOICE_ID)
         .then(() => advance())
@@ -143,44 +167,20 @@ export function ChunkPlayer({
       };
     }
 
-    // pause / breath: timer-driven beats of silence between spoken lines.
     const delayMs = demoMode ? DEMO_BEAT_MS : segment.duration * 1000;
     const handle = window.setTimeout(advance, delayMs);
-    advanceHandleRef.current = handle;
     return () => {
       cancelled = true;
       window.clearTimeout(handle);
-      advanceHandleRef.current = null;
     };
   }, [segment, onComplete, demoMode, getKokoro]);
 
-  // Skip the current non-breath segment. Breath segments are deliberately
-  // not skippable — the paced breath *is* the intervention, not waiting on
-  // it. The button in the UI is only rendered for text/pause anyway; this
-  // guard is defensive.
-  const skipSegment = useCallback(() => {
-    if (!segment) return;
-    if (segment.type === "breath") return;
-    if (advanceHandleRef.current !== null) {
-      window.clearTimeout(advanceHandleRef.current);
-      advanceHandleRef.current = null;
-    }
-    // If a text line is mid-Kokoro-speak, cut it cleanly.
-    kokoroRef.current?.stop();
-    setCurrentSegmentIndex((idx) => idx + 1);
-  }, [segment]);
-
-  const canSkip = segment ? segment.type !== "breath" : false;
-
-  // The line we render is the most recent text or breath instruction.
-  // During pure `pause` segments we keep the previous line on screen
-  // so the patient is not staring at a blank surface.
+  // The line we render is the most recent spoken text. During pause /
+  // breath segments we keep the last text line on screen.
   const visibleText = useMemo(() => {
     for (let idx = currentSegmentIndex; idx >= 0; idx--) {
       const candidate = segments[idx];
-      if (!candidate) continue;
-      if (candidate.type === "text") return candidate.content;
-      if (candidate.type === "breath") return candidate.instruction;
+      if (candidate?.type === "text") return candidate.content;
     }
     return "";
   }, [currentSegmentIndex, segments]);
@@ -188,40 +188,152 @@ export function ChunkPlayer({
   const breathSegment =
     segment && segment.type === "breath" ? segment : null;
 
-  return (
-    <div className="space-y-6">
-      {breathSegment ? (
-        <AnimatedWave
-          mode="breath"
-          breathPhase={breathSegment.phase}
-          // In demo mode the chunk player advances on a 2-second beat,
-          // so we tell the wave to ease over that same window. Without
-          // this the wave would only get halfway up on inhale before
-          // we hopped to the next phase, which looks broken.
-          breathDurationSec={
-            demoMode ? DEMO_BEAT_MS / 1000 : breathSegment.duration
-          }
-        />
-      ) : (
-        <AnimatedWave mode="ambient" intensity={currentIntensity} />
-      )}
+  const total = segments.length;
+  const pct = total > 0 ? ((currentSegmentIndex + 1) / total) * 100 : 0;
 
-      <article className="relative rounded-2xl border border-border bg-surface p-6">
-        <p className="min-h-[3.5rem] pr-20 text-lg leading-relaxed text-foreground/90">
-          {visibleText}
-        </p>
-        {canSkip ? (
+  const ack = MAT_ACK[matType] ?? MAT_ACK.none;
+  const crumb = `Chunk ${chunkNumber} of 5 · ${CHUNK_PHASE_WORD[chunkNumber]}`;
+
+  return (
+    <div className="screen">
+      <div style={{ padding: "8px 8px 0", maxWidth: 880, margin: "0 auto", width: "100%" }}>
+        <div className="thin-progress">
+          <span style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      <div className="topbar" style={{ justifyContent: "center" }}>
+        <span className="crumb" style={{ letterSpacing: "0.28em" }}>
+          {crumb.toUpperCase()}
+        </span>
+      </div>
+
+      <div className="screen-body" style={{ paddingTop: 6 }}>
+        {bannerVisible ? (
+          <div className={`mat-banner ${bannerLeaving ? "dismissing" : ""}`}>
+            <div
+              className="row"
+              style={{ alignItems: "flex-start", gap: 10 }}
+            >
+              <span style={{ marginTop: 2, color: "var(--wave-glow)" }}>
+                <PillIcon />
+              </span>
+              <div>
+                <div
+                  className="eyebrow accent"
+                  style={{ marginBottom: 6 }}
+                >
+                  Medication-aware · {ack.label}
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 14.5,
+                    lineHeight: 1.5,
+                    color: "var(--wave-crest)",
+                  }}
+                >
+                  {ack.body}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div style={{ flex: 1 }} />
+
+        <div
+          style={{
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+          }}
+        >
+          {breathSegment ? (
+            <div
+              className="serif"
+              style={{
+                fontSize: 28,
+                color: "var(--wave-crest)",
+                textShadow: "0 0 24px rgba(92,225,214,0.4)",
+                transition: "opacity 600ms ease",
+              }}
+            >
+              {BREATH_LABEL[breathSegment.phase]}{" "}
+              <span
+                className="mono"
+                style={{
+                  fontStyle: "normal",
+                  fontSize: 13,
+                  color: "var(--ink-faint)",
+                  letterSpacing: "0.22em",
+                  marginLeft: 8,
+                }}
+              >
+                · {breathSegment.duration}s
+              </span>
+            </div>
+          ) : null}
+
+          <div
+            className="serif"
+            style={{
+              fontSize: 22,
+              lineHeight: 1.35,
+              color: "var(--ink)",
+              maxWidth: 360,
+              margin: "0 auto",
+              opacity: visibleText ? 1 : 0.4,
+              transition: "opacity 600ms ease",
+              textWrap: "pretty",
+            }}
+          >
+            {visibleText || " "}
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button
             type="button"
-            onClick={skipSegment}
-            aria-label="Skip pause"
-            className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border border-border bg-surface-muted px-3 py-1 text-xs font-medium text-foreground/60 transition hover:border-accent hover:text-accent focus:border-accent focus:text-accent focus:outline-none"
+            className="btn ghost"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              padding: "6px 10px",
+            }}
+            onClick={() => {
+              kokoroRef.current?.stop();
+              onComplete();
+            }}
           >
-            Skip pause
-            <span aria-hidden>→</span>
+            Skip to check-in →
           </button>
-        ) : null}
-      </article>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function PillIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="2" y="9" width="20" height="6" rx="3" />
+      <path d="M12 9v6" />
+    </svg>
   );
 }

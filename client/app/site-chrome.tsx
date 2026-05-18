@@ -28,7 +28,8 @@ function shouldHide(pathname: string | null): boolean {
     pathname === "/training" ||
     pathname.startsWith("/training/") ||
     pathname === "/models" ||
-    pathname.startsWith("/models/")
+    pathname.startsWith("/models/") ||
+    pathname === "/prompts"
   );
 }
 
