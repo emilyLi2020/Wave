@@ -368,6 +368,27 @@ export default function KokoroTestScreen() {
     pcmPlayerActiveRef.current = false;
   };
 
+  // Generation finishes well before the queued audio has played out.
+  // Stopping the player immediately (or on a fixed timer) truncates the
+  // tail — wait out the real remaining audio first, and keep the buttons
+  // disabled (phase "running") until then so it doesn't look done early.
+  const finishRun = (
+    engine: StreamingTtsEngine,
+    totalSamples: number,
+    sr: number,
+    firstAudioWall: number,
+    summary: NonNullable<typeof streamSummary>,
+  ) => {
+    setStreamSummary(summary);
+    const audioMs = sr > 0 ? (totalSamples / sr) * 1000 : 0;
+    const elapsed = firstAudioWall ? Date.now() - firstAudioWall : 0;
+    const drainMs = Math.max(0, audioMs - elapsed) + 400;
+    setTimeout(() => {
+      void stopSharedPlayer(engine);
+      setStreamPhase((p) => (p === "running" ? "done" : p));
+    }, drainMs);
+  };
+
   // The LLM always streams word-by-word (45 ms/word ≈ 22 tok/s). What
   // changes between tests is the TTS chunk granularity:
   //   wordThreshold 12 → "sentence" stream (fewer, larger gen calls)
@@ -393,6 +414,9 @@ export default function KokoroTestScreen() {
     const t0 = Date.now();
     let ttfaMs = 0;
     let zeroChunkCalls = 0;
+    let totalSamples = 0;
+    let sr = 0;
+    let firstAudioWall = 0;
     const log: { idx: number; text: string; chunks: number; ms: number }[] = [];
 
     // Producer: 45 ms/word ≈ a ~22 tok/s LLM.
@@ -412,22 +436,31 @@ export default function KokoroTestScreen() {
         if (streamCancelRef.current) break;
         idx += 1;
         const r = await genOnce(engine, sentence, () => {
+          if (firstAudioWall === 0) firstAudioWall = Date.now();
           if (ttfaMs === 0) ttfaMs = Date.now() - t0;
         });
         if (r.chunks === 0) zeroChunkCalls += 1;
+        if (sr === 0 && r.sr > 0) sr = r.sr;
+        totalSamples += r.samples;
         log.push({ idx, text: sentence, chunks: r.chunks, ms: r.ms });
         setStreamLog([...log]);
       }
-      setStreamSummary({
+      const summary = {
         mode,
         ttfaMs,
         totalMs: Date.now() - t0,
         sentences: log.length,
         zeroChunkCalls,
-      });
-      setStreamPhase(streamCancelRef.current ? "idle" : "done");
-      // let the last chunk's audio drain, then stop the shared player
-      setTimeout(() => void stopSharedPlayer(engine), 1500);
+      };
+      if (streamCancelRef.current) {
+        setStreamSummary(summary);
+        await stopSharedPlayer(engine);
+        setStreamPhase("idle");
+      } else {
+        // keep phase "running" (buttons disabled) until the queued
+        // audio actually finishes — then finishRun stops + flips "done"
+        finishRun(engine, totalSamples, sr, firstAudioWall, summary);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStreamPhase("error");
@@ -459,25 +492,37 @@ export default function KokoroTestScreen() {
     ];
     const t0 = Date.now();
     let zeroChunkCalls = 0;
+    let totalSamples = 0;
+    let sr = 0;
+    let firstAudioWall = 0;
     const log: { idx: number; text: string; chunks: number; ms: number }[] = [];
     try {
       for (let i = 0; i < phrases.length; i++) {
         if (streamCancelRef.current) break;
-        const r = await genOnce(engine, phrases[i]!, () => {});
+        const r = await genOnce(engine, phrases[i]!, () => {
+          if (firstAudioWall === 0) firstAudioWall = Date.now();
+        });
         if (r.chunks === 0) zeroChunkCalls += 1;
+        if (sr === 0 && r.sr > 0) sr = r.sr;
+        totalSamples += r.samples;
         log.push({ idx: i + 1, text: phrases[i]!, chunks: r.chunks, ms: r.ms });
         setStreamLog([...log]);
         await sleep(300);
       }
-      setStreamSummary({
+      const summary = {
         mode: "engine-reuse",
         ttfaMs: 0,
         totalMs: Date.now() - t0,
         sentences: log.length,
         zeroChunkCalls,
-      });
-      setStreamPhase("done");
-      setTimeout(() => void stopSharedPlayer(engine), 1200);
+      };
+      if (streamCancelRef.current) {
+        setStreamSummary(summary);
+        await stopSharedPlayer(engine);
+        setStreamPhase("idle");
+      } else {
+        finishRun(engine, totalSamples, sr, firstAudioWall, summary);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStreamPhase("error");
