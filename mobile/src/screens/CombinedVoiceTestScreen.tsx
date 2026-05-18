@@ -357,13 +357,14 @@ export default function CombinedVoiceTestScreen() {
                     console.log(
                       `[voiceloop] tts turn ${turnNo} startPcmPlayer OK`,
                     );
-                    // sherpa's startTtsPcmPlayer forces the shared
-                    // AVAudioSession to Playback (output-only). Re-assert
-                    // PlayAndRecord so the mic survives playback.
-                    setAudioModeAsync({
-                      playsInSilentMode: true,
-                      allowsRecording: true,
-                    }).catch(() => {});
+                    // DO NOT re-assert the audio session here. expo-audio's
+                    // setAudioModeAsync({allowsRecording:true}) maps to
+                    // playAndRecord WITHOUT defaultToSpeaker → iOS routes
+                    // output to the EARPIECE, making TTS inaudible (root
+                    // cause of "no audio", confirmed: Apple AVAudioSession
+                    // docs + expo-audio AudioModule.swift has no speaker
+                    // flag). sherpa's startPcmPlayer already configures the
+                    // session for loud-speaker output; leave it alone.
                     return eng.writePcmChunk(c.samples);
                   })
                   .catch((e) => {
