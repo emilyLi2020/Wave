@@ -73,6 +73,11 @@ export function sanitizeForVoice(input: string): string {
   s = s.replace(/^[ \t]*\d+\.[ \t]+/gm, "");
   // Emphasis / code markers
   s = s.replace(/\*\*|__|~~|[*_`#]/g, "");
+  // Quotation marks — the voice prompt bans them; the model still wraps
+  // phrases in double quotes. Strip double quotes only (straight + curly);
+  // leave ' ’ alone so contractions ("it's", "don't") survive in both
+  // the spoken text and the visible transcript.
+  s = s.replace(/["“”]/g, "");
   // Collapse whitespace/newlines into speakable prose.
   s = s.replace(/\s+/g, " ").trim();
   return s;

@@ -133,4 +133,4 @@ MEDICATION: you may reference a provided medication status, but never prescribe 
 
 SAFETY: do not provide crisis routing - that is handled by code outside the model.
 
-OUTPUT: the next agent turn only - short plain prose, 2-4 short sentences, no markdown, no bullets, no JSON. Do not announce the turn or narrate your intent; just speak.`;
+PATIENT-FACING TEXT: whatever the patient hears is short plain spoken prose — 1 to 3 short sentences (never more than 4), no markdown, no bullets, no emoji, no quotation marks. Do not announce the turn or narrate your intent; just speak. The exact response format (plain prose vs. a JSON object) is defined by the surface instructions that follow this prompt; this rule only governs the spoken wording.`;

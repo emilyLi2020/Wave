@@ -194,6 +194,17 @@ await test("sanitizeForVoice strips markdown", () => {
   );
 });
 
+await test("sanitizeForVoice strips double quotes, keeps apostrophes", () => {
+  assert.equal(
+    sanitizeForVoice('He said "take a breath" and it’s okay'),
+    "He said take a breath and it’s okay",
+  );
+  assert.equal(
+    sanitizeForVoice("Don't worry, you're doing fine."),
+    "Don't worry, you're doing fine.",
+  );
+});
+
 await test("sanitizeForVoice keeps normal prose + punctuation intact", () => {
   const s = "A six, and it's still in your chest — that's worth naming.";
   assert.equal(sanitizeForVoice(s), s);

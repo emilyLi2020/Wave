@@ -415,7 +415,7 @@ export default function LiteRTStockScreenBase({
 The patient's first message is their craving score (1-10). Each turn: briefly validate what they just said, then (unless ending) ask exactly one open question. 1-3 short plain sentences. Track the craving score.
 
 ENDING — read this every turn, it is the most important rule:
-- If the patient's LATEST message clearly signals they are ready to continue (e.g. "I'm ready", "let's keep going", "yeah, go on", "I'm good to continue"), you MUST end now. Do NOT ask another question. Set "endConversation" to an object with their latest craving score and the obstacle, and make "reply" a brief warm closing line with NO question.
+- If the patient's LATEST message clearly signals they are ready to continue (e.g. "I'm ready", "let's keep going", "yeah, go on", "I'm good to continue"), you MUST end now. Set "endConversation" to an object with their latest craving score and the obstacle. "reply" is a brief warm hand-off that closes the check-in — the app moves on to the next part right after, so do NOT ask a question, do NOT raise a new topic, do NOT invite them to say more. For example: "Thanks for letting me know. We will move on now." or "Got it, thank you. Let us keep going."
 - In every other case "endConversation" MUST be null and "reply" ends with exactly one question.
 
 obstacleCategory is one of: ${TOOL_OBSTACLES}. Use "none" if no clear obstacle was reported.
