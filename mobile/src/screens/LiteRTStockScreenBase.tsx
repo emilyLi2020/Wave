@@ -126,6 +126,36 @@ function extractToolCall(raw: string): { reply: string; tool: string | null } {
       tool: `endConversation{cravingScore:${score},obstacleCategory:${obst}}`,
     };
   };
+  // JSON output-contract (the working path): a single object
+  // {"reply": "...", "endConversation": null | {cravingScore,obstacleCategory}}.
+  const jStart = raw.indexOf("{");
+  const jEnd = raw.lastIndexOf("}");
+  if (jStart !== -1 && jEnd > jStart) {
+    try {
+      const o = JSON.parse(raw.slice(jStart, jEnd + 1)) as {
+        reply?: unknown;
+        endConversation?: { cravingScore?: unknown; obstacleCategory?: unknown } | null;
+      };
+      if (o && typeof o === "object" && "endConversation" in o) {
+        const reply =
+          typeof o.reply === "string" && o.reply.trim()
+            ? o.reply.trim()
+            : raw.trim();
+        const ec = o.endConversation;
+        if (ec && typeof ec === "object") {
+          const score = String(ec.cravingScore ?? "?");
+          const obst = String(ec.obstacleCategory ?? "none");
+          return {
+            reply,
+            tool: `endConversation{cravingScore:${score},obstacleCategory:${obst}}`,
+          };
+        }
+        return { reply, tool: null };
+      }
+    } catch {
+      /* not valid JSON — fall through to literal forms */
+    }
+  }
   // Gemma documented function-call: a ```tool_code``` fenced Python call.
   const fenced = raw.match(/```tool_code\s*([\s\S]*?)```/i);
   const inner = fenced
@@ -282,20 +312,27 @@ export default function LiteRTStockScreenBase({
       );
       setResults([...acc]);
 
-      // ── 2. Check-in — real user/assistant multi-turn ending in the
-      // native endConversation tool call. Compact WAVE persona +
-      // native-tool-call instruction (no JSON wrapper, no forged
-      // transcript). The 3 user messages are just the patient's words;
-      // the wrapper's chat template produces each assistant turn, and the
-      // conversation is preserved across sends (runSurface resets once).
-      setNote("2/4 · check-in (3 quick turns)…");
-      const ciSystem = `${WAVE_SYSTEM_PROMPT_STOCK_COMPACT}
+      // ── 2/3. Check-in via the JSON output-contract — the documented
+      // working path (issue #10: native tool-call attempts failed, JSON
+      // path works). Compact persona + a strict JSON envelope; the tool
+      // signal is the parsed `endConversation` field, not a literal.
+      // Both check-in surfaces share this prompt; they differ only by
+      // turn count (#2 quick 3-turn vs #3 full 5-turn arc → ending).
+      setNote("2/4 · check-in JSON (3 quick turns)…");
+      const ciSystemJson = `${WAVE_SYSTEM_PROMPT_STOCK_COMPACT}
 
-You are running a post-chunk check-in with the patient. The patient's first message is their craving score (1-10). Reply naturally in 1-3 short plain sentences each turn — validate, then one question — no markdown.
+You are running a post-chunk voice check-in. The patient's first message is their craving score (1-10). Each turn: validate what they said, then ask one question.
 
-Once the patient has clearly said they are ready to continue, give a brief warm closing line with NO question, then on its OWN final line emit exactly:
-endConversation{cravingScore:N,obstacleCategory:CAT}
-where N is their latest score and CAT is one of: ${TOOL_OBSTACLES} (use none if no clear obstacle). Do NOT emit endConversation before the patient is ready, and emit it at most once.`;
+<output_contract>
+Respond with ONLY a single JSON object, nothing else, matching exactly:
+
+{"reply": "<patient-facing prose, 1-3 short plain sentences>", "endConversation": null | {"cravingScore": <integer 1-10>, "obstacleCategory": "<one of: ${TOOL_OBSTACLES}>"}}
+
+Rules:
+- "reply" is the ONLY text the patient hears. Plain spoken prose. No markdown, no lists, no emoji.
+- "endConversation" stays null until the patient has clearly said they are ready to continue; then set it (use obstacleCategory "none" if no clear obstacle).
+- Output nothing outside the JSON object — no preamble, no code fences, no extra keys.
+</output_contract>`;
       // Real multi-turn: just the patient utterances, sent sequentially.
       const ciTurns = [
         "6",
@@ -305,44 +342,19 @@ where N is their latest score and CAT is one of: ${TOOL_OBSTACLES} (use none if 
       acc.push(
         await runSurface(
           modelPath,
-          "Check-in → endConversation",
-          ciSystem,
+          "Check-in JSON (3 quick turns)",
+          ciSystemJson,
           ciTurns,
         ),
       );
       setResults([...acc]);
 
-      // ── 3. Full-arc check-in → ending turn. Drives the real WAVE
-      // 5-turn arc (score → body → obstacle → technique landed →
-      // readiness confirmed) so the model is AT the genuine ending
-      // point, using Gemma's documented tool_code function-call format
-      // (vs surface #2's ad-hoc brace literal — A/B for what fires).
-      setNote("3/4 · full-arc check-in (Gemma tool_code → ending)…");
-      // Gemma's DOCUMENTED function-calling format: declare the tool as a
-      // Python signature, instruct a ```tool_code``` fenced call. This is
-      // the format Gemma was trained to emit — vs surface #2's ad-hoc
-      // brace literal. Compact persona, same eng2048.
-      const ciSystemGemmaTool = `${WAVE_SYSTEM_PROMPT_STOCK_COMPACT}
-
-You are running a post-chunk check-in. The patient's first message is their craving score (1-10). Each turn: validate, then ask one question, in 1-3 short plain sentences. No markdown.
-
-You have access to one tool:
-
-\`\`\`python
-def endConversation(cravingScore: int, obstacleCategory: str) -> None:
-    """Signal the check-in is complete. Call only after the patient has clearly said they are ready to continue.
-
-    Args:
-        cravingScore: the patient's latest craving score, an integer 1-10.
-        obstacleCategory: one of: ${TOOL_OBSTACLES}. Use "none" if no clear obstacle.
-    """
-\`\`\`
-
-When (and only when) the patient has clearly said they are ready to continue, first give one brief warm closing line with no question, then on a new line output the call inside a tool_code block, exactly:
-\`\`\`tool_code
-endConversation(cravingScore=6, obstacleCategory="none")
-\`\`\`
-Do not call it before the patient is ready, and call it at most once.`;
+      // ── 3. Full-arc check-in → ending turn, SAME JSON contract.
+      // Drives the real WAVE 5-turn arc (score → body → obstacle →
+      // technique landed → readiness confirmed) so the model is AT the
+      // genuine ending point — the real test of whether the parsed
+      // `endConversation` JSON field fires at the end on stock Gemma.
+      setNote("3/4 · check-in JSON (full arc → ending)…");
       const ciTurnsFullArc = [
         "It's about a seven.",
         "It's mostly in my chest, tight, but it eased a little near the end.",
@@ -353,8 +365,8 @@ Do not call it before the patient is ready, and call it at most once.`;
       acc.push(
         await runSurface(
           modelPath,
-          "Full-arc check-in (Gemma tool_code, 5 turns → ending)",
-          ciSystemGemmaTool,
+          "Check-in JSON (full arc, 5 turns → ending)",
+          ciSystemJson,
           ciTurnsFullArc,
         ),
       );
