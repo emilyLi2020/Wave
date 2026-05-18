@@ -30,7 +30,7 @@
 import { createLLM } from "react-native-litert-lm";
 import type { LiteRTLMInstance } from "react-native-litert-lm";
 
-import { ensureModel } from "@/runtime/model-cache";
+import { ensureModel, type ModelId } from "@/runtime/model-cache";
 import { buildCheckInPrompt } from "@/lib/prompts/check-in";
 import { buildChunkPrompt } from "@/lib/prompts/chunk-generator";
 import { buildInsightsPrompt } from "@/lib/prompts/insights";
@@ -86,70 +86,149 @@ const CHECK_IN_TOOL_OBSTACLES = [
 ] as const;
 
 // ────────────────────────────────────────────────────────────────────────
-// Singleton model lifecycle
+// Keyed model lifecycle
+//
+// Review pass 1 (#1, issue #21): the old single `llmPromise` memoized the
+// FIRST load and ignored every later `backend`/model — so a caller asking
+// for stock-Gemma-on-GPU silently got whatever loaded first (litert-wave on
+// CPU). The registry below memoizes per (modelId, backend, engine/output
+// budget, systemPrompt) so the voice loop can hold a stock-GPU instance
+// while the existing generators keep their litert-wave CPU instance.
+// `preloadWaveLiteRT` is preserved as a thin wrapper so existing generator
+// callers are byte-for-byte unchanged.
 // ────────────────────────────────────────────────────────────────────────
-
-let llmPromise: Promise<LiteRTLMInstance> | null = null;
 
 export type LoadProgressCallback = (progressPct: number) => void;
 
-interface LoadOptions {
+export interface LiteRTLoadConfig {
+  modelId: ModelId;
+  backend: "gpu" | "cpu" | "npu";
+  engineMaxTokens: number;
+  outputMaxTokens: number;
+  /** Load-time system prompt — the wrapper bakes it at loadModel(). */
+  systemPrompt?: string;
+  temperature?: number;
+  topK?: number;
+}
+
+export interface LoadOptions {
   onProgress?: LoadProgressCallback;
+  /**
+   * @deprecated The single-singleton no-op trap. Prefer preloadLiteRT(config).
+   * Kept so existing preloadWaveLiteRT(opts) call sites still compile.
+   */
   backend?: "gpu" | "cpu" | "npu";
 }
+
+function djb2(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+function cacheKey(c: LiteRTLoadConfig): string {
+  return [
+    c.modelId,
+    c.backend,
+    c.engineMaxTokens,
+    c.outputMaxTokens,
+    c.temperature ?? 0,
+    c.topK ?? 1,
+    c.systemPrompt ? `sp:${djb2(c.systemPrompt)}` : "sp:none",
+  ].join("|");
+}
+
+const llmRegistry = new Map<string, Promise<LiteRTLMInstance>>();
+
+/**
+ * Load (or return the memoized) LiteRT-LM instance for an exact
+ * (modelId, backend, token budget, systemPrompt) configuration. Distinct
+ * configs get distinct resident instances — that's the whole point of the
+ * refactor: the voice loop's stock-GPU instance and the generators'
+ * litert-wave-CPU instance coexist instead of clobbering each other.
+ */
+export function preloadLiteRT(
+  config: LiteRTLoadConfig,
+  opts?: { onProgress?: LoadProgressCallback },
+): Promise<LiteRTLMInstance> {
+  const key = cacheKey(config);
+  let entry = llmRegistry.get(key);
+  if (!entry) {
+    entry = (async () => {
+      // ensureModel is idempotent — cheap on a cache hit.
+      const fileUri = await ensureModel(config.modelId, {
+        onProgress: opts?.onProgress,
+      });
+      // The LiteRT-LM C++ engine stat()s the raw path (HybridLiteRTLM.cpp
+      // ~line 348/392); expo-file-system hands back file:// URIs which
+      // fail stat() with errno 2. Strip the scheme before loadModel.
+      const nativePath = fileUri.replace(/^file:\/\//, "");
+      const llm = createLLM({ enableMemoryTracking: true });
+      await llm.loadModel(nativePath, {
+        backend: config.backend,
+        engineMaxTokens: config.engineMaxTokens,
+        outputMaxTokens: config.outputMaxTokens,
+        ...(config.systemPrompt
+          ? { systemPrompt: config.systemPrompt }
+          : {}),
+        temperature: config.temperature ?? 0,
+        topK: config.topK ?? 1,
+      });
+      return llm;
+    })();
+    llmRegistry.set(key, entry);
+    // Drop a rejected load so a retry actually re-loads instead of
+    // re-returning the cached failure.
+    entry.catch(() => {
+      if (llmRegistry.get(key) === entry) llmRegistry.delete(key);
+    });
+  }
+  return entry;
+}
+
+export async function unloadLiteRT(config: LiteRTLoadConfig): Promise<void> {
+  const key = cacheKey(config);
+  const entry = llmRegistry.get(key);
+  if (!entry) return;
+  llmRegistry.delete(key);
+  try {
+    (await entry).close();
+  } catch {
+    /* best-effort — a failed load has nothing to close */
+  }
+}
+
+// litert-wave on CPU, no system prompt: the config every existing generator
+// caller used implicitly. Behavior is unchanged from the old singleton.
+const WAVE_CONFIG: LiteRTLoadConfig = {
+  modelId: "litert-wave",
+  backend: "cpu",
+  // Fork split knobs. The litert-lm-v3 fine-tune bundle was exported with
+  // --cache_length=4096 --prefill_lengths=[512,1024], so the KV budget can
+  // be the full 4096 and the chunk-1/reflection prompts fit. outputMaxTokens
+  // stays at the conservative 256-token decode-chunk default.
+  engineMaxTokens: 4096,
+  outputMaxTokens: 256,
+  temperature: 0,
+  topK: 1,
+};
 
 export function preloadWaveLiteRT(
   opts?: LoadOptions,
 ): Promise<LiteRTLMInstance> {
-  if (!llmPromise) {
-    llmPromise = (async () => {
-      // Download via the unified cache; ensureModel is idempotent so
-      // returning the local path is cheap when cached.
-      const fileUri = await ensureModel("litert-wave", {
-        onProgress: opts?.onProgress,
-      });
-      // The LiteRT-LM C++ engine uses POSIX stat()/fopen() directly on
-      // the path string (see HybridLiteRTLM.cpp line ~348/392) — it does
-      // NOT understand file:// URIs. expo-file-system returns paths with
-      // the file:// scheme, so strip it before handing to the native
-      // wrapper or stat() returns ENOENT and load fails with
-      // "Failed to create LiteRT-LM engine: failed to stat file (errno 2)".
-      const nativePath = fileUri.replace(/^file:\/\//, "");
-      const llm = createLLM({ enableMemoryTracking: true });
-      await llm.loadModel(nativePath, {
-        // No systemPrompt; per-flow composed prompts go in the user msg
-        // after resetConversation(). See file header.
-        // TEMP: defaulting to CPU while we debug whether the rebuilt
-        // xcframework from issue #13 includes proper Metal/GPU support.
-        // The agent's macOS verification only proved CPU loading; their
-        // own note flagged GPU dylibs not registering. Revert to "gpu"
-        // once Metal init is confirmed working on iPhone.
-        backend: opts?.backend ?? "cpu",
-        // Fork (react-native-litert-lm-wave) split knobs. The fine-tune
-        // litert-lm-v3 bundle was exported with --cache_length=4096
-        // --prefill_lengths=[512,1024] (see litert-lm-mobile-finetune.md
-        // step 3), so the engine KV budget can be the full 4096 and the
-        // WAVE chunk-1/reflection prompts finally fit. outputMaxTokens
-        // stays at the conservative 256-token decode-chunk default.
-        engineMaxTokens: 4096,
-        outputMaxTokens: 256,
-        temperature: 0,
-        topK: 1,
-      });
-      return llm;
-    })();
-  }
-  return llmPromise;
+  return preloadLiteRT(
+    { ...WAVE_CONFIG, backend: opts?.backend ?? WAVE_CONFIG.backend },
+    { onProgress: opts?.onProgress },
+  );
 }
 
 export async function unloadWaveLiteRT(): Promise<void> {
-  if (!llmPromise) return;
-  try {
-    const llm = await llmPromise;
-    llm.close();
-  } finally {
-    llmPromise = null;
-  }
+  // Unload whichever backend variants of the wave bundle got loaded.
+  await Promise.all(
+    (["cpu", "gpu", "npu"] as const).map((backend) =>
+      unloadLiteRT({ ...WAVE_CONFIG, backend }),
+    ),
+  );
 }
 
 // ────────────────────────────────────────────────────────────────────────
