@@ -83,12 +83,17 @@ Ending: once the patient has clearly said they are ready to continue, give one b
 endConversation{cravingScore:N,obstacleCategory:CAT}
 where N is their latest craving score as a digit from 1 to 10 and CAT is one of: ${TOOL_OBSTACLES} (use none if no clear obstacle). That final line is the ONLY place digits, braces, or symbols are allowed — it is a silent machine signal, never spoken. Do NOT emit endConversation before the patient is ready, and emit it at most once.`;
 
+// EXPERIMENT (#25): Gemma's chat template has no real system role — the
+// wrapper fakes a <start_of_turn>system turn the model was never trained
+// on, so CI_SYSTEM-as-system-prompt is weakly followed. Load with NO
+// system prompt and inject CI_SYSTEM into the FIRST user turn instead
+// (kept in history via reset-once; later turns send only the transcript).
 const STOCK_GPU_CONFIG: LiteRTLoadConfig = {
   modelId: "litert-stock-gemma4",
   backend: "gpu",
   engineMaxTokens: 2048,
   outputMaxTokens: 512,
-  systemPrompt: CI_SYSTEM,
+  // systemPrompt intentionally omitted — see EXPERIMENT note above.
   temperature: 0,
   topK: 1,
 };
@@ -469,7 +474,14 @@ export default function CombinedVoiceTestScreen() {
         const turn = await convRef.current.runTurn(
           text,
           async (u) => {
-            const raw = await llm.sendMessage(u);
+            // Inject the WAVE check-in instructions into the FIRST user
+            // turn (Gemma follows user-turn instructions far more
+            // reliably than the fake system turn). Later turns send only
+            // the transcript — the instruction persists in conversation
+            // history (resetConversation is called once).
+            const composed =
+              turnNo === 1 ? `${CI_SYSTEM}\n\nPatient: ${u}` : u;
+            const raw = await llm.sendMessage(composed);
             rawLen = raw.length;
             rawHead = raw.slice(0, 120);
             return raw;
