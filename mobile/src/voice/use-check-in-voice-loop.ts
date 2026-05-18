@@ -232,13 +232,17 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
     startedAtRef.current = Date.now();
     (async () => {
       try {
-        // Playback-only first. allowsRecording:true puts iOS in
-        // playAndRecord with NO defaultToSpeaker → output goes to the
-        // EARPIECE (quiet) — that's why the opener was quiet and the
-        // reply (after sherpa's player owned the speaker route) loud.
-        // deploy.md: don't enable recording while TTS plays; let
-        // sherpa's startPcmPlayer own the session during playback.
-        await setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+        // EXACTLY the proven working voice path (CombinedVoiceTestScreen):
+        // one setAudioModeAsync at mount with playsInSilentMode +
+        // allowsRecording, never toggled afterward. Removing
+        // allowsRecording / toggling it around the opener broke sherpa's
+        // PCM player (opener silent). The earlier "quiet opener" was the
+        // OLD Kokoro early-resolve bug clipping it (now fixed by the
+        // playback-drain change), NOT the audio category.
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: true,
+        }).catch(() => {});
         setPhase("warming");
         console.log("[wave][checkin] warming VAD/Whisper/Kokoro");
         const vadPath = await ensureModel("silero-vad");
@@ -257,13 +261,7 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
           /* speak failed — still listen so the loop isn't stuck */
         }
         if (!mountedRef.current) return;
-        // Opener has finished playing (speak() now drains fully) — NOW
-        // enable the mic for the VAD listening window. Output stays on
-        // the loud speaker route sherpa established for the opener.
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          allowsRecording: true,
-        }).catch(() => {});
+        // Audio session already set at boot (proven config, not toggled).
         await endpointerRef.current?.startListening();
         if (mountedRef.current) setPhase("listening");
       } catch (err) {
