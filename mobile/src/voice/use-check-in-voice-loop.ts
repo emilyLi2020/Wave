@@ -221,10 +221,13 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
     startedAtRef.current = Date.now();
     (async () => {
       try {
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          allowsRecording: true,
-        }).catch(() => {});
+        // Playback-only first. allowsRecording:true puts iOS in
+        // playAndRecord with NO defaultToSpeaker → output goes to the
+        // EARPIECE (quiet) — that's why the opener was quiet and the
+        // reply (after sherpa's player owned the speaker route) loud.
+        // deploy.md: don't enable recording while TTS plays; let
+        // sherpa's startPcmPlayer own the session during playback.
+        await setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
         setPhase("warming");
         console.log("[wave][checkin] warming VAD/Whisper/Kokoro");
         const vadPath = await ensureModel("silero-vad");
@@ -243,6 +246,13 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
           /* speak failed — still listen so the loop isn't stuck */
         }
         if (!mountedRef.current) return;
+        // Opener has finished playing (speak() now drains fully) — NOW
+        // enable the mic for the VAD listening window. Output stays on
+        // the loud speaker route sherpa established for the opener.
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: true,
+        }).catch(() => {});
         await endpointerRef.current?.startListening();
         if (mountedRef.current) setPhase("listening");
       } catch (err) {
