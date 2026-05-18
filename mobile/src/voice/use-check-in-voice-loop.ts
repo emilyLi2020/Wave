@@ -106,7 +106,14 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
     async (pcm: Float32Array) => {
       if (busyRef.current || endedRef.current || !mountedRef.current) return;
       busyRef.current = true;
-      endpointerRef.current?.setMuted(true);
+      // REAL mic release for the whole turn (issue #26 Step 2). setMuted
+      // only flipped a flag — the native PCM live stream stayed UP and
+      // re-asserted the AVAudioSession (PlayAndRecord/VoiceChat) on
+      // restart mid-playback → the loudness jump. Fully stop the stream
+      // here; re-acquire only AFTER speak() has truly drained (finally).
+      // The TTS player stays resident (no stop→restart = no
+      // turn-2-no-voice).
+      await endpointerRef.current?.stopListening();
       try {
         // ── STT ──
         setPhase("transcribing");
@@ -202,9 +209,13 @@ export function useCheckInVoiceLoop(): CheckInVoiceLoop {
         if (mountedRef.current) setError(msg);
       } finally {
         busyRef.current = false;
+        // Re-acquire the mic ONLY now — speak() has fully drained (Step
+        // 1) and the turn is over, so the stream restart can't re-assert
+        // the session under live TTS audio. Skip if the check-in ended
+        // (finalize/navigation owns teardown).
         if (!endedRef.current && mountedRef.current) {
-          endpointerRef.current?.setMuted(false);
           setPhase("listening");
+          await endpointerRef.current?.startListening();
         }
       }
     },

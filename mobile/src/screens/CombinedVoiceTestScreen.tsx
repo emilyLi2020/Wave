@@ -315,6 +315,14 @@ export default function CombinedVoiceTestScreen() {
       // (startPcmPlayer is async, ~100-300 ms behind the first chunk).
       let playbackStartedAt = 0;
       let playerSr = 24_000;
+      // Serialize every writePcmChunk (issue #26 Step 3). Non-first
+      // chunks were fire-and-forget/unordered, so under session churn the
+      // tail dropped non-deterministically ("speaks halfway").
+      let writeChain: Promise<unknown> = Promise.resolve();
+      // True when THIS speak() started the player — its startPcmPlayer
+      // .then() owns the playbackStartedAt stamp; later chunks of the
+      // same turn must not override it with an early (pre-resolve) time.
+      let startedPlayerThisCall = false;
       const turnNo = turnCountRef.current;
 
       return new Promise<void>((resolve) => {
@@ -331,11 +339,15 @@ export default function CombinedVoiceTestScreen() {
               // the player; cancelTtsAndPlayer() already tore it down.
               if (epochRef.current !== myEpoch) return;
               if (firstChunkAt === 0) {
-                // First chunk of THIS turn — mark when this turn's audio
-                // begins entering the (continuous) player.
+                // First chunk of THIS turn. firstChunkAt /
+                // speakingStartedAtRef anchor the barge grace window.
+                // playbackStartedAt is set at TRUE playback start below
+                // (startPcmPlayer resolve for the session's first turn;
+                // "now" when the player is already resident) — issue #26
+                // Step 1: stamping it here over-counts elapsed and cuts
+                // the tail.
                 firstChunkAt = Date.now();
                 speakingStartedAtRef.current = firstChunkAt;
-                playbackStartedAt = firstChunkAt;
                 playerSr = c.sampleRate;
               }
               if (!pcmPlayerActiveRef.current) {
@@ -348,23 +360,22 @@ export default function CombinedVoiceTestScreen() {
                 // teardown. Guard with the ref so only the first chunk
                 // ever triggers the single start.
                 pcmPlayerActiveRef.current = true;
+                startedPlayerThisCall = true;
                 console.log(
                   `[voiceloop] tts turn ${turnNo} startPcmPlayer(sr=${c.sampleRate}) [once]…`,
                 );
-                eng
+                writeChain = eng
                   .startPcmPlayer(c.sampleRate, 1)
                   .then(() => {
                     console.log(
                       `[voiceloop] tts turn ${turnNo} startPcmPlayer OK`,
                     );
-                    // DO NOT re-assert the audio session here. expo-audio's
-                    // setAudioModeAsync({allowsRecording:true}) maps to
-                    // playAndRecord WITHOUT defaultToSpeaker → iOS routes
-                    // output to the EARPIECE, making TTS inaudible (root
-                    // cause of "no audio", confirmed: Apple AVAudioSession
-                    // docs + expo-audio AudioModule.swift has no speaker
-                    // flag). sherpa's startPcmPlayer already configures the
-                    // session for loud-speaker output; leave it alone.
+                    // True playback start (startPcmPlayer is async,
+                    // ~100-300ms behind the first chunk). DO NOT re-assert
+                    // the audio session here (expo-audio
+                    // allowsRecording:true → earpiece; sherpa already set
+                    // loud-speaker output — leave it alone).
+                    playbackStartedAt = Date.now();
                     return eng.writePcmChunk(c.samples);
                   })
                   .catch((e) => {
@@ -376,15 +387,24 @@ export default function CombinedVoiceTestScreen() {
                     );
                   });
               } else {
-                eng
-                  .writePcmChunk(c.samples)
-                  .catch((e) =>
-                    console.log(
-                      `[voiceloop] tts turn ${turnNo} writePcmChunk ERR: ${
-                        e instanceof Error ? e.message : String(e)
-                      }`,
+                // Player resident from a PRIOR turn — audio begins as
+                // soon as this chunk is written. Stamp true start once
+                // (skip if this same call started the player; its .then()
+                // owns the stamp). SERIALIZE the write behind the chain.
+                if (!startedPlayerThisCall && playbackStartedAt === 0) {
+                  playbackStartedAt = Date.now();
+                }
+                writeChain = writeChain.then(() =>
+                  eng
+                    .writePcmChunk(c.samples)
+                    .catch((e) =>
+                      console.log(
+                        `[voiceloop] tts turn ${turnNo} writePcmChunk ERR: ${
+                          e instanceof Error ? e.message : String(e)
+                        }`,
+                      ),
                     ),
-                  );
+                );
               }
               chunkCount += 1;
               totalSamples += c.samples.length;
@@ -411,15 +431,23 @@ export default function CombinedVoiceTestScreen() {
               );
               // Resolve speak() only after THIS turn's audio has played
               // out, so the loop doesn't start listening over the reply —
-              // but do NOT stop the player (it stays alive across turns;
-              // stopping then restarting silences sherpa). Measured from
-              // this turn's first chunk + margin for buffer scheduling.
-              const audioMs = (totalSamples / (playerSr || 24_000)) * 1000;
-              const elapsed = playbackStartedAt
-                ? Date.now() - playbackStartedAt
-                : 0;
-              const drainMs = Math.max(0, audioMs - elapsed) + 500;
-              setTimeout(done, drainMs);
+              // but do NOT stop the player (stop→restart silences
+              // sherpa). Wait for the write chain to flush (all chunks
+              // queued), THEN the real remaining duration from TRUE
+              // playback start + a generous interim margin (issue #26
+              // Step 1/3; native scheduleBuffer completionHandler is the
+              // authoritative follow-up).
+              writeChain
+                .then(() => {
+                  const audioMs =
+                    (totalSamples / (playerSr || 24_000)) * 1000;
+                  const elapsed = playbackStartedAt
+                    ? Date.now() - playbackStartedAt
+                    : 0;
+                  const drainMs = Math.max(0, audioMs - elapsed) + 900;
+                  setTimeout(done, drainMs);
+                })
+                .catch(() => setTimeout(done, 900));
             },
             onError: (e) => {
               console.log(

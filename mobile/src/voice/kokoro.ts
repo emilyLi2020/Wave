@@ -93,33 +93,49 @@ export async function speak(text: string): Promise<void> {
           if (firstChunk) {
             firstChunk = false;
             sr = c.sampleRate;
-            // Real playback begins ~when the first PCM enters the player.
-            playbackStartedAt = Date.now();
             if (!playerActive) {
+              // First phrase of the session: startPcmPlayer is async and
+              // lags the first chunk ~100-300ms. Stamp playbackStartedAt
+              // when it RESOLVES (true playback start), not at chunk
+              // arrival — stamping early over-counts `elapsed`, shrinks
+              // drainMs, and resolves speak() before audio finishes
+              // (issue #26, Step 1 interim JS fix).
               playerActive = true;
               chain = engine
                 .startPcmPlayer(c.sampleRate, 1)
-                .then(() => engine.writePcmChunk(c.samples))
+                .then(() => {
+                  playbackStartedAt = Date.now();
+                  return engine.writePcmChunk(c.samples);
+                })
                 .catch(() => {});
               totalSamples += c.samples.length;
               return;
             }
+            // Player already resident from a prior phrase — audio begins
+            // as soon as this chunk is written, so "now" is accurate.
+            playbackStartedAt = Date.now();
           }
           totalSamples += c.samples.length;
           chain = chain.then(() => engine.writePcmChunk(c.samples).catch(() => {}));
         },
         onEnd: () => {
-          // onEnd = SYNTHESIS done (fast). The PCM player is still
-          // draining real-time audio. Resolving now (the old flat 450ms)
-          // returned before the phrase finished — so the opener got cut
-          // / the turn passed before WAVE spoke, and replies were
-          // truncated when finalize() navigated away. Wait for the
-          // ACTUAL remaining audio duration (CombinedVoiceTestScreen's
-          // proven drain calc) + a margin for the player's scheduling.
-          const audioMs = (totalSamples / (sr || 24_000)) * 1000;
-          const elapsed = playbackStartedAt ? Date.now() - playbackStartedAt : 0;
-          const drainMs = Math.max(0, audioMs - elapsed) + 600;
-          setTimeout(resolve, drainMs);
+          // onEnd = SYNTHESIS done (fast); the PCM player is still
+          // draining real-time audio. Wait for the write chain to flush
+          // (all chunks queued) THEN for the real remaining audio
+          // duration measured from true playback start, + a generous
+          // interim margin. The authoritative fix is a native
+          // scheduleBuffer completionHandler (issue #26 Step 1 native);
+          // this JS estimate is the documented interim mitigation.
+          chain
+            .then(() => {
+              const audioMs = (totalSamples / (sr || 24_000)) * 1000;
+              const elapsed = playbackStartedAt
+                ? Date.now() - playbackStartedAt
+                : 0;
+              const drainMs = Math.max(0, audioMs - elapsed) + 900;
+              setTimeout(resolve, drainMs);
+            })
+            .catch(() => setTimeout(resolve, 900));
         },
         onError: (e) => reject(new Error(e.message)),
       })
