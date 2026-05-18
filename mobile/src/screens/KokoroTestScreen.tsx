@@ -344,7 +344,12 @@ export default function KokoroTestScreen() {
         resolve({ chunks, samples, ms: Date.now() - g0, sr });
       };
       engine
-        .generateSpeechStream(sentence, undefined, {
+        // silenceScale: 0 — drop sherpa's per-utterance/inter-sentence
+        // silence padding so consecutive streamed chunks butt up against
+        // each other seamlessly (matches kokoro-js web behaviour). This
+        // is the cause of the "leading/trailing model silence"; it's a
+        // sherpa framework setting, not the Kokoro model.
+        .generateSpeechStream(sentence, { silenceScale: 0 }, {
           onChunk: (c) => {
             if (chunks === 0) {
               sr = c.sampleRate;
