@@ -59,6 +59,13 @@ export interface AmbientAudioBedHandle {
   fade: (seconds: number) => Promise<void>;
   /** Instant mute / unmute (preserves the underlying graph). */
   setMuted: (muted: boolean) => void;
+  /**
+   * Duck the bed to silence without touching the user's mute choice.
+   * Used by the session machine to silence ambient while the voice
+   * check-in is live so the bed can't self-trigger the mic. Restored
+   * when `setDucked(false)` is called after the check-in.
+   */
+  setDucked: (ducked: boolean) => void;
 }
 
 const TARGET_GAIN = 0.2;
@@ -81,7 +88,27 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
     const lfoRef = useRef<OscillatorNode | null>(null);
     const lfoGainRef = useRef<GainNode | null>(null);
     const startedRef = useRef(false);
+    const duckedRef = useRef(false);
     const [muted, setMutedState] = useState(false);
+
+    // Effective gain is zero whenever the user muted OR the session
+    // ducked the bed; otherwise the normal target. Ramped, never
+    // stepped, so transitions stay click-free.
+    const rampMasterGain = useCallback(
+      (silent: boolean) => {
+        const ctx = audioContextRef.current;
+        const masterGain = masterGainRef.current;
+        if (!ctx || !masterGain) return;
+        const now = ctx.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+        masterGain.gain.linearRampToValueAtTime(
+          silent ? 0 : TARGET_GAIN,
+          now + 0.15,
+        );
+      },
+      [],
+    );
 
     const teardown = useCallback(() => {
       try {
@@ -139,7 +166,7 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
             void ctx.suspend();
           }
         } else {
-          if (ctx.state === "suspended" && !muted) {
+          if (ctx.state === "suspended" && !muted && !duckedRef.current) {
             void ctx.resume();
           }
         }
@@ -232,7 +259,7 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
           const masterGain = ctx.createGain();
           masterGain.gain.setValueAtTime(0, ctx.currentTime);
           masterGain.gain.linearRampToValueAtTime(
-            muted ? 0 : TARGET_GAIN,
+            muted || duckedRef.current ? 0 : TARGET_GAIN,
             ctx.currentTime + FADE_IN_SECONDS,
           );
 
@@ -281,19 +308,14 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
         },
         setMuted(next: boolean) {
           setMutedState(next);
-          const ctx = audioContextRef.current;
-          const masterGain = masterGainRef.current;
-          if (!ctx || !masterGain) return;
-          const now = ctx.currentTime;
-          masterGain.gain.cancelScheduledValues(now);
-          masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-          masterGain.gain.linearRampToValueAtTime(
-            next ? 0 : TARGET_GAIN,
-            now + 0.15,
-          );
+          rampMasterGain(next || duckedRef.current);
+        },
+        setDucked(next: boolean) {
+          duckedRef.current = next;
+          rampMasterGain(next || muted);
         },
       }),
-      [muted, teardown],
+      [muted, teardown, rampMasterGain],
     );
 
     if (!showMuteButton) return null;
@@ -304,16 +326,7 @@ export const AmbientAudioBed = forwardRef<AmbientAudioBedHandle, Props>(
         onClick={() => {
           const next = !muted;
           setMutedState(next);
-          const ctx = audioContextRef.current;
-          const masterGain = masterGainRef.current;
-          if (!ctx || !masterGain) return;
-          const now = ctx.currentTime;
-          masterGain.gain.cancelScheduledValues(now);
-          masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-          masterGain.gain.linearRampToValueAtTime(
-            next ? 0 : TARGET_GAIN,
-            now + 0.15,
-          );
+          rampMasterGain(next || duckedRef.current);
         }}
         aria-pressed={muted}
         aria-label={muted ? "Unmute ambient sound" : "Mute ambient sound"}

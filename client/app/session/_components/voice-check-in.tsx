@@ -212,6 +212,11 @@ export function VoiceCheckIn({
     opener: CHECK_IN_OPENER,
     onTurnComplete: handleTurnComplete,
     onError: handleError,
+    // Full hands-free loop: the patient can interrupt the assistant
+    // mid-sentence, same as /models/voice-test. The ambient bed is
+    // ducked by the session machine while this surface is mounted so
+    // it can't self-trigger the mic.
+    enableBargeIn: true,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);

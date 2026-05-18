@@ -1,0 +1,2287 @@
+/* ───────────────────────────────────────────────
+   WAVE prototype tokens.
+   Mirrors client/app/globals.css; accent + tones are
+   tweakable from the host panel via --accent-* vars.
+   ─────────────────────────────────────────────── */
+
+:root {
+  --bg:           #f5f8fb;
+  --bg-deep:      #eaf1f8;
+  --fg:           #0b1f33;
+  --fg-soft:      color-mix(in oklab, var(--fg) 70%, transparent);
+  --fg-faint:     color-mix(in oklab, var(--fg) 45%, transparent);
+  --fg-ghost:     color-mix(in oklab, var(--fg) 22%, transparent);
+  --surface:      #ffffff;
+  --surface-mute: #eef3f9;
+  --border:       #d6e1ec;
+  --border-soft:  color-mix(in oklab, var(--border) 60%, transparent);
+
+  --accent:        #0e7490;
+  --accent-fg:     #ffffff;
+  --accent-soft:   #cffafe;
+  --accent-deep:   color-mix(in oklab, var(--accent) 70%, #000);
+
+  --wave-rise:   #38bdf8;
+  --wave-peak:   #0284c7;
+  --wave-fall:   #67e8f9;
+
+  --warn:        #b45309;
+  --warn-soft:   #fef3c7;
+  --danger:      #b91c1c;
+  --danger-soft: #fee2e2;
+
+  --radius-sm: 10px;
+  --radius:    16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --shadow-soft:  0 1px 2px rgba(11,31,51,0.04), 0 10px 30px -16px rgba(11,31,51,0.18);
+  --shadow-deep:  0 20px 60px -30px rgba(11,31,51,0.4);
+
+  --motion-mult: 1;
+}
+
+[data-theme="dark"] {
+  /* WAVE — bioluminescent oceanic palette */
+  --bg-deep:      #02060d;
+  --bg:           #05101c;
+  --bg-mid:       #07182a;
+  --bg-deep-rgb:   2, 6, 13;
+
+  --ink:          #f3faff;
+  --ink-soft:     rgba(243, 250, 255, 0.92);
+  --ink-mute:     rgba(243, 250, 255, 0.75);
+  --ink-faint:    rgba(243, 250, 255, 0.55);
+  --ink-ghost:    rgba(243, 250, 255, 0.22);
+
+  /* legacy aliases — many components still reference these */
+  --fg:           var(--ink);
+  --fg-soft:      var(--ink-soft);
+  --fg-faint:     var(--ink-faint);
+  --fg-ghost:     var(--ink-ghost);
+  --surface:      rgba(8, 22, 38, 0.62);
+  --surface-mute: rgba(7, 24, 42, 0.45);
+  --border:       rgba(232, 243, 252, 0.14);
+  --border-soft:  rgba(232, 243, 252, 0.08);
+
+  --accent:        #22d3ee;
+  --accent-fg:     #02060d;
+  --accent-soft:   rgba(34, 211, 238, 0.12);
+  --accent-deep:   #5ce1d6;
+
+  --wave-glow:    #5ce1d6;
+  --wave-crest:   #b8fff2;
+  --wave-rise:    #5ce1d6;
+  --wave-peak:    #22d3ee;
+  --wave-fall:    #b8fff2;
+  --warm:         #f0c987;
+
+  --warn:        #f0c987;
+  --warn-soft:   rgba(240, 201, 135, 0.14);
+  --danger:      #ef9a9a;
+  --danger-soft: rgba(239, 154, 154, 0.14);
+
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.4), 0 18px 40px -16px rgba(0,0,0,0.7);
+  --shadow-deep: 0 30px 80px -30px rgba(0,0,0,0.85);
+}
+
+/* ─── Base ─────────────────────────────────────── */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #f0f3f6;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+[data-theme="dark"] html,
+[data-theme="dark"] body { background: #02060d; }
+
+/* WAVE — type voices.
+   - .serif        → Instrument Serif, italic, for emotional headlines
+   - .mono / Geist Mono → meta labels, eyebrows
+   - Geist (body)  → instructions, body copy */
+.serif {
+  font-family: 'Instrument Serif', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* Re-declare display / section headlines as serif in dark mode so
+   every screen's hero copy automatically picks up the new voice. We
+   keep the original sans for light mode where the WAVE aesthetic is
+   not fully expressed. */
+[data-theme="dark"] .display,
+[data-theme="dark"] .section,
+[data-theme="dark"] h1.display {
+  font-family: 'Instrument Serif', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.mono { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ─── Frame shell ─────────────────────────────── */
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background:
+    radial-gradient(1200px 800px at 20% 0%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 60%),
+    radial-gradient(900px 700px at 90% 90%, color-mix(in oklab, var(--wave-rise) 12%, transparent), transparent 60%),
+    var(--bg-deep);
+  transition: background 320ms ease;
+}
+
+/* In web frame mode the shell is a fixed 1280×800 laptop browser
+   window. The stage scales it down to fit if the viewport is smaller
+   so it never crops. */
+[data-frame="web"] #root {
+  padding: 28px;
+  min-height: 100vh;
+}
+
+[data-frame="web"] .stage {
+  width: 100%;
+  align-items: center;
+}
+
+[data-frame="web"] .web-shell-fit {
+  transform-origin: top center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ─── Web shell (browser-window mock) ─────────── */
+
+.web-shell {
+  width: 1280px;
+  height: 800px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 30px 80px rgba(11, 31, 51, 0.18),
+    0 0 0 1px rgba(11, 31, 51, 0.08);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.web-shell.is-dark {
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Chrome bar + toolbar */
+
+.web-chrome { flex-shrink: 0; }
+
+.web-chrome-bar {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  background: #ddd9d6;
+  padding-left: 14px;
+  gap: 10px;
+}
+[data-theme="dark"] .web-chrome-bar { background: #2a2c2e; }
+
+.web-chrome-traffic { display: flex; gap: 7px; }
+.web-chrome-traffic span {
+  width: 11px; height: 11px; border-radius: 50%;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.12);
+}
+
+.web-chrome-tabs {
+  display: flex; align-items: flex-end;
+  height: 100%;
+  gap: 0;
+  padding-left: 8px;
+}
+
+.web-chrome-tab {
+  height: 30px;
+  padding: 0 14px 0 12px;
+  display: flex; align-items: center; gap: 10px;
+  background: transparent;
+  border-radius: 8px 8px 0 0;
+  min-width: 180px; max-width: 260px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.55);
+}
+.web-chrome-tab.active {
+  background: var(--bg);
+  color: var(--fg);
+  position: relative;
+}
+[data-theme="dark"] .web-chrome-tab.active { background: #1a1d20; color: #e8eaed; }
+
+.web-chrome-favicon {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.web-chrome-tab-title {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 500;
+}
+.web-chrome-tab-x {
+  font-size: 14px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: rgba(0,0,0,0.4);
+}
+[data-theme="dark"] .web-chrome-tab-x { color: rgba(255,255,255,0.5); }
+
+.web-chrome-new-tab {
+  width: 22px; height: 22px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  color: rgba(0,0,0,0.45);
+}
+[data-theme="dark"] .web-chrome-new-tab { color: rgba(255,255,255,0.45); }
+
+.web-chrome-toolbar {
+  height: 42px;
+  background: var(--bg);
+  display: flex; align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+[data-theme="dark"] .web-chrome-toolbar { background: #1a1d20; border-color: rgba(255,255,255,0.06); }
+
+.web-chrome-nav { display: flex; gap: 4px; }
+.web-chrome-btn {
+  width: 28px; height: 28px;
+  border: 0; background: transparent;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--fg-soft);
+  cursor: pointer;
+}
+.web-chrome-btn:hover { background: color-mix(in oklab, var(--fg) 6%, transparent); color: var(--fg); }
+
+.web-chrome-url {
+  flex: 1; height: 28px;
+  background: color-mix(in oklab, var(--fg) 5%, transparent);
+  border-radius: 999px;
+  display: flex; align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: var(--fg-soft);
+}
+.web-chrome-lock {
+  display: inline-flex; align-items: center;
+  color: color-mix(in oklab, var(--fg) 55%, transparent);
+}
+.web-chrome-url-text { letter-spacing: 0; }
+
+/* Viewport — the actual page area, where the wave bg + content live. */
+
+.web-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.web-wave-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.web-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Web mode screen overrides ──────────────────
+   Existing screen components were sized for a 402×874 phone canvas;
+   in web mode we relax the paddings, scale up display type, and
+   center a generous content column. Keeps the same DOM. */
+
+[data-frame="web"] .screen {
+  background: transparent;
+  padding-top: 0;
+  padding-bottom: 0;
+  min-height: 0;
+  display: block;
+  /* In iOS mode the screen clips content (the IOSDevice owns the
+     scroller). In web mode the scroller is .web-content above us, so
+     leaving overflow:hidden here would clip tall screens (reflection,
+     dashboard) and stop the parent from ever scrolling. */
+  overflow: visible;
+}
+
+[data-frame="web"] .topbar {
+  max-width: 880px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 28px 32px 0;
+  height: auto;
+  font-size: 13px;
+}
+
+[data-frame="web"] .screen-body {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 32px 32px 80px;
+  gap: 22px;
+}
+
+/* Spacer-grow was used to push CTAs to the bottom of a fixed phone
+   screen. In web mode the page scrolls so the spacer just adds
+   awkward whitespace — collapse it to a small gap. */
+[data-frame="web"] .spacer-grow { flex: 0 0 24px; height: 24px; }
+
+/* Reflection score arc: SVG uses preserveAspectRatio="none" so its
+   text labels balloon when the column gets wider. Cap the SVG width
+   in web mode so the chart stays a sensible size and the score
+   numbers above each point read like normal labels, not headlines. */
+[data-frame="web"] .arc-card svg {
+  max-width: 460px;
+  display: block;
+  margin: 0 auto;
+}
+[data-frame="web"] .arc-card .arc-axis {
+  max-width: 460px;
+  margin: 8px auto 0;
+}
+
+[data-frame="web"] h1.display {
+  font-size: 44px;
+  line-height: 1.08;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+[data-frame="web"] h1.display.big {
+  font-size: 64px;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 300;
+}
+
+[data-frame="web"] p.lede {
+  font-size: 18px;
+  line-height: 1.55;
+  max-width: 56ch;
+}
+
+[data-frame="web"] .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+}
+
+[data-frame="web"] .btn.huge {
+  font-size: 17px;
+  min-height: 60px;
+  padding: 18px 30px;
+  align-self: flex-start;
+  border-radius: 999px;
+}
+
+[data-frame="web"] .btn.primary {
+  font-size: 16px;
+}
+
+/* Home wave bg lives inside .web-wave-bg now, hide the inline copy
+   from HomeScreen so we don't double-render it. */
+[data-frame="web"] .home-bg { display: none; }
+
+/* The wave canvas inside chunk/check-in screens stays bare and small
+   in web mode (intentional — wave is in the background); keep the
+   small variant we already use. Nothing to override. */
+
+/* ─── Web lock toast page ────────────────────── */
+
+.web-lock {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  padding: 32px;
+}
+
+.web-lock-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  margin-top: -40px;
+}
+
+.web-lock-time {
+  font-size: 132px;
+  font-weight: 200;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  font-feature-settings: 'ss01';
+  color: var(--fg);
+}
+
+.web-lock-date {
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--fg-soft);
+  letter-spacing: -0.01em;
+}
+
+.web-lock-quiet {
+  margin-top: 28px;
+  font-size: 15px;
+  color: var(--fg-faint);
+  max-width: 38ch;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.web-lock-toast {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  width: 360px;
+  display: flex;
+  gap: 12px;
+  padding: 16px 18px;
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px -20px rgba(11, 31, 51, 0.25),
+              0 0 0 1px rgba(11, 31, 51, 0.04);
+  text-align: left;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+  animation: web-toast-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.web-lock-toast:hover {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+}
+
+@keyframes web-toast-in {
+  from { opacity: 0; transform: translateX(40px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.web-lock-toast-icon { flex-shrink: 0; }
+
+.web-lock-toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.web-lock-toast-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px;
+  color: var(--fg-faint);
+  letter-spacing: 0.02em;
+}
+.web-lock-toast-app { font-weight: 600; color: var(--fg-soft); }
+.web-lock-toast-source { font-family: 'Geist Mono', ui-monospace, monospace; }
+.web-lock-toast-ts { margin-left: auto; }
+.web-lock-toast-dot { color: var(--fg-ghost); }
+
+.web-lock-toast-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--fg);
+  margin-top: 2px;
+}
+.web-lock-toast-body-text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-soft);
+}
+
+.web-lock-toast-actions {
+  display: flex; gap: 6px;
+  margin-top: 8px;
+}
+.web-lock-toast-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  color: var(--fg-soft);
+}
+.web-lock-toast-btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.web-lock-toast-x {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 16px;
+  color: var(--fg-faint);
+  line-height: 1;
+}
+
+/* When body is in web mode and theme is dark, the lock page still
+   wants a calm dim surface. Inherit from theme; no extra rules. */
+
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.stage-caption {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+/* ─── Screen container ────────────────────────── */
+
+.screen {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  position: relative;
+  overflow: hidden;
+  padding-top: 54px;     /* iOS safe area · status bar */
+  padding-bottom: 30px;  /* iOS safe area · home indicator */
+}
+
+.screen-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 22px 14px;
+  gap: 16px;
+}
+
+.screen-body.tight { padding-top: 4px; gap: 12px; }
+
+/* ─── Type ─────────────────────────────────────── */
+
+.eyebrow {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.eyebrow.accent { color: var(--accent); }
+
+h1.display {
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: -0.028em;
+  font-weight: 500;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+h1.display.big {
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: pretty;
+}
+
+h2.section {
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+p.lede {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fg-soft);
+  text-wrap: pretty;
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-faint);
+}
+
+/* ─── Buttons ─────────────────────────────────── */
+
+.btn {
+  appearance: none;
+  border: 0;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 12px 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: transform 120ms ease, background 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:active { transform: scale(0.985); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+  box-shadow: 0 8px 24px -8px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+.btn.primary:hover { color: var(--accent-fg); filter: brightness(1.05); }
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-soft);
+}
+.btn.ghost:hover { color: var(--accent); }
+
+.btn.huge {
+  font-size: 21px;
+  padding: 22px 28px;
+  min-height: 76px;
+  border-radius: 28px;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Cards ───────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.card.flush { padding: 18px; }
+.card.tight { padding: 14px 16px; }
+
+.card.glass {
+  background: color-mix(in oklab, var(--surface) 85%, transparent);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+/* ─── Pills & chips ────────────────────────────── */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg-soft);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pill .dot {
+  width: 6px; height: 6px; border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+
+.pill.solid {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.chip-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.chip-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.chip-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+.chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-mute);
+  color: var(--fg);
+  padding: 14px 6px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 120ms ease;
+  text-align: center;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip:active { transform: scale(0.97); }
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+.chip.list {
+  padding: 14px 14px;
+  text-align: left;
+  font-size: 15px;
+}
+.chip.list[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+}
+
+.chip-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+
+/* ─── Intensity slider ────────────────────────── */
+
+.intensity {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  user-select: none;
+}
+
+.intensity-readout {
+  display: flex; align-items: baseline; justify-content: center;
+  min-height: 60px;
+}
+
+.intensity-num {
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  transition: opacity 200ms ease, color 200ms ease;
+}
+.intensity-num .intensity-unit {
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--fg-faint);
+  margin-left: 4px;
+}
+
+.intensity.lg .intensity-num { font-size: 92px; font-weight: 200; }
+
+.intensity-track {
+  position: relative;
+  height: 56px;
+  display: flex; align-items: center;
+  touch-action: none;
+  cursor: grab;
+  padding: 0 4px;
+  border-radius: 999px;
+}
+.intensity-track:active { cursor: grabbing; }
+.intensity-track:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 999px; }
+
+.intensity.lg .intensity-track { height: 64px; }
+
+.intensity-track-bg {
+  position: absolute; left: 4px; right: 4px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-mute);
+  border: 1px solid var(--border-soft);
+}
+
+.intensity-track-fill {
+  position: absolute; left: 4px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px -6px color-mix(in oklab, var(--accent) 70%, transparent);
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+.intensity-ticks {
+  position: absolute; left: 4px; right: 4px;
+  height: 12px;
+  pointer-events: none;
+}
+.intensity-tick {
+  position: absolute;
+  top: 50%; transform: translate(-50%, -50%);
+  width: 2px; height: 4px;
+  background: color-mix(in oklab, var(--fg) 18%, transparent);
+  border-radius: 1px;
+}
+[data-theme="dark"] .intensity-tick {
+  background: color-mix(in oklab, var(--fg) 24%, transparent);
+}
+
+.intensity-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.10),
+    0 6px 20px -6px color-mix(in oklab, var(--accent) 50%, transparent),
+    0 0 0 1px var(--border);
+  display: flex; align-items: center; justify-content: center;
+  transition: left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 120ms ease;
+  pointer-events: none;
+}
+.intensity-track:active .intensity-thumb { transform: translate(-50%, -50%) scale(1.06); }
+
+.intensity-thumb-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+.intensity.lg .intensity-thumb { width: 44px; height: 44px; }
+.intensity.lg .intensity-thumb-dot { width: 18px; height: 18px; }
+
+/* ─── Scale label rail (under chips/sliders) ──── */
+
+.scale-rail {
+  display: flex; justify-content: space-between;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 0 2px;
+}
+
+/* ─── Wave canvas container ───────────────────── */
+
+.wave-canvas {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--surface) 95%, transparent),
+    color-mix(in oklab, var(--surface-mute) 85%, transparent));
+  border: 1px solid var(--border-soft);
+  isolation: isolate;
+}
+
+.wave-canvas.bare {
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+}
+
+.wave-canvas .layer { position: absolute; inset: 0; }
+
+.wave-canvas .scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 50%, transparent) 0%, transparent 30%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.wave-canvas .badge {
+  position: absolute; left: 14px; top: 12px;
+  z-index: 4;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-soft);
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+}
+
+.wave-canvas .gauge {
+  position: absolute; right: 14px; top: 12px;
+  z-index: 4;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--fg);
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Chat bubbles ────────────────────────────── */
+
+.chat-scroll {
+  display: flex; flex-direction: column;
+  gap: 8px;
+  padding: 6px 2px;
+}
+
+.bubble {
+  max-width: 86%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  animation: fadeup 260ms ease both;
+}
+.bubble.agent {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  align-self: flex-start;
+  border-top-left-radius: 8px;
+}
+.bubble.patient {
+  background: var(--accent);
+  color: var(--accent-fg);
+  align-self: flex-end;
+  border-top-right-radius: 8px;
+  border: 1px solid transparent;
+}
+
+@keyframes fadeup {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dot-typing {
+  display: inline-flex; gap: 4px;
+  align-items: center;
+}
+.dot-typing span {
+  width: 5px; height: 5px;
+  border-radius: 999px;
+  background: var(--fg-ghost);
+  animation: bob 1s ease-in-out infinite;
+}
+.dot-typing span:nth-child(2) { animation-delay: 120ms; }
+.dot-typing span:nth-child(3) { animation-delay: 240ms; }
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50%      { transform: translateY(-3px); opacity: 1; }
+}
+
+/* ─── Composer ────────────────────────────────── */
+
+.composer {
+  display: flex; gap: 8px;
+  align-items: flex-end;
+  padding: 8px 10px 8px 14px;
+  border-radius: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14.5px;
+  padding: 6px 0;
+  outline: none;
+  line-height: 1.4;
+  min-height: 24px;
+  max-height: 96px;
+}
+
+.send-btn {
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.send-btn:active:not(:disabled) { transform: scale(0.93); }
+
+/* ─── Voice check-in ──────────────────────────── */
+
+.voice-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--accent) 14%, var(--border));
+  border-radius: 22px;
+  overflow: hidden;
+  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+}
+.voice-card::before {
+  /* faint accent glow that brightens with state */
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 80% at 50% 0%,
+    color-mix(in oklab, var(--accent) 14%, transparent),
+    transparent 70%);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.voice-card.live::before { opacity: 1; }
+.voice-card.recording {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 10%, transparent);
+}
+.voice-card.speaking {
+  border-color: color-mix(in oklab, var(--accent) 28%, var(--border));
+}
+
+.voice-viz {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 56px;
+  width: 100%;
+}
+.voice-viz .vbar {
+  display: block;
+  width: 4px;
+  min-height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--accent) 95%, white),
+    color-mix(in oklab, var(--accent) 65%, var(--accent-soft)));
+  transition: height 70ms cubic-bezier(0.2, 0.7, 0.2, 1),
+              background 220ms ease;
+}
+.voice-card.idle .vbar,
+.voice-card.done .vbar {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--fg) 28%, transparent),
+    color-mix(in oklab, var(--fg) 14%, transparent));
+}
+.voice-card.recording .vbar {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--accent) 100%, white),
+    color-mix(in oklab, var(--wave-peak, var(--accent)) 80%, transparent));
+}
+
+.voice-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: color-mix(in oklab, var(--fg) 70%, transparent);
+}
+.voice-dot {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--fg) 35%, transparent);
+  box-shadow: 0 0 0 0 transparent;
+}
+.voice-dot.recording,
+.voice-dot.listening,
+.voice-dot.speaking,
+.voice-dot.thinking,
+.voice-dot.transcribing,
+.voice-dot.warming {
+  background: var(--accent);
+  animation: voice-dot-pulse 1.6s ease-in-out infinite;
+}
+.voice-dot.recording { animation-duration: 0.9s; }
+.voice-dot.speaking  { animation-duration: 1.2s; }
+.voice-dot.done {
+  background: color-mix(in oklab, var(--accent) 60%, var(--fg));
+}
+
+@keyframes voice-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 0%, transparent); }
+}
+
+.voice-transcript {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 110px;
+  max-height: 220px;
+  padding: 4px 2px;
+  scroll-behavior: smooth;
+  mask-image: linear-gradient(180deg, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+}
+.voice-empty {
+  margin: 12px 4px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--fg) 50%, transparent);
+  text-align: center;
+}
+
+/* ─── Mic toggle button ───────────────────────── */
+
+.mic-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 2px;
+}
+.mic-btn {
+  position: relative;
+  width: 76px; height: 76px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--accent-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 140ms cubic-bezier(0.2, 0.7, 0.2, 1),
+              background 220ms ease,
+              box-shadow 220ms ease;
+  box-shadow:
+    0 6px 20px color-mix(in oklab, var(--accent) 35%, transparent),
+    inset 0 -3px 0 color-mix(in oklab, black 18%, transparent);
+}
+.mic-btn:active { transform: scale(0.94); }
+.mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mic-btn.on {
+  background: color-mix(in oklab, var(--danger, #e11d48) 92%, var(--accent));
+  color: white;
+  box-shadow:
+    0 6px 22px color-mix(in oklab, var(--danger, #e11d48) 40%, transparent),
+    inset 0 -3px 0 color-mix(in oklab, black 22%, transparent);
+}
+.mic-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+
+/* Concentric pulsing rings — only animate when live */
+.mic-rings {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.mic-rings span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid color-mix(in oklab, currentColor 45%, transparent);
+  opacity: 0;
+  transform: scale(1);
+}
+.mic-btn.recording .mic-rings span,
+.mic-btn.speaking  .mic-rings span,
+.mic-btn.listening .mic-rings span {
+  animation: mic-ring-out 2.2s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+}
+.mic-btn.recording .mic-rings span { animation-duration: 1.4s; }
+.mic-btn.recording .mic-rings span:nth-child(2),
+.mic-btn.speaking  .mic-rings span:nth-child(2),
+.mic-btn.listening .mic-rings span:nth-child(2) { animation-delay: 0.45s; }
+.mic-btn.recording .mic-rings span:nth-child(3),
+.mic-btn.speaking  .mic-rings span:nth-child(3),
+.mic-btn.listening .mic-rings span:nth-child(3) { animation-delay: 0.9s; }
+
+@keyframes mic-ring-out {
+  0%   { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0;    transform: scale(1.7); }
+}
+
+/* Subtle "thinking" spin for the mic icon while LLM is generating */
+.mic-btn.thinking .mic-glyph,
+.mic-btn.transcribing .mic-glyph,
+.mic-btn.warming .mic-glyph {
+  animation: mic-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes mic-shimmer {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.mic-label {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--fg) 90%, transparent);
+}
+.mic-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+  color: color-mix(in oklab, var(--fg) 55%, transparent);
+  max-width: 260px;
+}
+.mic-hint.subtle { color: color-mix(in oklab, var(--fg) 42%, transparent); }
+
+.chip-row.quick { gap: 6px; }
+.chip.quick {
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+/* ─── Score arc & charts ──────────────────────── */
+
+.arc-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.arc-axis {
+  display: flex; justify-content: space-between;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--fg-faint);
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+/* ─── Reflection plan textarea ────────────────── */
+
+.plan-area {
+  width: 100%;
+  min-height: 76px;
+  padding: 12px 14px;
+  background: var(--surface-mute);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.4;
+  resize: none;
+  color: var(--fg);
+}
+.plan-area:focus { outline: none; border-color: var(--accent); }
+
+/* ─── Nav-rail at top of screens ──────────────── */
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 22px 0;
+  height: 44px;
+  color: var(--fg-soft);
+  font-size: 13px;
+}
+
+.topbar .back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+  color: var(--fg-soft);
+  background: none; border: 0; font: inherit;
+  padding: 6px 10px 6px 4px;
+  border-radius: 999px;
+}
+.topbar .back-link:hover { color: var(--accent); }
+
+.crumb {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ─── Lock screen ─────────────────────────────── */
+
+.lock {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  color: #fff;
+  padding-top: 54px;
+  padding-bottom: 30px;
+  background:
+    radial-gradient(80% 60% at 50% 0%, color-mix(in oklab, #0e7490 50%, transparent), transparent 70%),
+    radial-gradient(80% 60% at 50% 100%, color-mix(in oklab, #1e293b 50%, transparent), transparent 60%),
+    linear-gradient(180deg, #061827 0%, #04121d 60%, #020a14 100%);
+}
+
+.lock-time {
+  font-size: 92px;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-align: center;
+  font-feature-settings: "ss01";
+}
+
+.lock-date {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 6px;
+}
+
+.lock-notif {
+  margin: 0 14px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.95);
+  display: flex;
+  gap: 12px;
+  text-align: left;
+  align-items: flex-start;
+  cursor: pointer;
+  font: inherit;
+  opacity: 1;
+}
+.lock-notif:hover { background: rgba(255,255,255,0.14); }
+
+@keyframes notif-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.lock-notif .icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background:
+    radial-gradient(circle at 30% 30%, #67e8f9, transparent 60%),
+    linear-gradient(135deg, #0284c7, #0e7490);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.lock-notif h4 {
+  margin: 0 0 1px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.lock-notif h4 .ts {
+  font-weight: 400;
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+}
+
+.lock-notif p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: rgba(255,255,255,0.85);
+}
+
+.lock-hint {
+  margin-top: auto;
+  text-align: center;
+  padding-bottom: 32px;
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+
+.lock-hint .arrow {
+  width: 18px; height: 18px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  animation: bob-arrow 1.6s ease-in-out infinite;
+  opacity: 0.55;
+}
+@keyframes bob-arrow {
+  0%, 100% { transform: translateY(0) rotate(45deg); }
+  50%      { transform: translateY(4px) rotate(45deg); }
+}
+
+/* ─── Home screen ─────────────────────────────── */
+
+.home-bg {
+  position: absolute; inset: 0; z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ─── Score tester (check-in test affordance) ─── */
+
+.score-tester {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.score-tester-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  flex-shrink: 0;
+}
+
+.score-tester-chips {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  flex: 1;
+}
+
+.score-tester-chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-soft);
+  padding: 6px 0;
+  border-radius: 8px;
+  font: inherit;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 120ms ease;
+}
+.score-tester-chip:hover { border-color: var(--accent); color: var(--accent); }
+.score-tester-chip:active { transform: scale(0.95); }
+.score-tester-chip.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+/* ─── Breath orb (loading) ────────────────────── */
+
+.breath {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 22px;
+  padding: 40px 24px 64px;
+  flex: 1;
+}
+
+.breath-orb {
+  width: 180px; height: 180px;
+  border-radius: 50%;
+  background:
+    /* Specular highlight — light kiss off the upper-left */
+    radial-gradient(circle at 28% 22%, rgba(255,255,255,0.5), rgba(255,255,255,0) 40%),
+    /* Pale wash sitting just under the highlight (uses the wave's
+       lightest tone, --wave-fall) */
+    radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--wave-fall) 92%, white), transparent 55%),
+    /* Body gradient — same palette as the wave layers:
+         wave-fall (crest highlight) → wave-rise (mid layer) → wave-peak (front layer) */
+    radial-gradient(circle at 50% 45%,
+      var(--wave-fall) 0%,
+      var(--wave-rise) 38%,
+      var(--wave-peak) 100%);
+  /* Soft, feathered edge — body stays fully opaque through the middle,
+     then fades smoothly to transparent at the perimeter so the orb has
+     no hard outline. */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, black 38%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.4) 82%, transparent 100%);
+          mask-image: radial-gradient(circle at 50% 50%, black 38%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.4) 82%, transparent 100%);
+  box-shadow: none;
+  filter: drop-shadow(0 0 60px color-mix(in oklab, var(--wave-peak) 45%, transparent));
+  animation: breathe 7s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(0.86); filter: brightness(0.92); }
+  45%, 55% { transform: scale(1.08); filter: brightness(1.08); }
+}
+
+/* ─── Reflection title progress ──────────────── */
+
+.thinking-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+.thinking-list li {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14.5px;
+  color: var(--fg-soft);
+  padding: 8px 0;
+}
+.thinking-list .marker {
+  width: 16px; height: 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+}
+.thinking-list li.done .marker {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.thinking-list li.done .marker::after {
+  content: ''; position: absolute; left: 3px; top: 6px;
+  width: 4px; height: 8px;
+  border: 2px solid var(--accent-fg);
+  border-top: 0; border-left: 0;
+  transform: rotate(45deg);
+}
+.thinking-list li.active .marker {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 25%, transparent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 0%, transparent); }
+}
+.thinking-list li.done { color: var(--fg); }
+
+/* ─── Dashboard mini-cards ────────────────────── */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.stat .num {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.stat .num .unit {
+  font-size: 13px;
+  color: var(--fg-faint);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.stat .label {
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-top: 4px;
+}
+
+/* ─── Misc utilities ──────────────────────────── */
+
+.divider {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 4px 0;
+}
+
+.spacer-grow { flex: 1; }
+
+.center-col {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 12px;
+}
+
+.row {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.row.between { justify-content: space-between; }
+
+a, a:visited { color: var(--accent); text-decoration: none; }
+
+/* ─── Wave animations ─────────────────────────── */
+
+@keyframes wave-slide {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes wave-slide-rev {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+@keyframes wave-bob-vert {
+  0%   { transform: translateY(0); }
+  35%  { transform: translateY(calc(var(--bob-offset, 2px) * 0.7)); }
+  60%  { transform: translateY(var(--bob-offset, 2px)); }
+  100% { transform: translateY(0); }
+}
+@keyframes sparkle-drift {
+  0%, 100% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+  25%      { transform: translate(6px, -1px) scale(1);   opacity: 0.75; }
+  55%      { transform: translate(18px, 0)   scale(0.85); opacity: 0.55; }
+  82%      { transform: translate(30px, -2px) scale(0.55); opacity: 0; }
+}
+@keyframes orb-bob {
+  0%, 100% { transform: scale(var(--orb-s, 1)); }
+  50%      { transform: scale(calc(var(--orb-s, 1) * 1.04)); }
+}
+@keyframes orb-halo {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50%      { transform: scale(1.06); opacity: 0.9; }
+}
+
+/* hide host frame overflow gracefully when iOS frame scrolls */
+[data-theme="dark"] .lock {
+  background:
+    radial-gradient(80% 60% at 50% 0%, color-mix(in oklab, #0e7490 35%, transparent), transparent 70%),
+    radial-gradient(80% 60% at 50% 100%, color-mix(in oklab, #1e293b 60%, transparent), transparent 60%),
+    linear-gradient(180deg, #03101a 0%, #020a14 60%, #010810 100%);
+}
+
+/* Edit-mode toolbar can sometimes overflow; ensure our app fills */
+html, body, #root { width: 100%; }
+
+/* WAVE wordmark glyph — single soft curve, fades from accent to nothing.
+   A real wave: rises, crests, falls, doesn't repeat. */
+.wave-mark {
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  flex-shrink: 0;
+  background: currentColor;
+  color: var(--accent);
+  /* SVG mask draws the curve so it inherits color via currentColor. */
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 16'><path d='M1 11 C 4 11 6 4 10 4 C 14 4 16 11 20 11 C 24 11 25 7 27 7' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 16'><path d='M1 11 C 4 11 6 4 10 4 C 14 4 16 11 20 11 C 24 11 25 7 27 7' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/contain no-repeat;
+}
+.wave-mark::before,
+.wave-mark::after { content: none; }
+
+/* ════════════════════════════════════════════════════════════
+   WAVE design — atmosphere, dark-mode tunings, new components
+   ════════════════════════════════════════════════════════════ */
+
+/* ─── Film grain overlay on the canvas ──────────
+   SVG fractal noise sat ~5% opacity, blend overlay. Sits inside the
+   .wave-canvas-host so it's part of the atmosphere layer. */
+.wave-grain {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9JzAuOScgbnVtT2N0YXZlcz0nMicgc2VlZD0nNScgc3RpdGNoVGlsZXM9J3N0aXRjaCcvPjxmZUNvbG9yTWF0cml4IHZhbHVlcz0nMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMSAwJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsdGVyPSd1cmwoJTIzbiknLz48L3N2Zz4=");
+  background-size: 240px 240px;
+}
+[data-theme="light"] .wave-grain { opacity: 0; }
+
+/* The host sits inside the device frame, behind .screen content.
+   We push every screen above z-index 1 to ensure stacking. */
+.wave-canvas-host { z-index: 1; }
+.screen { position: relative; z-index: 10; }
+.lock { position: relative; z-index: 10; }
+[data-theme="dark"] .stage > .web-shell-fit-wrap,
+[data-theme="dark"] .stage > div { z-index: auto; }
+/* Ensure the children container in IOSDevice stacks above the canvas. */
+[data-theme="dark"] .home-bg ~ * { z-index: 10; }
+
+/* Dark theme — every screen is transparent so the canvas shows
+   through. We also clear the gradient bg the old screen had. */
+[data-theme="dark"] .screen,
+[data-theme="dark"] #root,
+[data-theme="dark"] .web-viewport,
+[data-theme="dark"] .web-content {
+  background: transparent;
+}
+
+/* Tone the device-level bg flat black so the wave does the work. */
+[data-theme="dark"] #root {
+  background: #02060d;
+}
+
+/* ─── Card surfaces in dark mode — translucent + glass ──────
+   The wave is visible *through* every card. Borders use ink-ghost so
+   they read as thin etched edges, not painted dividers. */
+[data-theme="dark"] .card {
+  background: color-mix(in oklab, var(--bg-mid) 70%, transparent);
+  border-color: var(--ink-ghost);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 243, 252, 0.04),
+    0 24px 50px -32px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .card.glass {
+  background: color-mix(in oklab, var(--bg-mid) 55%, transparent);
+}
+
+[data-theme="dark"] .pill {
+  background: color-mix(in oklab, var(--bg-mid) 60%, transparent);
+  border-color: var(--ink-ghost);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--ink-soft);
+}
+
+[data-theme="dark"] .pill .dot {
+  background: var(--wave-glow);
+  box-shadow: 0 0 0 4px rgba(92, 225, 214, 0.18), 0 0 8px var(--wave-glow);
+}
+
+[data-theme="dark"] .btn {
+  background: color-mix(in oklab, var(--bg-mid) 55%, transparent);
+  border-color: var(--ink-ghost);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--ink);
+}
+[data-theme="dark"] .btn:hover {
+  border-color: var(--accent);
+  color: var(--wave-crest);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+[data-theme="dark"] .btn.primary {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--wave-glow) 28%, transparent),
+    color-mix(in oklab, var(--accent) 22%, transparent));
+  border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+  color: var(--wave-crest);
+  box-shadow:
+    inset 0 1px 0 rgba(184,255,242,0.18),
+    0 14px 30px -14px rgba(34, 211, 238, 0.5),
+    0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
+  text-shadow: 0 0 12px rgba(92,225,214,0.5);
+}
+[data-theme="dark"] .btn.primary:hover {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--wave-glow) 38%, transparent),
+    color-mix(in oklab, var(--accent) 32%, transparent));
+  filter: none;
+  color: #fff;
+}
+[data-theme="dark"] .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-mute);
+}
+[data-theme="dark"] .btn.ghost:hover { color: var(--wave-glow); background: transparent; }
+
+[data-theme="dark"] .chip {
+  background: color-mix(in oklab, var(--bg-mid) 55%, transparent);
+  border-color: var(--ink-ghost);
+  color: var(--ink-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+[data-theme="dark"] .chip:hover { border-color: var(--accent); color: var(--ink); }
+[data-theme="dark"] .chip[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  color: var(--wave-crest);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent),
+              0 8px 24px -12px rgba(34, 211, 238, 0.45);
+}
+
+[data-theme="dark"] .eyebrow {
+  color: var(--ink-faint);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+[data-theme="dark"] .eyebrow.accent {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.35);
+}
+
+[data-theme="dark"] .lede,
+[data-theme="dark"] p.lede {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+[data-theme="dark"] .hint { color: var(--ink-mute); }
+
+[data-theme="dark"] .crumb { color: var(--ink-faint); }
+
+[data-theme="dark"] .display { color: var(--ink); }
+[data-theme="dark"] .display.big { font-size: 42px; line-height: 1.04; }
+
+/* ─── Wordmark ─────────────────────────────────
+   Italic serif "WAVE" — the typographic mark on home/lock. */
+.wordmark {
+  font-family: 'Instrument Serif', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+
+/* ─── Drag-the-wave intake ─────────────────────
+   Step 1 of intake. The whole central area is a touch zone; while
+   dragging we show a large italic-serif readout with a cyan glow on
+   the number that intensifies with the score. */
+.drag-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.drag-readout {
+  text-align: center;
+  pointer-events: none;
+}
+.drag-readout .num {
+  font-family: 'Instrument Serif', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 96px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--wave-crest);
+  display: inline-block;
+  transition: text-shadow 240ms ease;
+}
+.drag-readout .denom {
+  font-family: 'Geist Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+.drag-readout .label {
+  display: block;
+  margin-top: 12px;
+  font-family: 'Instrument Serif', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--ink-soft);
+  letter-spacing: -0.01em;
+}
+.drag-readout.touched .num {
+  text-shadow:
+    0 0 18px var(--wave-glow),
+    0 0 42px color-mix(in oklab, var(--wave-glow) 60%, transparent);
+}
+
+/* ─── Voice orb ────────────────────────────────
+   72px core inside expanding rings. Driven by `data-state` set on the
+   wrapper; each state has its own keyframe so transitions read fast. */
+.voice-orb {
+  position: relative;
+  width: 88px; height: 88px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.voice-orb-core {
+  position: relative; z-index: 2;
+  width: 44px; height: 44px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%,
+    var(--wave-crest) 0%,
+    var(--wave-glow) 45%,
+    color-mix(in oklab, var(--accent) 70%, transparent) 100%);
+  box-shadow:
+    0 0 16px var(--wave-glow),
+    0 0 48px color-mix(in oklab, var(--wave-glow) 60%, transparent),
+    inset 0 -6px 14px rgba(2, 6, 13, 0.25);
+}
+.voice-orb-ring {
+  position: absolute; inset: 0; border-radius: 999px;
+  border: 1.5px solid color-mix(in oklab, var(--wave-glow) 50%, transparent);
+  pointer-events: none;
+}
+
+/* state: idle — slow breathing */
+.voice-orb[data-state="idle"] .voice-orb-core {
+  animation: orb-idle-core 4s ease-in-out infinite;
+  opacity: 0.7;
+}
+.voice-orb[data-state="idle"] .voice-orb-ring {
+  animation: orb-idle-ring 4s ease-in-out infinite;
+  opacity: 0.35;
+}
+@keyframes orb-idle-core {
+  0%, 100% { transform: scale(0.95); opacity: 0.6; }
+  50%      { transform: scale(1.08); opacity: 1.0; }
+}
+@keyframes orb-idle-ring {
+  0%, 100% { transform: scale(1.0); opacity: 0.3; }
+  50%      { transform: scale(1.12); opacity: 0.55; }
+}
+
+/* state: speaking — pulsing ring + scaling core */
+.voice-orb[data-state="speaking"] .voice-orb-core {
+  animation: orb-speak-core 2.4s ease-in-out infinite;
+}
+.voice-orb[data-state="speaking"] .voice-orb-ring {
+  animation: orb-speak-ring 2.4s ease-out infinite;
+}
+@keyframes orb-speak-core {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.55); }
+}
+@keyframes orb-speak-ring {
+  0%   { transform: scale(1.0); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0;   }
+}
+
+/* state: listening — two expanding rings staggered */
+.voice-orb[data-state="listening"] .voice-orb-core { opacity: 1; transform: scale(1.05); }
+.voice-orb[data-state="listening"] .voice-orb-ring {
+  animation: orb-listen-ring 1.6s ease-out infinite;
+}
+.voice-orb[data-state="listening"] .voice-orb-ring.r2 {
+  animation-delay: 0.8s;
+}
+@keyframes orb-listen-ring {
+  0%   { transform: scale(0.9); opacity: 0.9; }
+  100% { transform: scale(2.5); opacity: 0;   }
+}
+
+.voice-orb-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+  margin-top: 18px;
+  min-height: 14px;
+}
+
+/* ─── Score readout (check-in) ─────────────────
+   Italic serif centered number above the orb. A brief `is-updating`
+   flash on commit. */
+.score-readout {
+  text-align: center;
+  font-family: 'Instrument Serif', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 56px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--wave-crest);
+}
+.score-readout .denom {
+  font-family: 'Geist Mono', monospace;
+  font-style: normal;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  margin-left: 8px;
+  text-transform: uppercase;
+  vertical-align: 0.4em;
+}
+.score-readout .word {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+  color: var(--ink-soft);
+}
+.score-readout.is-updating {
+  animation: score-flash 900ms ease;
+}
+@keyframes score-flash {
+  0%   { text-shadow: 0 0 0   rgba(184,255,242,0); }
+  30%  { text-shadow: 0 0 32px rgba(184,255,242,0.9), 0 0 64px rgba(92,225,214,0.6); }
+  100% { text-shadow: 0 0 0   rgba(184,255,242,0); }
+}
+
+/* ─── Thin progress bar (chunk player) ─────────
+   1px line with cyan gradient + glow. */
+.thin-progress {
+  position: relative;
+  height: 1.5px;
+  background: var(--ink-ghost);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.thin-progress > span {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--wave-glow), var(--wave-crest));
+  box-shadow: 0 0 12px var(--wave-glow);
+  transition: width 800ms ease;
+}
+
+/* ─── MAT-aware banner (chunk player) ──────────
+   Subtle cyan-tinted card that appears at the start of a chunk and
+   auto-dismisses after ~7s. We avoid keyframe-based slide-ins here
+   so the banner stays readable even when the embedding iframe
+   throttles CSS animations. */
+.mat-banner {
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: 18px;
+  padding: 14px 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px -16px rgba(34, 211, 238, 0.4);
+  opacity: 1;
+  transition: opacity 480ms ease, transform 480ms ease;
+}
+.mat-banner.dismissing { opacity: 0; transform: translateY(-4px); }
+
+/* ─── Reflection thinking list dot glow ───────── */
+[data-theme="dark"] .thinking-list .marker {
+  background: var(--ink-ghost);
+  box-shadow: none;
+  transition: background 320ms ease, box-shadow 320ms ease;
+}
+[data-theme="dark"] .thinking-list li.active .marker {
+  background: var(--wave-glow);
+  box-shadow: 0 0 0 4px rgba(92, 225, 214, 0.18), 0 0 12px var(--wave-glow);
+}
+[data-theme="dark"] .thinking-list li.done .marker {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+[data-theme="dark"] .thinking-list li.active span:last-child {
+  color: var(--wave-crest);
+}
+[data-theme="dark"] .thinking-list li span:last-child {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--ink-soft);
+}
+[data-theme="dark"] .thinking-list li:not(.done):not(.active) span:last-child {
+  color: var(--ink-mute);
+}
+
+/* ─── Lock-screen reskin for dark oceanic ───── */
+[data-theme="dark"] .lock {
+  background: transparent;
+  /* The shared canvas already renders the deep-water bg + wave. */
+}
+[data-theme="dark"] .lock-notif {
+  background: color-mix(in oklab, var(--bg-mid) 70%, transparent);
+  border: 1px solid var(--ink-ghost);
+  color: var(--ink);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+[data-theme="dark"] .lock-time,
+[data-theme="dark"] .lock-date {
+  color: var(--ink);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Topbar / Crumb tuning ─────────────────── */
+[data-theme="dark"] .topbar { padding-top: 8px; }
+[data-theme="dark"] .back-link { color: var(--ink-mute); }
+[data-theme="dark"] .back-link:hover { color: var(--wave-glow); }
+
+/* ─── Home tap-anywhere zone & crisis line ──── */
+.tap-zone {
+  position: absolute; inset: 0; z-index: 1;
+  cursor: pointer; touch-action: manipulation;
+  background: transparent; border: 0;
+}
+.tap-hint {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+  animation: tap-pulse 2.4s ease-in-out infinite;
+}
+@keyframes tap-pulse {
+  0%, 100% { opacity: 0.32; }
+  50%      { opacity: 0.85; }
+}
+.crisis-line {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  text-align: center;
+}
+
+/* ─── Top-bar nav links (Home → Dashboard / History) ────
+   Quiet ghost-style links pinned to the right of the home topbar.
+   They sit ABOVE the tap-zone (z-index 2) so the click registers on
+   the link rather than starting a session. */
+.nav-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+  position: relative;
+  z-index: 2;
+}
+.nav-link:hover {
+  color: var(--wave-crest);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+/* ─── Web frame in dark mode ───────────────────
+   We want the browser chrome to feel like a transparent / blurred
+   shell over the wave, not a flat dark surface. */
+[data-theme="dark"] .web-shell { background: transparent; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04); }
+[data-theme="dark"] .web-chrome-bar { background: #0a1726; }
+[data-theme="dark"] .web-chrome-toolbar { background: #07121d; border-color: rgba(232, 243, 252, 0.06); }
+[data-theme="dark"] .web-chrome-tab.active { background: #02060d; color: var(--ink); }
+[data-theme="dark"] .web-viewport { background: #02060d; }
+
+/* ─── Hide the score-tester chips (gone) and old per-screen wave
+       containers (now superseded by the shared canvas) ─────── */
+.score-tester { display: none; }
+[data-theme="dark"] .home-bg,
+[data-theme="dark"] .web-wave-bg { display: none; }
+
+/* Suppress the per-screen wave widget in dark mode (the shared canvas
+   is now the wave). Keep light mode untouched for fallback. */
+[data-theme="dark"] .wave-shell { display: none; }
+
+/* ─── In-product theme toggle ─────────────────────
+   Small round button pinned to the top-right of the active frame.
+   Sits above the wave/content so it stays visible regardless of which
+   screen is rendered. Lock screen hides it. */
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+  background: color-mix(in oklab, var(--accent-soft) 85%, var(--surface));
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  box-shadow:
+    0 1px 2px rgba(11, 31, 51, 0.08),
+    0 12px 28px -14px rgba(11, 31, 51, 0.32);
+  padding: 0;
+}
+.theme-toggle:hover {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  transform: translateY(-1px);
+}
+.theme-toggle:active { transform: translateY(0); }
+.theme-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* Dark frame variant — used when the active frame is on a dark
+   surface (theme=dark, or lock screen). Boosts contrast so the pill
+   reads against deep navy. */
+.theme-toggle[data-dark="1"] {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  color: var(--accent);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    0 12px 28px -14px rgba(0, 0, 0, 0.7);
+}
+.theme-toggle[data-dark="1"]:hover {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  color: #ffffff;
+  border-color: color-mix(in oklab, var(--accent) 70%, transparent);
+}

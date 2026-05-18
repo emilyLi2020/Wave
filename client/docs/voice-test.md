@@ -7,10 +7,14 @@
 
 ## Scope
 
-The voice-test page is a functionality test surface, not the production
+The voice-test page is a developer functionality probe, not the production
 session. It lives under `/models/voice-test` (with the rest of the
 browser-runtime model probes) and starts with a mocked WAVE check-in scenario
-so the team can test realistic voice behavior without changing `/session`.
+so the team can test realistic voice behavior in isolation. The patient
+`/session` check-in now runs the **same** hands-free voice loop (extracted
+into the shared `client/lib/voice/use-check-in-voice-loop.ts` hook,
+including barge-in) against the real session context — the two surfaces
+share the engine; this page just adds dev-only controls/metrics on top.
 
 The mocked check-in context lives in
 [`client/lib/gemma/voice-test.ts`](../lib/gemma/voice-test.ts) and is
@@ -41,10 +45,12 @@ from `client/` to refresh:
 ## LLM: wllama (GGUF), not ONNX
 
 The voice-test page runs the WAVE fine-tune through `@wllama/wllama` rather
-than `transformers.js` + onnxruntime-web. The clinical session flow still uses
-ONNX Gemma via [`client/lib/gemma/local-runtime.ts`](../lib/gemma/local-runtime.ts);
-they are intentionally on different engines so the test page can validate the
-wllama path independently.
+than `transformers.js` + onnxruntime-web. The clinical `/session` check-in
+runs the **same** wllama path: `lib/gemma/checkin.ts` →
+[`generateWllamaCheckIn`](../lib/gemma/wllama-generators.ts) → the shared
+`lib/wllama/wave-instance.ts` singleton. Both surfaces therefore warm and
+reuse one model load; the older `lib/gemma/local-runtime.ts` ONNX path is no
+longer on the session check-in flow.
 
 Load + generate surface in [`client/lib/gemma/voice-test.ts`](../lib/gemma/voice-test.ts):
 

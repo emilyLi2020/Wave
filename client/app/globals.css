@@ -129,3 +129,103 @@ body {
 @utility animate-relax-pulse {
   animation: wave-relax-pulse 4.2s ease-in-out infinite;
 }
+
+/* ════════════════════════════════════════════════════════════
+   WAVE — bioluminescent oceanic re-skin (client demo)
+
+   Ported from the Claude Design handoff. SCOPED to [data-wave-skin]
+   so the dev-only /training/* and /models/* surfaces (and the
+   self-contained /demo prototype) keep the original light look.
+
+   Because every patient page styles itself with the semantic
+   tokens below (--surface, --foreground, --accent, …), redefining
+   those tokens inside [data-wave-skin] re-skins the whole flow
+   without touching any page markup or business logic. The Tailwind
+   @theme map already points --color-* at these vars.
+   ════════════════════════════════════════════════════════════ */
+
+[data-wave-skin] {
+  /* deep-water base + bioluminescent palette */
+  --background: #02060d;
+  --foreground: #f3faff;
+  --surface: rgba(8, 22, 38, 0.62);
+  --surface-muted: rgba(7, 24, 42, 0.45);
+  --border: rgba(232, 243, 252, 0.14);
+
+  --accent: #22d3ee;
+  --accent-foreground: #02060d;
+  --accent-soft: rgba(34, 211, 238, 0.14);
+
+  --wave-rise: #5ce1d6;
+  --wave-peak: #22d3ee;
+  --wave-fall: #b8fff2;
+
+  --warn: #f0c987;
+  --warn-soft: rgba(240, 201, 135, 0.16);
+  --danger: #ef9a9a;
+  --danger-soft: rgba(239, 154, 154, 0.16);
+
+  background: #02060d;
+  color-scheme: dark;
+}
+
+/* The fixed canvas paints the water; everything above it is
+   transparent so it shows through. */
+[data-wave-skin] header,
+[data-wave-skin] footer,
+[data-wave-skin] main {
+  background: transparent;
+}
+
+/* ─── Emotional / headline copy → Instrument Serif ──────────
+   The design uses an italic serif for every hero + section head. */
+[data-wave-skin] :is(h1, h2),
+[data-wave-skin] .serif-display {
+  font-family: var(--font-instrument-serif), "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Glass card surfaces ───────────────────────────────────
+   Every card in the flow is `bg-surface` / `bg-surface-muted`.
+   These stable Tailwind utility classes are the hook: glassify
+   them app-wide so the wave is visible through each panel. */
+[data-wave-skin] .bg-surface,
+[data-wave-skin] .bg-surface-muted {
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 243, 252, 0.05),
+    0 24px 50px -32px rgba(0, 0, 0, 0.65);
+}
+
+/* Accent fills (CTAs, dots) get a soft bioluminescent halo. */
+[data-wave-skin] .bg-accent {
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.22),
+    0 14px 34px -14px rgba(34, 211, 238, 0.55);
+}
+
+/* Inputs read as etched glass, not painted boxes. */
+[data-wave-skin] input,
+[data-wave-skin] textarea,
+[data-wave-skin] select {
+  background: rgba(7, 24, 42, 0.5);
+  color: var(--foreground);
+}
+[data-wave-skin] input::placeholder,
+[data-wave-skin] textarea::placeholder {
+  color: rgba(243, 250, 255, 0.4);
+}
+
+/* Calm entrance for the main content column. */
+[data-wave-skin] main > * {
+  animation: wave-fade-in-up 420ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-wave-skin] main > * {
+    animation: none;
+  }
+}

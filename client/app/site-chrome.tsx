@@ -18,6 +18,7 @@ const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/history", label: "History" },
   { href: "/insights", label: "Insights" },
+  { href: "/demo", label: "Demo" },
   { href: "/model-results", label: "Model Results" },
 ];
 

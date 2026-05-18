@@ -108,6 +108,13 @@ export interface UseCheckInVoiceLoopOptions {
   opener: string;
   onTurnComplete: (event: VoiceCheckInTurnEvent) => void;
   onError?: (err: Error) => void;
+  /**
+   * Keep the mic live in interruption mode while the assistant speaks
+   * so the patient can barge in over it (the validated
+   * /models/voice-test behavior). When `false`, falls back to strict
+   * turn-taking (VAD paused during agent speech). Default `true`.
+   */
+  enableBargeIn?: boolean;
 }
 
 export interface UseCheckInVoiceLoopReturn {
@@ -343,9 +350,17 @@ export function useCheckInVoiceLoop(
       replaceLastAssistantTranscript(finalText);
 
       setLoopStatus("speaking");
-      // Pause VAD during agent speech (barge-in re-arms it via the
-      // listener's interruption mode if the user starts talking again).
-      vadListenerRef.current?.pause();
+      // Keep the mic live in interruption mode while the assistant
+      // speaks so the patient can barge in over it — the same
+      // hands-free behavior validated on /models/voice-test. Kokoro's
+      // own output is suppressed per-chunk via markAudioOutput() (see
+      // handleTtsPlaybackEvent) so it won't self-trigger. With barge-in
+      // disabled, fall back to strict turn-taking by pausing the VAD.
+      if (optionsRef.current.enableBargeIn === false) {
+        vadListenerRef.current?.pause();
+      } else {
+        vadListenerRef.current?.resume("interruption");
+      }
 
       const ttsResult = await ttsPromise;
       if (ttsResult.firstAudioMs === null) {

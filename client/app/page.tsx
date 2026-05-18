@@ -36,51 +36,50 @@ const features = [
 export default function LandingPage() {
   return (
     <div>
+      {/* Home screen — matched to the Claude Design handoff "Home"
+          screen. Atmosphere is the shared bioluminescent <WaveCanvas/>
+          mounted by WaveSkin at the layout level (no per-page SVG). */}
       <section className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 -z-10 bg-gradient-to-b from-accent-soft/40 via-background to-background"
-        />
-        <HomeWaveBackground />
-        <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl flex-col items-center justify-center px-6 py-20 text-center sm:py-28">
-          <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-foreground/70">
+        <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center sm:py-28">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground/70">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Marlatt&apos;s MBRP protocol, personalized in real time
-          </p>
-          <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight sm:text-6xl">
-            When a craving hits, start here.
+            On-device
+          </span>
+
+          <h1 className="mt-10 max-w-[14ch] text-5xl font-light italic leading-[1.02] tracking-tight sm:text-7xl">
+            Something&apos;s rising. Let&apos;s watch it.
           </h1>
-          <p className="mt-4 max-w-2xl text-lg text-foreground/70">
-            One clear path into an urge-surfing session. No account, no setup,
-            no typing required to begin.
+          <p className="mt-6 max-w-[42ch] text-lg leading-relaxed text-foreground/70">
+            A wave you don&apos;t have to fight. Just watch it crest and pass.
           </p>
-          <div className="mt-10 flex w-full max-w-2xl flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+
+          <div className="mt-12 flex w-full max-w-md flex-col items-center gap-4">
             <Link
               href="/session"
-              className="inline-flex min-h-24 flex-1 items-center justify-center gap-3 rounded-[2rem] bg-accent px-8 py-7 text-center text-2xl font-semibold tracking-tight text-accent-foreground shadow-lg shadow-accent/20 transition hover:-translate-y-0.5 hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-accent/20 sm:text-3xl"
+              className="group inline-flex w-full items-center justify-center gap-3 rounded-full bg-accent px-8 py-5 text-lg font-medium tracking-tight text-accent-foreground transition hover:-translate-y-0.5 hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-accent/25"
             >
-              Start Session
-              <span aria-hidden>→</span>
+              Begin
+              <span aria-hidden className="transition group-hover:translate-x-0.5">
+                →
+              </span>
             </Link>
             <Link
               href="/onboarding"
-              className="inline-flex items-center justify-center rounded-full border border-border bg-surface/90 px-5 py-3 text-sm font-medium text-foreground/75 shadow-sm backdrop-blur transition hover:border-accent hover:text-accent focus:outline-none focus:ring-4 focus:ring-accent/10 sm:self-end"
+              className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition hover:text-accent"
             >
-              First time? Build profile
+              First time? Build your profile
             </Link>
           </div>
-          <p className="mt-8 max-w-2xl text-lg text-foreground/70">
-            WAVE is an offline-first, medication-aware urge surfing companion
-            for SUD recovery. It learns your personal high-risk windows,
-            notifies you before the next craving peaks, and guides you through
-            evidence-based sessions tuned to what&apos;s actually happening in
-            your body, including whether your medication is working right now.
+
+          <p
+            className="mt-14 font-mono text-[10px] uppercase tracking-[0.18em] text-foreground/45 animate-shimmer"
+            aria-hidden
+          >
+            Tap Begin when you&apos;re ready
           </p>
-          <p className="mt-6 text-xs text-foreground/50 max-w-2xl">
-            If you are in crisis, call or text 988 (Suicide &amp; Crisis
-            Lifeline) or call SAMHSA&apos;s National Helpline at
-            1-800-662-HELP. WAVE is a support tool, not a substitute for a
-            counselor, prescriber, or crisis line.
+
+          <p className="mt-5 max-w-[52ch] font-mono text-[10px] uppercase tracking-[0.18em] text-foreground/55">
+            In crisis? Call or text 988 · SAMHSA 1-800-662-HELP
           </p>
         </div>
       </section>
@@ -161,76 +160,5 @@ export default function LandingPage() {
         </div>
       </section>
     </div>
-  );
-}
-
-function HomeWaveBackground() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-      <div className="absolute inset-x-[-20%] top-0 h-[34rem] opacity-70 blur-3xl">
-        <div className="h-full rounded-full bg-gradient-to-r from-wave-fall/40 via-accent-soft to-wave-rise/40" />
-      </div>
-      <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-wave-peak/30 via-wave-rise/14 to-transparent" />
-      <OceanLayer
-        className="absolute left-1/2 bottom-[-2rem] w-[1800px] -translate-x-1/2 text-wave-peak opacity-35"
-        durationSec={36}
-        heightClassName="h-72"
-      />
-      <OceanLayer
-        className="absolute left-1/2 bottom-12 w-[1600px] -translate-x-1/2 text-wave-rise opacity-25"
-        durationSec={28}
-        heightClassName="h-60"
-      />
-      <OceanLayer
-        className="absolute left-1/2 bottom-28 w-[1400px] -translate-x-1/2 text-wave-fall opacity-20 blur-[1px]"
-        durationSec={44}
-        heightClassName="h-48"
-      />
-    </div>
-  );
-}
-
-function OceanLayer({
-  className,
-  durationSec,
-  heightClassName,
-}: {
-  className: string;
-  durationSec: number;
-  heightClassName: string;
-}) {
-  return (
-    <div className={`${className} overflow-hidden`}>
-      <div
-        className="flex"
-        style={{
-          width: "200%",
-          animation: `wave-slide ${durationSec}s linear infinite`,
-        }}
-      >
-        <OceanSvg heightClassName={heightClassName} />
-        <OceanSvg heightClassName={heightClassName} />
-      </div>
-    </div>
-  );
-}
-
-function OceanSvg({ heightClassName }: { heightClassName: string }) {
-  return (
-    <svg
-      className={`${heightClassName} w-1/2 flex-none`}
-      viewBox="0 0 900 260"
-      preserveAspectRatio="none"
-    >
-      <path
-        d="M0 96 C75 28 150 28 225 96 C300 164 375 164 450 96 C525 28 600 28 675 96 C750 164 825 164 900 96 V260 H0 Z"
-        fill="currentColor"
-      />
-      <path
-        d="M0 128 C75 72 150 72 225 128 C300 184 375 184 450 128 C525 72 600 72 675 128 C750 184 825 184 900 128 V260 H0 Z"
-        fill="currentColor"
-        opacity="0.45"
-      />
-    </svg>
   );
 }
