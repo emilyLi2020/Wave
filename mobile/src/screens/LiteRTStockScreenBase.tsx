@@ -316,7 +316,6 @@ export default function LiteRTStockScreenBase({
           .join("\n");
         const combined = `${systemJson}\n\n${transcript}\n\nWAVE:`;
         llm.resetConversation();
-        // eslint-disable-next-line no-await-in-loop
         const raw = await llm.sendMessage(combined);
         const { reply, tool } = extractToolCall(raw);
         last = reply;
