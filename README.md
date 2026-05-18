@@ -91,6 +91,7 @@ Open [http://localhost:3000](http://localhost:3000). Navigate between **Home**, 
 - **`docs/models.md`** — per-model reference: the Gemma 4 base, every LoRA adapter, what each is fine-tuned for, where it is used, and its input/output contract.
 - **`docs/model-training.md`** — how we produce every LoRA: data collection, synthetic-data pipeline, clinician spot-check, train/test split, QLoRA recipe, eval harness, ship gates.
 - **`docs/postmortems/tool-call-finetune.md`** — the v1–v6 native-tool-call mode-collapse postmortem and the constrained-decoding mitigation that shipped.
+- **`docs/skills.md`** — project agent skills, including the impartial issue/plan observer workflow.
 - **`client/docs/voice-test.md`** — developer-only voice stack reference for `/models/voice-test`: Whisper STT, wllama Gemma streaming, Kokoro TTS, hands-free VAD, interruption detection.
 - **`client/.cursor/rules/frontend-guardrails.mdc`** — frontend guardrails scoped to `client/`.
 
