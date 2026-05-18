@@ -1,22 +1,14 @@
-// Reflection — post-session card. Still a skeleton ahead of the
-// generateReflection() wiring (src/gemma/session.ts is ported; the bind
-// is not), so the summary copy is representative static text. Re-skinned
-// to the dark oceanic reflection. Navigation (done → dev menu, "/") is
-// unchanged.
+// Reflection — task ④ will call generateReflection(ReflectionContext)
+// for the structured card. For now this closes the loop with a real
+// summary computed from the reducer's captured scores, then dispatches
+// sessionFinished and returns Home.
 
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
-import {
-  Chip,
-  Display,
-  Eyebrow,
-  TopBar,
-  WaveButton,
-  WaveCard,
-  WaveScreen,
-} from "@/components/wave-ui";
+import { Chip, Display, Eyebrow, TopBar, WaveButton, WaveCard, WaveScreen } from "@/components/wave-ui";
 import { WaveColors, WaveType } from "@/constants/wave-theme";
+import { useSession } from "@/session/session-context";
 
 const NEXT_STEPS = [
   "Glass of water · step outside for two minutes",
@@ -27,54 +19,52 @@ const NEXT_STEPS = [
 
 export default function ReflectionScreenRoute() {
   const router = useRouter();
-  const finish = () => router.replace("/");
+  const { state, dispatch, resetSession } = useSession();
+
+  const intake = state.intake?.intakeIntensity ?? null;
+  const scores = state.checkIns.map((c) => c.cravingScore);
+  const last = scores.length ? scores[scores.length - 1] : intake;
+  const drop = intake != null && last != null ? intake - last : 0;
+
+  let summary: string;
+  if (drop >= 2) summary = `Your craving fell ${drop} points across the session.`;
+  else if (drop === 1) summary = "It dropped one point — and you stayed with it.";
+  else if (drop === 0) summary = "You stayed for the whole wave. That counts.";
+  else summary = "The wave is still here. You met it.";
+
+  function finish(choice?: string) {
+    if (choice) dispatch({ type: "nextStepPicked", choice });
+    dispatch({ type: "sessionFinished" });
+    resetSession();
+    router.replace("/");
+  }
 
   return (
-    <WaveScreen intensity={4}>
+    <WaveScreen intensity={last ?? 4}>
       <TopBar crumb="Closing · reflection" />
 
-      <View style={styles.summaryBlock}>
-        <Eyebrow accent>Your reflection</Eyebrow>
-        <Display size="lg">
-          Your craving fell{" "}
-          <Text style={styles.hl}>3 points</Text>
-          {"\n"}across the session.
-        </Display>
-      </View>
-
-      <Text style={styles.insight}>
-        When you noticed it in your chest, you stopped fighting it — that&apos;s
-        when it started moving.
-      </Text>
+      <Eyebrow accent>Your reflection</Eyebrow>
+      <Display size="lg">{summary}</Display>
 
       <WaveCard style={styles.arcCard}>
         <Eyebrow>Intake → end</Eyebrow>
-        <Text style={styles.arc}>7 · 7 · 6 · 5 · 4 · 4</Text>
+        <Text style={styles.arc}>
+          {[intake, ...scores].filter((n) => n != null).join(" · ") || "—"}
+        </Text>
       </WaveCard>
 
-      <Eyebrow style={styles.stepsLabel}>Next 10 minutes · pick one</Eyebrow>
-      <View style={styles.steps}>
-        {NEXT_STEPS.map((s) => (
-          <Chip key={s} label={s} onPress={finish} />
-        ))}
-      </View>
+      <Eyebrow style={styles.lbl}>Next 10 minutes · pick one</Eyebrow>
+      {NEXT_STEPS.map((s) => (
+        <Chip key={s} label={s} onPress={() => finish(s)} />
+      ))}
 
-      <WaveButton label="done" variant="quiet" onPress={finish} style={styles.done} />
+      <WaveButton label="done" variant="quiet" onPress={() => finish()} style={styles.done} />
     </WaveScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  summaryBlock: { gap: 10, marginTop: 8 },
-  hl: { color: WaveColors.waveCrest },
-  insight: {
-    fontFamily: WaveType.serif,
-    fontStyle: "italic",
-    fontSize: 14,
-    lineHeight: 22,
-    color: WaveColors.inkMute,
-  },
-  arcCard: { gap: 8 },
+  arcCard: { gap: 8, marginTop: 6 },
   arc: {
     fontFamily: WaveType.serif,
     fontStyle: "italic",
@@ -82,7 +72,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: WaveColors.waveCrest,
   },
-  stepsLabel: { marginTop: 6 },
-  steps: { gap: 6 },
+  lbl: { marginTop: 8 },
   done: { alignSelf: "center", marginTop: 18 },
 });

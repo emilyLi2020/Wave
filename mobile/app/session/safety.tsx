@@ -1,27 +1,32 @@
-// Safety — rule-based gate before any model call. Still a skeleton: the
-// usedSubstanceToday flag is not yet threaded into the reducer, so every
-// answer advances to /session/chunk exactly as the previous skeleton did.
-// Re-skinned to the dark oceanic "have you used today" screen.
+// Safety — rule-based gate. Dispatches safetyResolved into the reducer
+// (proceed → phase loadingChunk; handoff → safetyHandoff) then routes
+// into the chunk player. Q1 "no" → not used today; any "yes" → used
+// today (still proceeds). The crisis card is the handoff affordance.
 
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
-import {
-  Chip,
-  Display,
-  Eyebrow,
-  Lede,
-  TopBar,
-  WaveCard,
-  WaveScreen,
-} from "@/components/wave-ui";
+import { Chip, Display, Eyebrow, Lede, TopBar, WaveCard, WaveScreen } from "@/components/wave-ui";
 import { WaveColors, WaveType } from "@/constants/wave-theme";
+import { useSession } from "@/session/session-context";
 
-const ANSWERS = ["No, not today", "Yes, earlier today", "Yes, within the last hour"];
+const ANSWERS: { label: string; used: boolean }[] = [
+  { label: "No, not today", used: false },
+  { label: "Yes, earlier today", used: true },
+  { label: "Yes, within the last hour", used: true },
+];
 
 export default function SafetyScreenRoute() {
   const router = useRouter();
-  const proceed = () => router.push("/session/chunk");
+  const { dispatch } = useSession();
+
+  function resolve(usedSubstanceToday: boolean) {
+    dispatch({
+      type: "safetyResolved",
+      outcome: { kind: "proceed", usedSubstanceToday },
+    });
+    router.push("/session/chunk");
+  }
 
   return (
     <WaveScreen>
@@ -34,15 +39,13 @@ export default function SafetyScreenRoute() {
         answer and no judgment.
       </Lede>
 
-      <View style={styles.options}>
-        {ANSWERS.map((a) => (
-          <Chip key={a} label={a} onPress={proceed} />
-        ))}
-      </View>
+      {ANSWERS.map((a) => (
+        <Chip key={a.label} label={a.label} onPress={() => resolve(a.used)} />
+      ))}
 
       <WaveCard style={styles.shield}>
         <Eyebrow accent>If you&apos;re in crisis</Eyebrow>
-        <Text style={styles.shieldBody}>
+        <Text style={styles.body}>
           Call or text <Text style={styles.b}>988</Text> (Suicide &amp; Crisis
           Lifeline),{"\n"}or call SAMHSA at{" "}
           <Text style={styles.b}>1-800-662-HELP</Text>.{"\n"}WAVE is a support
@@ -54,13 +57,7 @@ export default function SafetyScreenRoute() {
 }
 
 const styles = StyleSheet.create({
-  options: { gap: 6, marginTop: 4 },
   shield: { marginTop: 16, gap: 8 },
-  shieldBody: {
-    color: WaveColors.inkSoft,
-    fontSize: 13,
-    lineHeight: 20,
-    fontFamily: WaveType.sans,
-  },
+  body: { color: WaveColors.inkSoft, fontSize: 13, lineHeight: 20, fontFamily: WaveType.sans },
   b: { color: WaveColors.waveCrest, fontWeight: "700" },
 });

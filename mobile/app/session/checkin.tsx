@@ -1,10 +1,10 @@
-// Check-in — production surface for the conversational voice loop
-// (src/voice/use-check-in-voice-loop.ts, not yet wired). Skeleton: it
-// shows the design's voice orb in its idle/listening pulse without the
-// real STT/LLM/TTS loop. Re-skinned to the dark oceanic check-in.
-// Navigation (Skip → /session/reflection) is unchanged.
+// Check-in — task ③ will replace the body with the real conversational
+// voice loop (VAD → Whisper → generateCheckIn → Kokoro). For now this is
+// a minimal interactive bridge so the reducer loop is fully traversable:
+// capture a craving score, dispatch checkInCompleted, and let the reducer
+// route to the next chunk or to reflection.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -15,108 +15,105 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import {
-  Display,
-  Pill,
-  TopBar,
-  WaveButton,
-  WaveCard,
-  WaveScreen,
-} from "@/components/wave-ui";
+import { Display, Pill, TopBar, WaveButton, WaveCard, WaveScreen } from "@/components/wave-ui";
 import { WaveColors, WaveType } from "@/constants/wave-theme";
+import { useSession } from "@/session/session-context";
+import type { CheckIn } from "@/types/session";
 
-function VoiceOrb() {
+function Orb() {
   const ring = useSharedValue(0);
-  const core = useSharedValue(0);
-
   useEffect(() => {
-    ring.value = withRepeat(
-      withTiming(1, { duration: 1600, easing: Easing.out(Easing.ease) }),
-      -1,
-    );
-    core.value = withRepeat(
-      withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    );
-  }, [ring, core]);
-
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.9 + ring.value * 1.6 }],
-    opacity: 0.9 - ring.value * 0.9,
+    ring.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.ease) }), -1);
+  }, [ring]);
+  const r = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.9 + ring.value * 1.5 }],
+    opacity: 0.85 - ring.value * 0.85,
   }));
-  const coreStyle = useAnimatedStyle(() => ({
-    opacity: 0.6 + core.value * 0.4,
-    transform: [{ scale: 1 + core.value * 0.12 }],
-  }));
-
   return (
     <View style={styles.orb}>
-      <Animated.View style={[styles.orbRing, ringStyle]} />
-      <Animated.View style={[styles.orbCore, coreStyle]} />
+      <Animated.View style={[styles.ring, r]} />
+      <View style={styles.core} />
     </View>
   );
 }
 
 export default function CheckInScreenRoute() {
   const router = useRouter();
+  const { state, dispatch } = useSession();
+  const chunkNo = state.currentChunk;
+  const [score, setScore] = useState<number | null>(null);
+
+  function complete() {
+    const now = Date.now();
+    const checkIn: CheckIn = {
+      chunkNumber: chunkNo,
+      cravingScore: score ?? state.intake?.intakeIntensity ?? 5,
+      turns: [],
+      obstacleCategory: null,
+      readyToContinue: chunkNo >= state.totalChunks ? null : true,
+      startedAt: now,
+      endedAt: now,
+    };
+    const goReflection = chunkNo >= state.totalChunks;
+    dispatch({ type: "checkInCompleted", checkIn });
+    router.replace(goReflection ? "/session/reflection" : "/session/chunk");
+  }
 
   return (
-    <WaveScreen intensity={7}>
+    <WaveScreen intensity={score ?? 7}>
       <TopBar
-        crumb="Check-in 1 of 5"
+        crumb={`Check-in ${chunkNo} of ${state.totalChunks}`}
         trailing={<Pill>Voice · on-device</Pill>}
       />
 
-      <Display size="lg" style={styles.centered}>
+      <Display size="lg" style={styles.center}>
         Where is it{"\n"}now?
       </Display>
 
       <WaveCard style={styles.voiceCard}>
-        <VoiceOrb />
-        <Text style={styles.state}>listening</Text>
+        <Orb />
+        <Text style={styles.state}>tap your number — voice loop next</Text>
       </WaveCard>
 
-      <View style={styles.readout}>
-        <Text style={styles.readoutNum}>
-          7<Text style={styles.readoutUnit}> /10</Text>
-        </Text>
-        <Text style={styles.readoutLbl}>strong</Text>
+      <View style={styles.scale}>
+        {Array.from({ length: 10 }).map((_, i) => {
+          const n = i + 1;
+          const on = score != null && n <= score;
+          return (
+            <Text
+              key={n}
+              onPress={() => setScore(n)}
+              style={[styles.tick, on && styles.tickOn]}
+            >
+              {n}
+            </Text>
+          );
+        })}
       </View>
 
-      <Text style={styles.empty}>
-        Whisper transcribes you, Kokoro replies in voice.{"\n"}Nothing leaves
-        the phone.
-      </Text>
-
       <WaveButton
-        label="Skip check-in →"
-        variant="ghost"
-        onPress={() => router.push("/session/reflection")}
-        style={styles.skip}
+        label={chunkNo >= state.totalChunks ? "to reflection →" : "next phase →"}
+        onPress={complete}
+        disabled={score == null}
+        style={styles.cta}
       />
     </WaveScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  centered: { textAlign: "center", marginTop: 8 },
-  voiceCard: { alignItems: "center", gap: 12, marginTop: 8, paddingVertical: 22 },
-  orb: {
-    width: 80,
-    height: 80,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  orbRing: {
+  center: { textAlign: "center", marginTop: 6 },
+  voiceCard: { alignItems: "center", gap: 12, marginTop: 8, paddingVertical: 24 },
+  orb: { width: 78, height: 78, alignItems: "center", justifyContent: "center" },
+  ring: {
     position: "absolute",
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 1,
     borderColor: WaveColors.waveGlow,
   },
-  orbCore: {
+  core: {
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -124,39 +121,32 @@ const styles = StyleSheet.create({
     shadowColor: WaveColors.waveGlow,
     shadowOpacity: 0.9,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
   },
   state: {
     fontFamily: WaveType.mono,
     fontSize: 9.5,
-    letterSpacing: 3,
+    letterSpacing: 2,
     textTransform: "uppercase",
     color: WaveColors.inkFaint,
   },
-  readout: { alignItems: "center", marginTop: 18, gap: 4 },
-  readoutNum: {
-    fontFamily: WaveType.serif,
-    fontStyle: "italic",
-    fontSize: 56,
-    lineHeight: 58,
-    letterSpacing: -1.5,
-    color: WaveColors.ink,
-  },
-  readoutUnit: { fontSize: 18, color: WaveColors.inkMute },
-  readoutLbl: {
-    fontFamily: WaveType.serif,
-    fontStyle: "italic",
-    fontSize: 15,
-    color: WaveColors.inkSoft,
-  },
-  empty: {
-    marginTop: 18,
+  scale: { flexDirection: "row", gap: 6, marginTop: 22, justifyContent: "center" },
+  tick: {
+    flex: 1,
     textAlign: "center",
-    fontFamily: WaveType.serif,
-    fontStyle: "italic",
-    fontSize: 14,
-    lineHeight: 21,
-    color: WaveColors.inkMute,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: WaveColors.border,
+    backgroundColor: WaveColors.surface,
+    color: WaveColors.inkFaint,
+    fontFamily: WaveType.mono,
+    fontSize: 11,
+    overflow: "hidden",
   },
-  skip: { alignSelf: "center", marginTop: 22 },
+  tickOn: {
+    borderColor: WaveColors.chipActiveBorder,
+    backgroundColor: WaveColors.chipActive,
+    color: WaveColors.waveCrest,
+  },
+  cta: { marginTop: 28 },
 });
