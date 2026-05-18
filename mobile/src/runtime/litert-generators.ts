@@ -28,6 +28,7 @@
 //     inside the `reply` string.
 
 import { createLLM } from "react-native-litert-lm";
+import { AbortError } from "@/runtime/abort-error";
 import type { LiteRTLMInstance } from "react-native-litert-lm";
 
 import { ensureModel, type ModelId } from "@/runtime/model-cache";
@@ -273,7 +274,7 @@ function streamOnce(
         }
         if (options.signal?.aborted) {
           resolved = true;
-          reject(new DOMException("Aborted", "AbortError"));
+          reject(new AbortError());
           return;
         }
         accumulated += token;
@@ -428,7 +429,7 @@ WAVE:`;
 // ────────────────────────────────────────────────────────────────────────
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  if (signal?.aborted) throw new AbortError();
 }
 
 export function extractFirstJsonObject(text: string): string {

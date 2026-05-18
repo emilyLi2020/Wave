@@ -17,6 +17,7 @@ import {
   type ChunkLinesPayload,
 } from "@/lib/prompts/schemas";
 import { generateWllamaChunk as generateGemmaChunk } from "@/runtime/litert-generators";
+import { isAbortError } from "@/runtime/abort-error";
 import { fallbackChunk } from "@/lib/prompts/fallback-bank";
 import type { Chunk, ChunkNumber, Segment } from "@/types/session";
 
@@ -93,7 +94,7 @@ export async function generateChunk(
         attempts,
       };
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
+      if (isAbortError(err)) {
         throw err;
       }
       lastError = err;

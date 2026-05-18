@@ -13,6 +13,7 @@
  */
 
 import { fallbackCheckInTurn } from "@/lib/prompts/fallback-bank";
+import { isAbortError } from "@/runtime/abort-error";
 import { generateWllamaCheckIn as generateGemmaCheckIn } from "@/runtime/litert-generators";
 import type { ChunkNumber, ObstacleCategory } from "@/types/session";
 import type { CheckInContextPayload } from "@/lib/prompts/schemas";
@@ -116,7 +117,7 @@ export async function streamCheckInTurn(
         endConversation: result.endConversation,
       };
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
+      if (isAbortError(err)) {
         throw err;
       }
       lastError = err;

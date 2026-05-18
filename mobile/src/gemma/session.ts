@@ -7,6 +7,7 @@
  */
 
 import { generateWllamaReflection as generateGemmaReflection } from "@/runtime/litert-generators";
+import { isAbortError } from "@/runtime/abort-error";
 import { fallbackReflection } from "@/lib/prompts/fallback-bank";
 import {
   reflectionPayloadSchema,
@@ -111,7 +112,7 @@ export async function generateReflection(
         attempts,
       };
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
+      if (isAbortError(err)) {
         throw err;
       }
       lastError = err;

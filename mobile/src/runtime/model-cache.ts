@@ -18,6 +18,7 @@
 // per expo-file-system's deprecation notes.
 
 import { Directory, File, Paths } from "expo-file-system";
+import { AbortError } from "@/runtime/abort-error";
 import { createDownloadResumable } from "expo-file-system/legacy";
 
 export type ModelId =
@@ -209,7 +210,7 @@ export async function ensureModel(
   const result = await dl.downloadAsync();
   if (aborted || opts?.signal?.aborted) {
     deleteFileIfExists(file);
-    throw new DOMException("Aborted", "AbortError");
+    throw new AbortError();
   }
   if (!result?.uri) {
     throw new Error(`download produced no uri for ${id}`);

@@ -63,34 +63,31 @@ export default function IntakeScreen() {
     else setStep(step - 1);
   }
 
-  function next() {
-    if (step === 0) {
-      if (intensity != null) setStep(1);
-      return;
-    }
-    if (step === 1) {
-      if (!matType) return;
-      setStep(noMat ? 3 : 2);
-      return;
-    }
-    if (step === 2) {
-      if (!dose) return;
-      setStep(3);
-      return;
-    }
-    if (step === 3) {
-      if (!trigger) return;
-      const answers: IntakeAnswers = {
-        intakeIntensity: value,
-        matType: matType as IntakeAnswers["matType"],
-        medicationStatus: noMat ? "none" : (dose as IntakeAnswers["medicationStatus"]),
-        trigger: trigger as IntakeAnswers["trigger"],
-        triggerOther: null,
-        demoMode,
-      };
-      dispatch({ type: "intakeSubmitted", answers });
-      router.push("/session/safety");
-    }
+  function submit(finalTrigger: IntakeAnswers["trigger"]) {
+    const answers: IntakeAnswers = {
+      intakeIntensity: value,
+      matType: matType as IntakeAnswers["matType"],
+      medicationStatus: matType === "none" ? "none" : (dose as IntakeAnswers["medicationStatus"]),
+      trigger: finalTrigger,
+      triggerOther: null,
+      demoMode,
+    };
+    dispatch({ type: "intakeSubmitted", answers });
+    router.push("/session/safety");
+  }
+
+  // Tap-to-advance: picking an answer moves to the next page directly.
+  function pickMat(v: IntakeAnswers["matType"]) {
+    setMatType(v);
+    setStep(v === "none" ? 3 : 2);
+  }
+  function pickDose(v: IntakeAnswers["medicationStatus"]) {
+    setDose(v);
+    setStep(3);
+  }
+  function pickTrigger(v: IntakeAnswers["trigger"]) {
+    setTrigger(v);
+    submit(v);
   }
 
   // ── Drag-the-wave (step 0) ──
@@ -103,12 +100,6 @@ export default function IntakeScreen() {
   const pan = Gesture.Pan()
     .onBegin((e) => runOnJS(applyDragY)(e.y))
     .onUpdate((e) => runOnJS(applyDragY)(e.y));
-
-  const stepDisabled =
-    (step === 0 && intensity == null) ||
-    (step === 1 && !matType) ||
-    (step === 2 && !dose) ||
-    (step === 3 && !trigger);
 
   return (
     <View style={styles.root}>
@@ -161,7 +152,7 @@ export default function IntakeScreen() {
 
           <WaveButton
             label="continue"
-            onPress={next}
+            onPress={() => setStep(1)}
             disabled={intensity == null}
             style={styles.cta}
           />
@@ -178,7 +169,7 @@ export default function IntakeScreen() {
                     key={o.value}
                     label={o.label}
                     selected={matType === o.value}
-                    onPress={() => setMatType(o.value)}
+                    onPress={() => pickMat(o.value)}
                   />
                 ))}
               </View>
@@ -195,7 +186,7 @@ export default function IntakeScreen() {
                     key={o.value}
                     label={o.label}
                     selected={dose === o.value}
-                    onPress={() => setDose(o.value)}
+                    onPress={() => pickDose(o.value)}
                   />
                 ))}
               </View>
@@ -212,20 +203,12 @@ export default function IntakeScreen() {
                     key={o.value}
                     label={o.label}
                     selected={trigger === o.value}
-                    onPress={() => setTrigger(o.value)}
+                    onPress={() => pickTrigger(o.value)}
                   />
                 ))}
               </View>
             </>
           ) : null}
-
-          <View style={styles.grow} />
-          <WaveButton
-            label={step === 3 ? "continue to session" : "continue"}
-            onPress={next}
-            disabled={stepDisabled}
-            style={styles.cta}
-          />
         </View>
       )}
     </View>
