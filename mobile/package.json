@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "postinstall": "patch-package",
-    "test": "node src/voice/conversation.test.ts && node src/voice/sentence-buffer.test.ts"
+    "test": "node src/voice/conversation.test.ts && node src/voice/sentence-buffer.test.ts && node src/runtime/json-extract.test.ts && node src/session/session-machine.test.ts"
   },
   "dependencies": {
     "@dr.pogodin/react-native-fs": "^2.38.2",
